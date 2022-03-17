@@ -16,16 +16,18 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(DBI)
 library(RPostgres)
+library(config)
 library(UpSetR)
 ```
 
 ```{r db_open}
+clin_config <- config::get("clinDB")
 britroc_con <- dbConnect(RPostgres::Postgres(),
-                         dbname='britroc1',
-                         host='jblab-db.cri.camres.org',
-                         port = 5432,
-                         user = 'phil',
-                         password = 'strength slum progeny upswing headache'
+                         dbname=clin_config$dbname,
+                         host=clin_config$host,
+                         port = clin_config$port,
+                         user = clin_config$user,
+                         password = clin_config$password
 )
 ```
 
