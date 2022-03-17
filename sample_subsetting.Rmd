@@ -1,0 +1,114 @@
+---
+title: "Sample subsetting"
+author: "Philip Smith"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libs}
+library(tidyverse)
+library(DBI)
+library(RPostgres)
+library(UpSetR)
+```
+
+```{r db_open}
+britroc_con <- dbConnect(RPostgres::Postgres(),
+                         dbname='britroc1',
+                         host='jblab-db.cri.camres.org',
+                         port = 5432,
+                         user = 'phil',
+                         password = 'strength slum progeny upswing headache'
+)
+```
+
+```{r sig_data}
+load("copy_number_signatures/britroc_30kb_signature_data.rds")
+```
+
+```{r arx}
+patient.meta$SAMPLE_ID[patient.meta$group == "arx"]
+arx <- as.character(patient.meta$SAMPLE_ID[patient.meta$group == "arx"])
+writeLines(arx,con = "sample_lists/arx.txt")
+```
+
+```{r rlps}
+patient.meta$SAMPLE_ID[patient.meta$group == "rlps"]
+rlps <- as.character(patient.meta$SAMPLE_ID[patient.meta$group == "rlps"])
+writeLines(rlps,con = "sample_lists/rlps.txt")
+```
+
+```{r paired_arx}
+patient.meta$SAMPLE_ID[patient.meta$paired == "TRUE" & patient.meta$group == "arx"]
+paired_arx <- as.character(patient.meta$SAMPLE_ID[patient.meta$paired == "TRUE" & patient.meta$group == "arx"])
+writeLines(paired_arx,con = "sample_lists/paired_arx.txt")
+```
+
+```{r paired_rlps}
+patient.meta$SAMPLE_ID[patient.meta$paired == "TRUE" & patient.meta$group == "rlps"]
+paired_rlps <- as.character(patient.meta$SAMPLE_ID[patient.meta$paired == "TRUE" & patient.meta$group == "rlps"])
+writeLines(paired_rlps,con = "sample_lists/paired_rlps.txt")
+```
+
+```{r db_list_tables}
+#RPostgres::dbListObjects(britroc_con)
+# Get table example
+pat.data <- RPostgres::dbReadTable(britroc_con, 'patients')
+pat.data$britroc_number <- paste0("BRITROC-",pat.data$britroc_number)
+pat.data <- pat.data[pat.data$britroc_number %in% patient.meta$PATIENT_ID,]
+```
+
+```{r pat_res_sens_filtering}
+resistant.patients <- pat.data$britroc_number[pat.data$pt_sensitivity_at_reg == "resistant"]
+sensitive.patients <- pat.data$britroc_number[pat.data$pt_sensitivity_at_reg == "sensitive"]
+
+resistant.samples <- as.character(patient.meta$SAMPLE_ID[patient.meta$PATIENT_ID %in% resistant.patients])
+sensitive.samples <- as.character(patient.meta$SAMPLE_ID[patient.meta$PATIENT_ID %in% sensitive.patients])
+```
+
+```{r resistant_patients}
+resistant.patients
+writeLines(resistant.patients,con = "patient_lists/resistant.txt")
+```
+
+```{r sensitive_patients}
+sensitive.patients
+writeLines(resistant.patients,con = "patient_lists/sensitive.txt")
+```
+
+```{r resistant_samples}
+resistant.samples
+table(gsub(pattern = "-[0-9]*$|_[0-9]*$",replacement = "",x = resistant.samples))
+writeLines(resistant.samples,con = "sample_lists/resistant.txt")
+```
+
+```{r sensitive_samples}
+sensitive.samples
+table(gsub(pattern = "-[0-9]*$|_[0-9]*$",replacement = "",x = sensitive.samples))
+writeLines(resistant.samples,con = "sample_lists/sensitive.txt")
+```
+
+```{r paired_resist}
+paired.resistant.samples <- as.character(patient.meta$SAMPLE_ID[patient.meta$SAMPLE_ID %in% resistant.samples & patient.meta$paired == TRUE])
+```
+
+```{r paired_sensitive}
+paired.sensitive.samples <- as.character(patient.meta$SAMPLE_ID[patient.meta$SAMPLE_ID %in% sensitive.samples & patient.meta$paired == TRUE])
+```
+
+```{r UpsetR}
+SampleLists <- list(Res=resistant.samples,
+                    Sens=sensitive.samples,
+                    Paired_rlps=paired_rlps,
+                    Paired_arx=paired_arx,
+                    Paired_res=paired.resistant.samples,
+                    Paired_sens=paired.sensitive.samples)
+upset(fromList(SampleLists), order.by = "freq")
+```

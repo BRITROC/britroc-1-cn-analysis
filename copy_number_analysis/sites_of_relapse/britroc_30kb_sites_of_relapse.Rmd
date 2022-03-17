@@ -1,0 +1,250 @@
+---
+title: "Analysis of absolute CNAs - BriTROC 30kb - focal"
+author: "Philip Smith"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+---
+
+## Initial steps
+
+### knitr options
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Load libraries
+
+```{r load_libraries}
+# Load libraries
+suppressPackageStartupMessages(suppressWarnings(library(tidyverse)))
+suppressPackageStartupMessages(suppressWarnings(library(kableExtra)))
+suppressPackageStartupMessages(suppressWarnings(library(RPostgres)))
+suppressPackageStartupMessages(suppressWarnings(library(Biobase)))
+suppressPackageStartupMessages(suppressWarnings(library(QDNAseqmod)))
+suppressPackageStartupMessages(suppressWarnings(library(cowplot)))
+suppressPackageStartupMessages(suppressWarnings(library(ggsignif)))
+```
+
+```{r funcs}
+source("../focal_analysis/data/focal_cna_analysis_funcs.R")
+
+get_cna_rates <- function(data=NULL,genes=NULL){
+  if(!is.null(genes)){
+    data <- data[rownames(data) %in% genes,]
+    genes <- unique(data$Gene)
+  } else {
+    genes <- unique(data$Gene)
+  }
+  amp_rate <- count_amp_focal(data = data)
+  del_rate <- count_del_focal(data = data)
+  cna_rate_table <- rbind(data.frame(gene=names(amp_rate),rate=amp_rate,group=rep("amplification",times=length(amp_rate)),row.names = NULL),
+                          data.frame(gene=names(del_rate),rate=del_rate,group=rep("deletion",times=length(del_rate)),row.names = NULL))
+  return(cna_rate_table)
+}
+
+get_cna_changes <- function(data=NULL,genes=NULL,patients=NULL){
+  #data <- rownames_to_column(data,var = "Gene")
+  if(!is.null(genes)){
+    data <- data[rownames(data) %in% genes,]
+    genes <- unique(rownames(data))
+  } else {
+    genes <- unique(rownames(data))
+  }
+  amp_changes <- as.data.frame(t(data[rownames(data) %in% genes,]))
+  amp_changes <- rownames_to_column(amp_changes,var = "SAMPLE_ID") %>%
+    mutate(PATIENT_ID=meta.data$PATIENT_ID[match(SAMPLE_ID,meta.data$SAMPLE_ID)]) %>%
+    mutate(group=meta.data$group[match(SAMPLE_ID,meta.data$SAMPLE_ID)]) %>%
+    relocate(PATIENT_ID,SAMPLE_ID,group) %>%
+    pivot_longer(names_to = "gene",cols = 4:ncol(.))
+  amp_changes <- amp_changes[amp_changes$PATIENT_ID %in% patients,]
+  return(amp_changes)
+}
+
+```
+
+```{r read_meta}
+meta.data <- read.table("../../copy_number_signatures/britroc_30kb_signature_data_meta.tsv",header = TRUE,sep = "\t")
+patient_data <- read.table("../../britroc_cohort_patient_data.tsv",header = T,sep = "\t")
+tissue_data <- read.table("data/Biopsies_relapse_curated.csv",header = T,sep = ",",na.strings = "")
+focal_genes_table <- read.table("../focal_analysis/data/focal_CNA_pseudo_bed.txt",header = T,sep = "\t")
+ith_table <- read.table("../heterogeneity/data/ith_results_table.tsv",header = T,sep = "\t")
+```
+
+```{r format_tissue_table}
+tissue_data <- tissue_data %>%
+                dplyr::select(BritRoc.No,JBLAB_ID,relapse_location_curated,relapse_tissue_grouped) %>%
+                rename(PATIENT_ID = "BritRoc.No",
+                       SAMPLE_ID = "JBLAB_ID") %>%
+                mutate(PATIENT_ID = paste0("BRITROC-",PATIENT_ID))
+
+head(tissue_data)
+```
+
+```{r add_tissue_metadata}
+meta.data <- left_join(x = meta.data,
+                       y = tissue_data,
+                       by = c("PATIENT_ID","SAMPLE_ID"))
+```
+
+```{r summarise_tissues}
+table(meta.data$relapse_location_curated[meta.data$group == "rlps"],useNA="ifany")
+ggplot(as.data.frame(table(meta.data$relapse_location_curated[meta.data$group == "rlps"],useNA="ifany"))) +
+  geom_col(aes(Var1,Freq)) +
+  xlab("") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90,vjust = 0.5))
+
+table(meta.data$relapse_tissue_grouped[meta.data$group == "rlps"],useNA="ifany")
+ggplot(as.data.frame(table(meta.data$relapse_tissue_grouped[meta.data$group == "rlps"],useNA="ifany"))) +
+  geom_col(aes(Var1,Freq)) +
+  xlab("") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90,vjust = 0.5))
+```
+
+### Read copy number data
+
+```{r cn_data}
+abs_data <- readRDS("../../absolute_POST_down_sampling/britroc_30kb_ds_absCopyNumber.rds")
+abs_data <- abs_data[,which(colnames(abs_data) %in% meta.data$SAMPLE_ID[meta.data$use == "TRUE"])]
+```
+
+```{r set_ploidy}
+ploidys <- pData(abs_data)$ploidy
+names(ploidys) <- pData(abs_data)$name
+```
+
+```{R cna_calling}
+cna_data <- readRDS("../focal_analysis/data/extracted_output.RDS")
+cna_calls <- get_cna_calls(data = cna_data)
+```
+
+```{r group_samples}
+relapse_tissue_samples <- split(meta.data$SAMPLE_ID,f = meta.data$relapse_tissue_grouped,drop = T)
+relapse_tissue_samples
+```
+
+## Analysis
+### CNA rates
+
+```{r get_rates}
+diag_rates <- get_cna_rates(data = cna_calls[,colnames(cna_calls) %in% meta.data$SAMPLE_ID[meta.data$group == "arx"]],
+                            genes = focal_genes_table$Gene.name)
+diag_rates$tissue <- rep("diagnosis",nrow(diag_rates))
+
+cna_rates_tissue <- do.call(rbind,lapply(X = names(relapse_tissue_samples),FUN = function(x){
+  rates <- get_cna_rates(data = cna_calls[,colnames(cna_calls) %in% relapse_tissue_samples[[x]]],
+                            genes = focal_genes_table$Gene.name)
+  rates$tissue <- rep(x,times=nrow(rates))
+  return(rates)
+}))
+
+cna_combined_tissue_rates <- rbind(diag_rates,cna_rates_tissue)
+
+focal_rate_plot <- ggplot(cna_combined_tissue_rates) +
+  geom_col(aes(x = gene,y = rate,fill = tissue),position="dodge",color="grey20") +
+  #scale_fill_manual(values = colour_palettes$amplification_deletion) +
+  labs(title = "") +
+  xlab("") +
+  ylab("rate (%)") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+          axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90),
+        legend.position = "bottom") +
+  facet_wrap(. ~ group)
+
+saveRDS(focal_rate_plot,file = "plots/cna_rates_tissue.RDS")
+ggsave(plot = focal_rate_plot,filename = "plots/cna_rates_tissue.png",width = 12,height = 8,units = "in",dpi = 300)
+focal_rate_plot
+```
+
+
+```{r cna_rates_fisher}
+test_CNA_rates <- do.call(rbind,lapply(X = names(relapse_tissue_samples),FUN = function(x){
+  table_group <- as.data.frame(do.call(rbind,fishers_gene_CNA(data = cna_calls,
+                            sub_a = meta.data$SAMPLE_ID[meta.data$group == "arx"],
+                            sub_b = relapse_tissue_samples[[x]],
+                            genes = focal_genes_table$Gene.name)))
+  table_group$tissue <- rep(x,nrow(table_group))
+  return(table_group)
+  }))
+
+test_CNA_rates[order(test_CNA_rates$p.value),]
+```
+
+### CNA counts
+
+```{r cna_count}
+cna_copies <- get_cna_changes(data = cna_data,genes = focal_genes_table$Gene.name,patients = meta.data$PATIENT_ID) %>%
+                mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse")) %>%
+                mutate(tissue = meta.data$relapse_tissue_grouped[match(SAMPLE_ID,meta.data$SAMPLE_ID)]) %>%
+                filter(!is.na(tissue) | grepl("IM",SAMPLE_ID)) %>%
+                mutate(tissue = ifelse(is.na(tissue),"diagnosis",as.character(tissue)))
+```
+
+```{r plot_cna_count}
+cna_count_plot <- ggplot(cna_copies) +
+  #geom_point(aes(x = gene,y=value,fill=group),position="jitter",alpha = 0.3) +
+  geom_point(aes(x = tissue,y=value,color=tissue),
+             position=position_jitterdodge(jitter.width = 0.2),
+             alpha=0.2) +
+  geom_boxplot(aes(x = tissue,y=value,fill=tissue),outlier.shape = NA) +
+  ylab("copy number") +
+  xlab("") +
+  #scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  #scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+  facet_wrap(. ~ gene,scales = "free") +
+  # ggsignif::geom_signif(aes(x = group,y=value),vjust = 1.2,
+  #                       comparisons = list(c("diagnosis","relapse")),
+  #                       test = "wilcox.test") +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+saveRDS(cna_count_plot,file = "plots/cna_count_tissue.RDS")
+ggsave(plot = cna_count_plot,filename = "plots/cna_count_tissue.png",width = 12,height = 8,units = "in",dpi = 300)
+cna_count_plot
+```
+
+```{r cna_count_test}
+cna_count_test <- do.call(rbind,lapply(X = names(relapse_tissue_samples),FUN = function(x){
+  cna_count_table <- cna_median_copies(data = cna_data,min_obs = 3,genes = focal_genes_table$Gene.name,
+                         sub_a = meta.data$SAMPLE_ID[meta.data$group == "arx"],
+                         sub_b = relapse_tissue_samples[[x]],p.adj = "fdr")
+  cna_count_table$tissue <- rep(x,times = nrow(cna_count_table))
+  return(cna_count_table)
+  }))
+cna_count_test[order(cna_count_test$pVal),c(1,4,5,7,8,10)]
+```
+
+### ITH 
+
+```{r ith_data}
+ith_table_tissue <- ith_table %>%
+                      mutate(tissue = meta.data$relapse_tissue_grouped[match(sample,meta.data$SAMPLE_ID)]) %>%
+                      filter(!is.na(tissue) | grepl("IM",sample)) %>%
+                      mutate(tissue = ifelse(is.na(tissue),"diagnosis",as.character(tissue)))
+```
+
+```{r ith_plot}
+ith_plot <- ggplot(ith_table_tissue) +
+  geom_point(aes(tissue,ith,fill=tissue),position="jitter",color="grey50") +
+  geom_violin(aes(tissue,ith,fill=tissue),alpha=0.5) +
+  #geom_signif(aes(tissue,ith),comparisons = list(c("diagnosis","relapse")),test = "wilcox.test") +
+  #scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  theme_bw()
+
+saveRDS(ith_plot,file = "plots/ith_tissue.RDS")
+ggsave(plot = ith_plot,filename = "plots/ith_tissue.png",width = 10,height = 8,units = "in",dpi = 300)
+ith_plot
+```
+
+```{r test_ith}
+res.aov <- aov(ith ~ tissue,data = ith_table_tissue)
+summary(res.aov)
+TukeyHSD(res.aov)
+```
+

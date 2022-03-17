@@ -1,0 +1,671 @@
+---
+title: "britroc_30kb_ds_preanalysis_qc"
+author: "Philip Smith"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+---
+
+## Intial setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Load libraries
+
+```{r library_load, warning=FALSE}
+# Load required libraries with supressed start-up text
+suppressMessages(library(QDNAseqmod))
+suppressMessages(library(tidyverse))
+suppressMessages(library(kableExtra))
+suppressMessages(library(ggplot2))
+suppressMessages(library(reshape2))
+suppressMessages(library(Biobase))
+suppressMessages(library(cowplot))
+suppressMessages(library(RColorBrewer))
+suppressMessages(library(plotly))
+```
+
+### Source functions
+
+```{r source_scripts}
+# Load main functions
+source("data/britroc_30kb_functions.R")
+```
+
+### Load meta data and filter
+
+```{r meta.data}
+# Load abs cn meta data and add arx/rlps annotation based on sample name prefix
+meta.data <- read.table("../absolute_POST_down_sampling/britroc_30kb_ds_abs_fits.tsv",header = T,sep = "\t")
+meta.data$group <- ifelse(grepl("^IM_*", x = meta.data$SAMPLE_ID),"arx","rlps")
+
+# For re-running this analysis, excluded samples need to be added back to the data
+excluded_samples <- c("IM_159","JBLAB-19324","JBLAB-4121","IM_181")
+meta.data$use[meta.data$SAMPLE_ID %in% excluded_samples] <- TRUE
+
+# Vector of post-normalisation samples selected to use and vectors of which are arx or rlps
+included_samples <- as.character(meta.data$SAMPLE_ID[meta.data$use == "TRUE"])
+arx_samples <- meta.data$SAMPLE_ID[meta.data$group == "arx" & meta.data$use == "TRUE"]
+rlps_samples <- meta.data$SAMPLE_ID[meta.data$group == "rlps" & meta.data$use == "TRUE"]
+
+# Factor of samples in patient order for exposure plots etc
+patient_sorted_samples <- factor(meta.data$SAMPLE_ID[order(meta.data$PATIENT_ID)],
+                                 levels = unique(meta.data$SAMPLE_ID[order(meta.data$PATIENT_ID)]))
+```
+
+### Set misc. parameters
+
+```{r options}
+# Cores to use
+CORES <- 1
+
+# Colour palette for exposure bar chart matching NatGen
+cbPalette <- c(RColorBrewer::brewer.pal(8,"Dark2"),RColorBrewer::brewer.pal(9,"Set1"),"black")
+```
+
+## Sample information
+### Loading absCN data
+
+```{r read_rds}
+# Load post-normalise BriTROC absCN profiles and filter to included samples
+cn_data <- readRDS("../absolute_POST_down_sampling/britroc_30kb_ds_absCopyNumber.rds")
+cn_data <- cn_data[,colnames(cn_data) %in% included_samples]
+
+# Filter arx/rlps specific absCN objects usng arx/rpls sample names vectors
+arx_cn_data <- cn_data[,colnames(cn_data) %in% arx_samples]
+rlps_cn_data <- cn_data[,colnames(cn_data) %in% rlps_samples]
+
+# Load pre-normalised BriTROC absCN profiles and filter to included samples [for comparison - not analysis]
+prenorm_cn_data <- readRDS("../absolute_PRE_down_sampling/prenorm_downsampled_fitsbritroc_30kb_ds_absCopyNumber.rds")
+prenorm_cn_data <- prenorm_cn_data[,colnames(prenorm_cn_data) %in% included_samples]
+```
+
+### Patient/sample stratification
+
+```{r explore_sample_data}
+#Load meta data for included samples
+patient.meta <- meta.data[meta.data$use == "TRUE",]
+# Split meta data by patient
+per_patient <- split(patient.meta,factor(patient.meta$PATIENT_ID))
+# Generate sample, arx, rlps, and paired status for each patient
+count.meta <- do.call(rbind,lapply(per_patient, FUN = function(x){
+                            patient <- unique(x$PATIENT_ID)
+                            sample_count <- length(x$SAMPLE_ID)
+                            arx_count <- length(x$SAMPLE_ID[x$group == "arx"])
+                            rlps_count <- length(x$SAMPLE_ID[x$group == "rlps"])
+                            pair.bool <- all(c("arx","rlps") %in% x$group)
+                            f <- data.frame(Patient = patient,
+                                            samples = sample_count,
+                                            archival = arx_count,
+                                            relapse = rlps_count,
+                                            paired = pair.bool,row.names = NULL)
+                            return(f)
+                            })
+                          )
+# Summarise counts
+sum.counts <- data.frame(patients = length(unique(patient.meta$PATIENT_ID)),
+                         patient_arx = length(unique(meta.data$PATIENT_ID[meta.data$group == "arx"])),
+                         patient_rlps = length(unique(meta.data$PATIENT_ID[meta.data$group == "rlps"])),
+                         Paired_patients = sum(count.meta$paired),
+                         samples = nrow(patient.meta),
+                         samples_arx = length(patient.meta$SAMPLE_ID[patient.meta$group == "arx"]),
+                         samples_rlps = length(patient.meta$SAMPLE_ID[patient.meta$group == "rlps"]),
+                         Paired_samples = sum(count.meta$samples[count.meta$paired == "TRUE"]))
+# Melt patient-level count data for plotting
+m.count.meta <- melt(count.meta)[order(melt(count.meta)$value,decreasing = T),]
+m.count.meta$Patient <- factor(as.character(m.count.meta$Patient),levels = unique(as.character(m.count.meta$Patient)))
+# Add paired info to patient.meta
+patient.meta <- merge(patient.meta,count.meta[c("Patient","paired")],by.x = "PATIENT_ID",by.y = "Patient")
+```
+
+### Patient/sample summary
+
+```{r sum_counts,echo=FALSE}
+knitr::kable(sum.counts) %>% kable_styling()
+```
+
+### Patient-level profile counts
+
+```{r count.meta,echo=FALSE}
+knitr::kable(count.meta[],row.names = F) %>% kable_styling() %>% scroll_box(height = "200px")
+```
+
+### Bar plots of sample counts per patient
+
+```{r sample_count_bars}
+ggplot(m.count.meta) +
+  geom_col(aes(Patient,value,fill=paired)) +
+  facet_wrap(.~variable,ncol = 1, scales = "free_x") +
+  scale_y_continuous(name = "Count",breaks = seq.int(1,10,1),limits = c(0,10),expand = c(0,0)) +
+  labs(title = "Sample counts across patients") +
+  theme(axis.text.x = element_blank(),
+        panel.background = element_blank(),
+        panel.grid = element_blank(),
+        axis.line = element_line(),
+        axis.ticks.x = element_blank(),
+        strip.text = element_text(face = "bold"),
+        strip.background = element_blank())
+```
+
+## Generate paired-only absCN
+
+```{r paired_cn_data}
+# Select patients marked as paired
+paired_patients <- count.meta$Patient[count.meta$paired == "TRUE"]
+# Select samples matching patients
+paired_samples <- meta.data$SAMPLE_ID[meta.data$PATIENT_ID %in% paired_patients]
+# SUbset absCN data to paired samples
+paired_cn_data <- cn_data[,colnames(cn_data) %in% paired_samples]
+# Subset arx/rlps-specific paired absCN
+paired_arx_cn_data <- paired_cn_data[,colnames(paired_cn_data) %in% arx_samples]
+paired_rlps_cn_data <- paired_cn_data[,colnames(paired_cn_data) %in% rlps_samples]
+```
+
+## CN state stddev analysis
+### pre vs post normalisation (all)
+
+Across all comparisons, standard deviation around integer copy states 1-4 in post-read depth normalised absolute fits is more narrow than pre-read depth normalised absolute fits. Increased overall standard deviation is attributable a global decrease in read depth.
+
+```{r cn_stddev_pre_vs_post_norm, warning=FALSE}
+# Perform calculation of std.dev across CN states for post and pre RD normalised data
+sddf <- cn_stddev(cn_object = cn_data)
+sddf.pre <- cn_stddev(cn_object = prenorm_cn_data)
+
+sddf$norm <- rep("TRUE",nrow(sddf))
+sddf.pre$norm <- rep("FALSE",nrow(sddf.pre))
+
+sddf.pre <- sddf.pre[which(sddf.pre$name %in% sddf$name),]
+
+sddf.merge <- melt(rbind(sddf,sddf.pre),measure.vars = 4)
+
+ggplot(sddf.merge) + geom_point(aes(norm,value,color=norm),position = "jitter",alpha=0.3) +  
+  geom_violin(aes(norm,value,fill=norm),alpha=0.5) +
+  labs(title = "CN state standard deviation by normalisation (all)") +
+  ylab(label = "Standard deviation") +
+  xlab(label = "") +
+  facet_wrap(.~cn_state) +
+  theme_bw() +
+  theme(strip.background = element_blank())
+
+ggplot(sddf.merge)+geom_point(aes(value,rd,color=norm),alpha=0.5) + 
+  facet_wrap(.~cn_state) +
+  labs(title = "CN state standard deviation against used reads (all)") +
+  ylab(label = "Read depth") +
+  xlab(label = "Standard deviation") +
+  facet_wrap(.~cn_state) +
+  theme_bw() +
+  theme(strip.background = element_blank())
+
+vline_data <- as.data.frame(cbind(c(1:4),
+                do.call(rbind,
+                        lapply(
+                          split(
+                            sddf.merge[sddf.merge$norm[sddf.merge$norm == TRUE] == TRUE,],f = factor(sddf.merge$cn_state)),
+                          FUN = function(x) cbind(mean(x$value),mean(x$value) + sd(x$value)*2,mean(x$value) + sd(x$value)*3)))))
+colnames(vline_data) <- c("cn_state","mean","Stdev2","Stdev3")
+vline_data <- vline_data %>% pivot_longer(-cn_state,names_to = "stat")
+
+ggplot() + 
+  geom_density(data = sddf.merge[sddf.merge$norm == "TRUE",],aes(value,color=norm)) + 
+  geom_density(data = sddf.merge[sddf.merge$norm == "FALSE",],aes(value,color=norm)) +
+  geom_vline(data = vline_data,aes(xintercept = value,linetype = stat)) +
+  labs(title = "CN state standard deviation density (all)") +
+  ylab(label = "Density") +
+  xlab(label = "Standard deviation") +
+  facet_wrap(.~cn_state,scales = "free") +
+  theme_bw() +
+  theme(strip.background = element_blank())
+```
+
+### arx vs rlps normalisation (all)
+
+Comparisons between archival and relapse tumour groups were identically affected by read depth normalisation.
+
+```{r cn_stddev_arx_vs_relapse, warning=FALSE}
+sddf.arx <- cn_stddev(cn_object = arx_cn_data)
+sddf.rlps <- cn_stddev(cn_object = rlps_cn_data)
+
+sddf.arx$group <- rep("ARX",nrow(sddf.arx))
+sddf.rlps$group <- rep("RLPS",nrow(sddf.rlps))
+
+sddf.merge <- melt(rbind(sddf.arx,sddf.rlps),measure.vars = 4)
+
+vline_data <- as.data.frame(cbind(c(1:4),
+                do.call(rbind,
+                        lapply(
+                          split(
+                            sddf.merge[sddf.merge$norm[sddf.merge$norm == TRUE] == TRUE,],f = factor(sddf.merge$cn_state)),
+                          FUN = function(x) cbind(mean(x$value),mean(x$value) + sd(x$value)*2,mean(x$value) + sd(x$value)*3)))))
+colnames(vline_data) <- c("cn_state","mean","Stdev2","Stdev3")
+vline_data <- vline_data %>% pivot_longer(-cn_state,names_to = "stat")
+
+ggplot(sddf.merge) + geom_point(aes(group,value,color=group),position = "jitter",alpha=0.3) +  
+  geom_violin(aes(group,value,fill=group),alpha=0.5) +
+  labs(title = "CN state standard deviation by tumour group (all)") +
+  ylab(label = "Standard deviation") +
+  xlab(label = "") +
+  facet_wrap(.~cn_state) +
+  theme_bw() +
+  theme(strip.background = element_blank())
+
+ggplot(sddf.merge)+geom_point(aes(value,rd,color=group),alpha=0.5) + 
+  facet_wrap(.~cn_state) +
+  labs(title = "CN state standard deviation against used reads by tumour group (all)") +
+  ylab(label = "Read depth") +
+  xlab(label = "Standard deviation") +
+  facet_wrap(.~cn_state) +
+  theme_bw() +
+  theme(strip.background = element_blank())
+
+ggplot() + 
+  geom_density(data = sddf.merge[sddf.merge$group == "ARX",],aes(value,color=group)) + 
+  geom_density(data = sddf.merge[sddf.merge$group == "RLPS",],aes(value,color=group)) +
+  geom_vline(data = vline_data,aes(xintercept = value,linetype = stat)) +
+  labs(title = "CN state standard deviation density by tumour group (all)") +
+  ylab(label = "Density") +
+  xlab(label = "Standard deviation") +
+  facet_wrap(. ~ cn_state,scales = "free") +
+  theme_bw() +
+  theme(strip.background = element_blank())
+```
+
+### pre vs post normalisation (paired)
+
+The normalisation pattern observed across all samples is maintained when analysing only paired samples, if not more exaggerated.
+
+```{r cn_stddev_paired_pre_vs_post_norm}
+sddf <- cn_stddev(cn_object = paired_cn_data)
+sddf.pre <- cn_stddev(cn_object = prenorm_cn_data)
+
+sddf$norm <- rep("TRUE",nrow(sddf))
+sddf.pre$norm <- rep("FALSE",nrow(sddf.pre))
+
+sddf.pre <- sddf.pre[which(sddf.pre$name %in% sddf$name),]
+
+sddf.merge <- melt(rbind(sddf,sddf.pre),measure.vars = 4)
+
+vline_data <- as.data.frame(cbind(c(1:4),
+                do.call(rbind,
+                        lapply(
+                          split(
+                            sddf.merge[sddf.merge$norm[sddf.merge$norm == TRUE] == TRUE,],f = factor(sddf.merge$cn_state)),
+                          FUN = function(x) cbind(mean(x$value),mean(x$value) + sd(x$value)*2,mean(x$value) + sd(x$value)*3)))))
+colnames(vline_data) <- c("cn_state","mean","Stdev2","Stdev3")
+vline_data <- vline_data %>% pivot_longer(-cn_state,names_to = "stat")
+
+ggplot(sddf.merge) + geom_point(aes(norm,value,color=norm),position = "jitter",alpha=0.3) +  
+  geom_violin(aes(norm,value,fill=norm),alpha=0.5) +
+  labs(title = "CN state standard deviation by normalisation (paired)") +
+  ylab(label = "Standard deviation") +
+  xlab(label = "") +
+  facet_wrap(.~cn_state) +
+  theme_bw() +
+  theme(strip.background = element_blank())
+
+ggplot(sddf.merge)+geom_point(aes(value,rd,color=norm),alpha=0.5) + 
+  facet_wrap(.~cn_state) +
+  labs(title = "CN state standard deviation against used reads (paired)") +
+  ylab(label = "Read depth") +
+  xlab(label = "Standard deviation") +
+  facet_wrap(.~cn_state) +
+  theme_bw() +
+  theme(strip.background = element_blank())
+
+ggplot() + 
+  geom_density(data = sddf.merge[sddf.merge$norm == "TRUE",],aes(value,color=norm)) + 
+  geom_density(data = sddf.merge[sddf.merge$norm == "FALSE",],aes(value,color=norm)) +
+  geom_vline(data = vline_data,aes(xintercept = value,linetype = stat)) +
+  labs(title = "CN state standard deviation density (paired)") +
+  ylab(label = "Density") +
+  xlab(label = "Standard deviation") +
+  facet_wrap(.~cn_state,scales = "free") +
+  theme_bw() +
+  theme(strip.background = element_blank())
+```
+
+### arx vs rlps normalisation (paired)
+
+```{r cn_stddev_paired_arx_vs_relapse}
+sddf.arx <- cn_stddev(cn_object = paired_arx_cn_data)
+sddf.rlps <- cn_stddev(cn_object = paired_rlps_cn_data)
+
+sddf.arx$group <- rep("ARX",nrow(sddf.arx))
+sddf.rlps$group <- rep("RLPS",nrow(sddf.rlps))
+
+sddf.merge <- melt(rbind(sddf.arx,sddf.rlps),measure.vars = 4)
+
+vline_data <- as.data.frame(cbind(c(1:4),
+                do.call(rbind,
+                        lapply(
+                          split(
+                            sddf.merge[sddf.merge$norm[sddf.merge$norm == TRUE] == TRUE,],f = factor(sddf.merge$cn_state)),
+                          FUN = function(x) cbind(mean(x$value),mean(x$value) + sd(x$value)*2,mean(x$value) + sd(x$value)*3)))))
+colnames(vline_data) <- c("cn_state","mean","Stdev2","Stdev3")
+vline_data <- vline_data %>% pivot_longer(-cn_state,names_to = "stat")
+
+ggplot(sddf.merge) + geom_point(aes(group,value,color=group),position = "jitter",alpha=0.3) +  
+  geom_violin(aes(group,value,fill=group),alpha=0.5) +
+  labs(title = "CN state standard deviation by tumour group (paired)") +
+  ylab(label = "Standard deviation") +
+  xlab(label = "") +
+  facet_wrap(.~cn_state) +
+  theme_bw() +
+  theme(strip.background = element_blank())
+
+ggplot(sddf.merge)+geom_point(aes(value,rd,color=group),alpha=0.5) + 
+  facet_wrap(.~cn_state) +
+  labs(title = "CN state standard deviation against used reads by tumour group (paired)") +
+  ylab(label = "Read depth") +
+  xlab(label = "Standard deviation") +
+  facet_wrap(.~cn_state) +
+  theme_bw() +
+  theme(strip.background = element_blank())
+
+ggplot() + 
+  geom_density(data = sddf.merge[sddf.merge$group == "ARX",],aes(value,color=group)) + 
+  geom_density(data = sddf.merge[sddf.merge$group == "RLPS",],aes(value,color=group)) +
+  geom_vline(data = vline_data,aes(xintercept = value,linetype = stat)) +
+  labs(title = "CN state standard deviation density by tumour group (paired)") +
+  ylab(label = "Density") +
+  xlab(label = "Standard deviation") +
+  facet_wrap(. ~ cn_state,scales = "free") +
+  theme_bw() +
+  theme(strip.background = element_blank())
+```
+
+## Sample QC
+
+### PCA of all samples 
+
+PCA analysis of copy number matrices from absolute copy number profiles demonstrated most variance seen in the data is imparted by ploidy (PC1), with unknown components comprising the remaining components at variance amounts less than 5%.
+
+As ploidy is an expected source of inter/intra sample and patient variance, and no remaining sources of variance exceeded 5%, no samples were removed on the basis of priciple component analysis.
+
+```{r pca_all_pca}
+pca_all <- prcomp(t(assayDataElement(object = cn_data,"copynumber")[fData(cn_data)$use,]))
+sample <- rownames(as.data.frame(pca_all$x))
+patients <- patient.meta$PATIENT_ID[which(patient.meta$SAMPLE_ID %in% sample)]
+Ploidy <- pData(cn_data)$ploidy
+
+pc1_sd2 <- c(mean(pca_all$x[,1]) - sd(pca_all$x[,1])*2,mean(pca_all$x[,1]) + sd(pca_all$x[,1])*2)
+pc2_sd2 <- c(mean(pca_all$x[,2]) - sd(pca_all$x[,2])*2,mean(pca_all$x[,2]) + sd(pca_all$x[,2])*2)
+pc3_sd2 <- c(mean(pca_all$x[,3]) - sd(pca_all$x[,3])*2,mean(pca_all$x[,3]) + sd(pca_all$x[,3])*2)
+
+ggplotly(ggplot(as.data.frame(pca_all$x[,c(1,2)])) + 
+  geom_point(aes(x=PC1,y=PC2,text=sprintf("Sample: %s <br><br>Patient: %s", sample, patients),color=Ploidy)) +
+  geom_vline(xintercept = pc1_sd2) +
+  geom_hline(yintercept = pc2_sd2) +
+  labs(title = "PCA - copynumber matrix (2 stdev lines)") +
+  xlab("PC1") +
+  ylab("PC2") +
+  theme_bw() +
+  theme(strip.background = element_blank()))
+
+ggplotly(ggplot(as.data.frame(pca_all$x)) + 
+  geom_point(aes(x=PC2,y=PC3,text=sprintf("Sample: %s <br>Patient: %s", sample, patients),color=Ploidy)) +
+  geom_vline(xintercept = pc2_sd2) +
+  geom_hline(yintercept = pc3_sd2) +
+  labs(title = "PCA - copynumber matrix (2 stdev lines)") +
+  xlab("PC2") +
+  ylab("PC3") +
+  theme_bw() +
+  theme(strip.background = element_blank()))
+```
+
+```{r cumul_var_all_pca}
+cummulative_var <- data.frame(PC = seq.int(1,nrow(pca_all$x)),variance = (pca_all$sdev^2 / sum(pca_all$sdev^2))
+                              ,stringsAsFactors = F)
+ggplot(cummulative_var) + 
+  geom_line(aes(PC,variance)) +
+  geom_point(aes(PC,variance)) +
+  labs(title = "Cumulative variance") +
+  ylab(label = "variance") +
+  xlab(label = "Principle component") +
+  theme_bw() +
+  theme(strip.background = element_blank())
+```
+
+### PCA of paired samples
+
+PCA analysis in paired-only absolute copynumber profiles broadly reflects the same outcome as the PCA analysis seen across all samples.
+
+```{r pca_paired_pca}
+pca_paired <- prcomp(t(assayDataElement(object = paired_cn_data,"copynumber")[fData(paired_cn_data)$use,]))
+sample <- rownames(as.data.frame(pca_paired$x))
+patients <- patient.meta$PATIENT_ID[which(patient.meta$SAMPLE_ID %in% sample)]
+Ploidy <- pData(paired_cn_data)$ploidy
+
+pc1_sd2 <- c(mean(pca_paired$x[,1]) - sd(pca_paired$x[,1])*2,mean(pca_paired$x[,1]) + sd(pca_paired$x[,1])*2)
+pc2_sd2 <- c(mean(pca_paired$x[,2]) - sd(pca_paired$x[,2])*2,mean(pca_paired$x[,2]) + sd(pca_paired$x[,2])*2)
+pc3_sd2 <- c(mean(pca_paired$x[,3]) - sd(pca_paired$x[,3])*2,mean(pca_paired$x[,3]) + sd(pca_paired$x[,3])*2)
+
+ggplotly(ggplot(as.data.frame(pca_paired$x[,c(1,2)])) + 
+  geom_point(aes(x=PC1,y=PC2,text=sprintf("Sample: %s <br><br>Patient: %s", sample, patients),color=Ploidy)) +
+  geom_vline(xintercept = pc1_sd2) +
+  geom_hline(yintercept = pc2_sd2) +
+  labs(title = "PCA - copynumber matrix (2 stdev lines)") +
+  xlab("PC1") +
+  ylab("PC2") +
+  theme_bw() +
+  theme(strip.background = element_blank()))
+
+ggplotly(ggplot(as.data.frame(pca_paired$x)) + 
+  geom_point(aes(x=PC2,y=PC3,text=sprintf("Sample: %s <br>Patient: %s", sample, patients),color=Ploidy)) +
+  geom_vline(xintercept = pc2_sd2) +
+  geom_hline(yintercept = pc3_sd2) +
+  labs(title = "PCA - copynumber matrix (2 stdev lines)") +
+  xlab("PC2") +
+  ylab("PC3") +
+  theme_bw() +
+  theme(strip.background = element_blank()))
+```
+
+```{r cumul_var_pca_paired}
+cummulative_var <- data.frame(PC = seq.int(1,nrow(pca_paired$x)),variance = (pca_paired$sdev^2 / sum(pca_paired$sdev^2)),stringsAsFactors = F)
+ggplot(cummulative_var) + 
+  geom_line(aes(PC,variance)) +
+  geom_point(aes(PC,variance)) +
+  labs(title = "Cumulative variance") +
+  ylab(label = "variance") +
+  xlab(label = "Principle component") +
+  theme_bw() +
+  theme(strip.background = element_blank())
+```
+
+### Standard dev. (post norm.)
+
+Minor peaks in the density distribution of post-normalised samples highlights potential outlier samples which may have incorrect fits. Manual examination and fixed standard deviation of standard deviation distributions using the following code across CN states 1-4 and collectively across all states were used to determine samples to exclude from downstream analysis.
+
+Standard deviation distributions across each CN state (1-4)
+
+```{r cn_stddev_pre_vs_post_norm_replot}
+# Perform calculation of std.dev across CN states for post and pre RD normalised data
+sddf <- cn_stddev(cn_object = cn_data)
+sddf.pre <- cn_stddev(cn_object = prenorm_cn_data)
+
+sddf$norm <- rep("TRUE",nrow(sddf))
+sddf.pre$norm <- rep("FALSE",nrow(sddf.pre))
+
+sddf.pre <- sddf.pre[which(sddf.pre$name %in% sddf$name),]
+
+sddf.merge <- melt(rbind(sddf,sddf.pre),measure.vars = 4)
+
+vline_data <- as.data.frame(cbind(c(1:4),
+                do.call(rbind,
+                        lapply(
+                          split(
+                            sddf.merge[sddf.merge$norm[sddf.merge$norm == TRUE] == TRUE,],f = factor(sddf.merge$cn_state)),
+                          FUN = function(x) cbind(mean(x$value),mean(x$value) + sd(x$value)*2,mean(x$value) + sd(x$value)*3)))))
+colnames(vline_data) <- c("cn_state","mean","Stdev2","Stdev3")
+vline_data <- vline_data %>% pivot_longer(-cn_state,names_to = "stat")
+
+ggplot() + 
+  geom_density(data = sddf.merge[sddf.merge$norm == "TRUE",],aes(value,color=norm)) + 
+  geom_density(data = sddf.merge[sddf.merge$norm == "FALSE",],aes(value,color=norm)) +
+  geom_vline(data = vline_data,aes(xintercept = value,linetype = stat)) +
+  labs(title = "CN state standard deviation density (all)") +
+  ylab(label = "Density") +
+  xlab(label = "Standard deviation") +
+  facet_wrap(.~cn_state,scales = "free") +
+  theme_bw() +
+  theme(strip.background = element_blank())
+```
+
+### Excluded samples (Std dev * 3)
+
+For CN state independent standard deviation, 4 samples exceeded 3 times standard deviation
+
+```{r std_tables_sd3}
+qc_samples <- c()
+for(i in 1:4){
+  qc_samples <- append(qc_samples,sddf.merge$name[sddf.merge$cn_state == i & sddf.merge$norm == "TRUE" & sddf.merge$value >    vline_data$value[vline_data$cn_state == i & vline_data$stat == "Stdev3"]])
+}
+qc_samples <- sort(unique(qc_samples))
+qc_samples
+```
+
+Standard deviation distribution ceollectively across each CN state (1-4)
+
+```{r collective_state_sd}
+sd.temp <- sddf.merge[sddf.merge$norm == TRUE,c(2,6)] %>% group_by(name) %>% summarise_all(.funs = sd)
+sd2 <- mean(sd.temp$value)+sd(sd.temp$value)*2       
+sd3 <- mean(sd.temp$value)+sd(sd.temp$value)*3
+ggplot(sd.temp) + 
+  geom_density(aes(value)) +
+  geom_vline(aes(xintercept = sd2)) +
+  geom_vline(aes(xintercept = sd3)) +
+  labs(title = "All states standard deviation density (all)") +
+  ylab(label = "Density") +
+  xlab(label = "Standard deviation") +
+  theme_bw() +
+  theme(strip.background = element_blank())
+```
+
+For collective CN state standard deviation, 3 samples exceeded 3 times standard deviation
+
+```{r samples_collective_sd3}
+collective_qc <- sort(sd.temp$name[sd.temp$value > sd3])
+collective_qc
+```
+
+Samples exceeding 3 standard deviations from the mean at either CN-state independent or all-CN state standard deviation
+
+```{r qc_overlaps}
+all_qc <- unique(c(qc_samples,collective_qc))
+all_qc
+```
+
+CN profiles and signature exposure plots for associated samples (by patients) exceeding 3 standard deviations
+
+```{r high_stdev, warning=FALSE}
+for(i in all_qc){
+  plot_abs(cn_data = cn_data,sample_name = i)
+}
+```
+
+### Flagged samples (Std dev * 2)
+
+An additional number of samples did not exceed 3 times standard deviation but did exceed 2 times standard deviation.
+
+For CN state independent standard deviation, 11 samples exceeded 2 times standard deviation
+ 
+```{r std_tables_sd2}
+qc_samples2 <- c()
+for(i in 1:4){
+  qc_samples2 <- append(qc_samples2,sddf.merge$name[sddf.merge$cn_state == i & sddf.merge$norm == "TRUE" & sddf.merge$value >    vline_data$value[vline_data$cn_state == i & vline_data$stat == "Stdev2"]])
+}
+qc_samples2 <- sort(unique(qc_samples2))
+qc_samples2
+```
+
+For collective CN state standard deviation, 11 samples exceeded 2 times standard deviation
+
+```{r samples_collective_sd2}
+collective_qc2 <- sort(sd.temp$name[sd.temp$value > sd2])
+collective_qc2
+```
+
+Samples exceeding 2 standard deviations from the mean at either CN-state independent or all-CN state standard deviation
+
+```{r qc_overlaps2}
+all_qc2 <- unique(c(qc_samples2,collective_qc2))
+all_qc2 <- all_qc2[which(!all_qc2 %in% all_qc)]
+all_qc2
+```
+
+```{r high_stdev2, warning=FALSE}
+for(i in all_qc2){
+  plot_abs(cn_data = cn_data,sample_name = i)
+}
+```
+
+## Sample exclusion and flags
+### Excluded samples
+
+Samples listed below were excluded from signature analysis (changes added to absolute_POST_down_sampling/britroc_30kb_ds_abs_fits.tsv)
+
+```{r excluded}
+all_qc
+length(all_qc)
+```
+
+### Flagged samples
+
+Samples listed below were flagged prior to signature analysis (changes added to absolute_POST_down_sampling/britroc_30kb_ds_abs_fits.tsv)
+
+```{r flagged}
+all_qc2
+length(all_qc2)
+```
+
+### Final sample counts
+
+```{r sample_data_final}
+#Load meta data for included samples
+patient.meta <- meta.data[meta.data$use == "TRUE",]
+# Remove excluded
+patient.meta <- patient.meta[which(!patient.meta$SAMPLE_ID %in% all_qc),]
+# Split meta data by patient
+per_patient <- split(patient.meta,factor(patient.meta$PATIENT_ID))
+# Generate sample, arx, rlps, and paired status for each patient
+count.meta <- do.call(rbind,lapply(per_patient, FUN = function(x){
+                            patient <- unique(x$PATIENT_ID)
+                            sample_count <- length(x$SAMPLE_ID)
+                            arx_count <- length(x$SAMPLE_ID[x$group == "arx"])
+                            rlps_count <- length(x$SAMPLE_ID[x$group == "rlps"])
+                            pair.bool <- all(c("arx","rlps") %in% x$group)
+                            f <- data.frame(Patient = patient,
+                                            samples = sample_count,
+                                            archival = arx_count,
+                                            relapse = rlps_count,
+                                            paired = pair.bool,row.names = NULL)
+                            return(f)
+                            })
+                          )
+# Summarise counts
+sum.counts <- data.frame(patients = length(unique(patient.meta$PATIENT_ID)),
+                         patient_arx = length(unique(meta.data$PATIENT_ID[meta.data$group == "arx"])),
+                         patient_rlps = length(unique(meta.data$PATIENT_ID[meta.data$group == "rlps"])),
+                         Paired_patients = sum(count.meta$paired),
+                         samples = nrow(patient.meta),
+                         samples_arx = length(patient.meta$SAMPLE_ID[patient.meta$group == "arx"]),
+                         samples_rlps = length(patient.meta$SAMPLE_ID[patient.meta$group == "rlps"]),
+                         Paired_samples = sum(count.meta$samples[count.meta$paired == "TRUE"]))
+# Melt patient-level count data for plotting
+m.count.meta <- melt(count.meta)[order(melt(count.meta)$value,decreasing = T),]
+m.count.meta$Patient <- factor(as.character(m.count.meta$Patient),levels = unique(as.character(m.count.meta$Patient)))
+```
+
+```{r sum_counts2,echo=FALSE}
+knitr::kable(sum.counts) %>% kable_styling()
+```
+
+### Session info
+
+```{r sessioninfo}
+sessionInfo()
+```

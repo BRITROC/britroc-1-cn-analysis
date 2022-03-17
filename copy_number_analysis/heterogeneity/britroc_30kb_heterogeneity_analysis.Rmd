@@ -1,0 +1,463 @@
+---
+title: "Analysis of patient heterogeneity"
+author: "Philip Smith"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+---
+
+## Initial steps
+
+- ANALYSIS of intra/inter group clonality (larger differences between spatial samples than temporal samples?)
+- ANALYSIS of intra/inter group clonality (larger differences between spatial samples than temporal samples?)
+- ANALYSIS of intra/inter group clonality (larger differences between spatial samples than temporal samples?)
+
+### knitr options
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Load libraries
+
+```{r load_libraries}
+# Load libraries
+suppressPackageStartupMessages(suppressWarnings(library(Biobase)))
+suppressPackageStartupMessages(suppressWarnings(library(QDNAseq)))
+suppressPackageStartupMessages(suppressWarnings(library(QDNAseqmod)))
+suppressPackageStartupMessages(suppressWarnings(library(tidyverse)))
+suppressPackageStartupMessages(suppressWarnings(library(cowplot)))
+suppressPackageStartupMessages(suppressWarnings(library(ggsignif)))
+suppressPackageStartupMessages(suppressWarnings(library(survival)))
+suppressPackageStartupMessages(suppressWarnings(library(survminer)))
+suppressPackageStartupMessages(suppressWarnings(library(kableExtra)))
+```
+
+## Load data and funcs
+
+Define functions specifically utilised in this document
+
+### Functions
+```{r funs}
+## Get clonality / heterogeneity metric from absolute copy number profiles
+get_clonality <- function(abs_data = NULL,weighted = TRUE,smooth=TRUE,wiggle=0.1,limit=1){
+  # extract segments matrix
+  segments <- assayDataElement(abs_data,elt = "segmented")
+  
+  # Weighted / smoothed method
+  if(weighted){
+    if(smooth){
+      # Get length of segment vector as proxy for length of genome
+      seg_len <- length(segments[,1])
+      # set segments with values less than zero to zero
+      segments[segments < 0] <- 0
+      # Rounded segments matrix to whole integers
+      rounded_segments <- round(segments)
+      # Get boolean matrix of values which absolute difference
+      # between unrounded and rounded segments is less than wiggle variable
+      wiggleRemove <- which(abs(segments - rounded_segments) < wiggle)
+      # Set TRUE boolean matrix values to NA in unrounded segment matrix
+      segments[wiggleRemove] <- NA
+      # between unrounded and rounded segments is greater than limit variable
+      limitRemove <- which(abs(segments - rounded_segments) > limit)
+      # Set TRUE boolean matrix values to NA in unrounded segment matrix
+      segments[limitRemove] <- NA
+      # Get segment rle object with NA values removed
+      segment_rle <- apply(segments, 2, FUN = function(x) rle(x[which(!is.na(x))]))
+      # Transform unrounded rle object values to absolute unrounded/rounded differences
+      diff_rle <- lapply(segment_rle,FUN = function(x){
+        x$values <- abs(x$values - round(x$values))
+        return(x)
+        })
+      # Obtain weighted mean of absolute differences using number of bins per segments / total bins
+      weightedMean <- lapply(diff_rle,FUN = function(x){
+        wm <- weighted.mean(x = x$values,w = (x$lengths/seg_len),na.rm = TRUE)
+        })
+      # Named vector of weighted mean clonality value
+      clonality <- unlist(weightedMean)
+      return(clonality)
+    } else if(!smooth){
+      # Get length of segment vector as proxy for length of genome
+      seg_len <- length(segments[,1])
+      # set segments with values less than zero to zero
+      segments[segments < 0] <- 0
+      # Get segment rle object with NA values removed
+      segment_rle <- apply(segments, 2, FUN = function(x) rle(x[which(!is.na(x))]))
+      # Transform unrounded rle object values to absolute unrounded/rounded differences
+      diff_rle <- lapply(segment_rle,FUN = function(x){
+        x$values <- abs(x$values - round(x$values))
+        return(x)
+        })
+      # Obtain weighted mean of absolute differences using number of bins per segments / total bins
+      weightedMean <- lapply(diff_rle,FUN = function(x){
+        wm <- weighted.mean(x = x$values,w = (x$lengths/seg_len),na.rm = TRUE)
+        })
+      # Named vector of weighted mean clonality value
+      clonality <- unlist(weightedMean)
+      return(clonality)
+    }
+  # Unweighted and unsmoothed method
+  } else if(!weighted){
+    if(smooth){
+      # Get length of segment vector as proxy for length of genome
+      seg_len <- length(segments[,1])
+      # set segments with values less than zero to zero
+      segments[segments < 0] <- 0
+      # Rounded segments matrix to whole integers
+      rounded_segments <- round(segments)
+      # Get boolean matrix of values which absolute difference
+      # between unrounded and rounded segments is less than wiggle variable
+      wiggleRemove <- which(abs(segments - rounded_segments) < wiggle)
+      # Set TRUE boolean matrix values to NA in unrounded segment matrix
+      segments[wiggleRemove] <- NA
+      # between unrounded and rounded segments is greater than limit variable
+      limitRemove <- which(abs(segments - rounded_segments) > limit)
+      # Set TRUE boolean matrix values to NA in unrounded segment matrix
+      segments[limitRemove] <- NA
+      # Get segment rle object with NA values removed
+      segment_rle <- apply(segments, 2, FUN = function(x) rle(x[which(!is.na(x))]))
+      # Transform unrounded rle object values to absolute unrounded/rounded differences
+      diff_rle <- lapply(segment_rle,FUN = function(x){
+        x$values <- abs(x$values - round(x$values))
+        return(x)
+        })
+      # Obtain mean of absolute differences using number of bins per segments / total bins
+      Mean <- lapply(diff_rle,FUN = function(x){
+        m <- mean(x = x$values,na.rm = TRUE)
+        })
+      # Named vector of weighted mean clonality value
+      clonality <- unlist(Mean)
+      return(clonality)
+    } else if(!smooth){
+      # Get rounded segments
+      int_segments <- round(segments)
+      # Get col means of absolute differences between unrounded and rounded segments matrix
+      clonality <- colMeans(abs(segments - int_segments),na.rm = TRUE)
+      return(clonality)
+    }
+  }
+}
+
+get_cox_HR <-function(x){
+  HR <- round(exp(coef(x)), 2)
+  CI <- round(exp(confint(x)), 2)
+  P <- round(coef(summary(x))[,5], 3)
+  colnames(CI) <- c("Lower", "Higher")
+  hazard_table <- as.data.frame(cbind(HR, CI, P))
+  hazard_table <- cbind(Feature=row.names(hazard_table),hazard_table,row.names = NULL)
+  return(hazard_table)
+}
+
+add_clonality_meta <- function(x){
+  clonality_table <- data.frame(sample = names(x),clonality = x,row.names = NULL)
+clonality_table$group <- meta.data$group[match(clonality_table$sample,meta.data$SAMPLE_ID)]
+clonality_table$patient <- meta.data$PATIENT_ID[match(clonality_table$sample,meta.data$SAMPLE_ID)]
+clonality_table$ploidy <- meta.data$ploidy[match(clonality_table$sample,meta.data$SAMPLE_ID)]
+clonality_table$paired <- meta.data$paired[match(clonality_table$sample,meta.data$SAMPLE_ID)]
+clonality_table$purity <- meta.data$purity[match(clonality_table$sample,meta.data$SAMPLE_ID)]
+return(clonality_table)
+}
+
+add_corr <- function(x,type="limit"){
+    x$zscore <- (x$clonality-mean(x$clonality,na.rm=T))/sd(x$clonality,na.rm = T)
+    x$corrected <- x$zscore*x$ploidy*x$purity
+    pl.clonality <- cor.test(x$ploidy,x$clonality,method = "kendal")$estimate
+    pu.clonality <- cor.test(x$purity,x$clonality,method = "kendal")$estimate
+    pl.zscore <- cor.test(x$ploidy,x$zscore,method = "kendal")$estimate
+    pu.zscore <- cor.test(x$purity,x$zscore,method = "kendal")$estimate
+    pl.corrected <- cor.test(x$ploidy,x$corrected,method = "kendal")$estimate
+    pu.corrected <- cor.test(x$purity,x$corrected,method = "kendal")$estimate
+    if(type == "limit"){
+      limit_correlation <- rbind(limit_correlation,data.frame(limit=i,
+                                   puclonality=pu.clonality,
+                                   plclonality=pl.clonality,
+                                   puzscore=pu.zscore,
+                                   plzscore=pl.zscore,
+                                   pucorrected=pu.corrected,
+                                   plcorrected=pl.corrected,row.names = NULL))
+      return(limit_correlation)
+    } else if(type == "wiggle"){
+      wiggle_correlation <- rbind(wiggle_correlation,data.frame(wiggle=i,
+                                   puclonality=pu.clonality,
+                                   plclonality=pl.clonality,
+                                   puzscore=pu.zscore,
+                                   plzscore=pl.zscore,
+                                   pucorrected=pu.corrected,
+                                   plcorrected=pl.corrected,row.names = NULL))
+      return(wiggle_correlation)
+    }
+}
+
+univar_surv <- function(surv = NULL,covariates = NULL,data = NULL){
+  censor_surv <- surv 
+  covariates <- covariates
+  univ_formulas <- sapply(covariates,
+                        function(x) as.formula(paste('censor_surv~', x)))
+  univ_models <- lapply(univ_formulas, function(x){coxph(x, data = data)})
+  univ_results <- lapply(univ_models,
+                       function(x){ 
+                          x <- summary(x)
+                          p.value<-signif(x$wald["pvalue"], digits=2)
+                          wald.test<-signif(x$wald["test"], digits=2)
+                          beta<-signif(x$coef[1], digits=2);#coeficient beta
+                          HR <-signif(x$coef[2], digits=2);#exp(beta)
+                          HR.confint.lower <- signif(x$conf.int[,"lower .95"], 2)
+                          HR.confint.upper <- signif(x$conf.int[,"upper .95"],2)
+                          HR <- paste0(HR, " (", 
+                                       HR.confint.lower, "-", HR.confint.upper, ")")
+                          res<-c(beta, HR, wald.test, p.value)
+                          names(res)<-c("beta", "HR (95% CI for HR)", "wald.test", 
+                                        "p.value")
+                          return(res)
+                         })
+  res <- t(as.data.frame(univ_results, check.names = FALSE))
+  as.data.frame(res)
+}
+
+multivar_surv <- function(surv = NULL,covariates = NULL,data = NULL){
+  censor_surv <- surv
+  covariates <- covariates
+  surv_formula <- as.formula(paste('censor_surv ~',paste(covariates,collapse = ' + ')))
+  res.cox <- coxph(surv_formula,
+                 data =  data)
+  summary(res.cox)
+  get_cox_HR(res.cox)
+}
+```
+
+### Read meta data
+
+Meta data for all samples with fitted absolute copy number profiles
+
+```{r read_meta}
+source("../../colour_palettes.R")
+meta.data <- read.table("../../copy_number_signatures/britroc_30kb_signature_data_meta.tsv",
+                        header = TRUE,
+                        sep = "\t")
+
+patient_data <- read.table("../../britroc_cohort_patient_data.tsv",
+                           sep = "\t",
+                           header = T)
+
+patient_data$PATIENT_ID <- paste0("BRITROC-",patient_data$britroc_number)
+```
+
+### Read absolute data
+
+Absolute copy number profiles are loaded in QDNAseq object format and unused/dropped samples are removed. 
+
+```{r read_abs}
+abs_data <- readRDS("../../absolute_POST_down_sampling/britroc_30kb_ds_absCopyNumber.rds")
+abs_data <- abs_data[,which(colnames(abs_data) %in% meta.data$SAMPLE_ID[meta.data$use == "TRUE"])]
+```
+
+## Analysis
+
+CORRECTION - No smoothing is now applied to either the upper or lower bounds applied to each segment to more closely conform with the approach seen by van Dijk et al.see [here](https://www.nature.com/articles/s41467-021-23384-6).
+
+```{r segment_noise}
+samples <- colnames(abs_data)[1:10]
+segment_noise <- do.call(rbind,lapply(samples,FUN = function(x){
+  sample <- x
+  s <- as.data.frame(assayDataElement(abs_data,"segmented"))
+  b <- as.data.frame(assayDataElement(abs_data,"copynumber"))
+  f <- fData(abs_data)[,1:3]
+  
+  s <- s[sample]
+  b <- b[sample]
+  
+  t <- cbind(f,s,b)
+  
+  colnames(t) <- c("chromosome","start","end","segments","bin")
+  tsd <- t %>%
+    group_by(chromosome) %>%
+    mutate(changepoint = abs(segments - lag(segments))) %>%
+    mutate(change = ifelse(changepoint > 0.1 | is.na(changepoint),TRUE,FALSE)) %>%
+    ungroup() %>%
+    mutate(segment = cumsum(change)) %>%
+    group_by(segment) %>%
+    mutate(bin_count = n()) %>%
+    mutate(seg_sd = sd(bin)) %>%
+    mutate(seg_start = min(start)) %>%
+    mutate(seg_end = max(end)) %>%
+    dplyr::select(-change,-bin,-start,-end,-changepoint) %>%
+    distinct() %>%
+    mutate(sample_mean = weighted.mean(seg_sd,w = bin_count))
+    
+  tsd$sample <- rep(sample,times=nrow(tsd))
+  return(tsd)
+}))
+    
+ggplot(segment_noise) + geom_density(aes(seg_sd))
+```
+
+### Clonality analysis
+
+```{r apply_seg_filter}
+
+```
+
+The clonality value was extracted from each sample utilising the parameters defined previously.
+
+```{r set_clonality}
+clonality_table <- add_clonality_meta(get_clonality(abs_data = abs_data,
+                             weighted = TRUE,
+                             smooth = FALSE,
+                             wiggle = 0.1)) %>%
+                    mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse")) %>%
+                    rename(ith="clonality")
+
+kableExtra::kable(clonality_table) %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
+write.table(clonality_table,file = "data/ith_results_table.tsv",quote = F,row.names = F,sep = "\t",col.names = T)
+```
+
+```{r plot_clonaltiy_basics}
+ggplot(clonality_table) +
+  geom_density(aes(ith)) +
+  theme_bw()
+
+ggplot(clonality_table) +
+  geom_point(aes(ploidy,ith)) +
+  geom_smooth(aes(ploidy,ith),method = "lm") +
+  theme_bw()
+
+cor.test(clonality_table$ploidy,clonality_table$ith,method = "kendal")
+
+ggplot(clonality_table) +
+  geom_point(aes(purity,ith)) +
+  geom_smooth(aes(purity,ith),method = "lm") +
+  theme_bw()
+
+cor.test(clonality_table$purity,clonality_table$ith,method = "kendal")
+```
+
+```{r clonality_by_type}
+ggplot(clonality_table) +
+  geom_point(aes(group,ith,fill=group),position="jitter",color="grey50") +
+  geom_violin(aes(group,ith,fill=group),alpha=0.5) +
+  geom_signif(aes(group,ith),comparisons = list(c("diagnosis","relapse")),test = "wilcox.test") +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  theme_bw()
+
+clonality_table_paired <- clonality_table %>%
+                            filter(paired == TRUE) %>%
+                            group_by(patient,group) %>%
+                            summarise(across(.cols = c(ploidy,purity,ith),.fns = median))
+                            
+
+clonality_plot_paired <- ggplot(clonality_table_paired) +
+  geom_point(aes(group,ith,fill=group),color="grey50") +
+  geom_line(aes(group,ith,group=patient),alpha=0.5) +
+  geom_violin(aes(group,ith,fill=group),alpha=0.5) +
+  geom_signif(aes(group,ith),comparisons = list(c("diagnosis","relapse")),test = "wilcox.test",test.args = list(paired=TRUE)) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  theme_bw()
+
+ggsave(filename = "plots/paired_clonality_plot.png",plot = clonality_plot_paired,width = 9,height = 7,units = "in",dpi = 300)
+clonality_plot_paired
+```
+
+#### Intra-sampe clonality
+
+Clonality values were not different at a cohort level between primary and relapse tumours but did have variation within the groups.
+
+```{r clonality_arx_data}
+arx_clonality_table <- clonality_table %>%
+                        filter(group == "diagnosis") %>%
+                        left_join(.,patient_data,by = c("patient"="PATIENT_ID"))
+```
+
+### Clonality change
+
+```{r patient_changes}
+patient_clonality_diffs <- clonality_table %>%
+                            dplyr::filter(paired == "TRUE") %>%
+                            group_by(patient,group) %>%
+                            summarise(ith=mean(ith)) %>%
+                            ungroup() %>%
+                            group_by(patient) %>%
+                            mutate(ith_change = ith[group == "relapse"] - ith[group == "diagnosis"]) %>%
+                            dplyr::select(patient,ith_change) %>%
+                            distinct()
+```
+
+```{r clonality_change_dist}
+ggplot(patient_clonality_diffs) +
+  geom_density(aes(ith_change)) +
+  theme_bw()
+```
+
+```{r patient_ploidy}
+patient_ploidy <- meta.data %>%
+  group_by(PATIENT_ID) %>%
+  summarise(ploidy=mean(ploidy))
+
+patient_purity <- meta.data %>%
+  group_by(PATIENT_ID) %>%
+  summarise(purity=mean(purity))
+```
+
+```{r clonality_diff_cors}
+patient_clonality_diffs <- patient_clonality_diffs %>%
+  inner_join(.,patient_data,by = c("patient"="PATIENT_ID")) %>%
+  mutate(.data = .,diagnosis_distance = as.numeric(difftime(diagnosis_date,as.Date(format(Sys.time(), '%Y-%m-%d')))))
+
+patient_clonality_diffs$ploidy <- patient_ploidy$ploidy[match(patient_clonality_diffs$patient,patient_ploidy$PATIENT_ID)]
+patient_clonality_diffs$purity <- patient_purity$purity[match(patient_clonality_diffs$patient,patient_purity$PATIENT_ID)]
+```
+
+```{r clonality_diff_age}
+ggplot(patient_clonality_diffs) +
+  geom_point(aes(age,ith_change)) +
+  geom_smooth(aes(age,ith_change),method = "lm") +
+  theme_bw()
+
+cor.test(patient_clonality_diffs$age,patient_clonality_diffs$ith_change,method = "kendal")
+```
+
+```{r clonality_diff_sample_age}
+ggplot(patient_clonality_diffs) +
+  geom_point(aes(diagnosis_distance,ith_change)) +
+  geom_smooth(aes(diagnosis_distance,ith_change),method = "lm") +
+  theme_bw()
+
+cor.test(patient_clonality_diffs$diagnosis_distance,patient_clonality_diffs$ith_change,method = "kendal")
+```
+
+```{r clonality_diff_sensitivity}
+delta_itg_pt_sens <- ggplot(patient_clonality_diffs) +
+  geom_point(aes(pt_sensitivity_at_reg,ith_change,fill=pt_sensitivity_at_reg),position="jitter") +
+  geom_violin(aes(pt_sensitivity_at_reg,ith_change,fill=pt_sensitivity_at_reg),alpha=0.6) +
+  geom_signif(aes(pt_sensitivity_at_reg,ith_change),comparisons = list(c("resistant","sensitive")),test = "wilcox.test") +
+  ylab(label = paste0("\u0394","ITH")) +
+  xlab("") +
+  scale_fill_discrete(name = "platinum status") +
+  theme_bw()
+delta_itg_pt_sens
+ggsave(filename = "plots/delta_itg_pt_sens.png",plot = delta_itg_pt_sens,width = 8,height = 6,units = "in",dpi = 300)
+```
+
+##### Clonality patient-level analysis
+
+```{r arx_multi_sample_data}
+multisite_patients <- clonality_table %>%
+  group_by(patient) %>%
+  tally() %>%
+  filter(n > 1) %>%
+  dplyr::select(patient)
+
+multisite_data <- clonality_table %>%
+  filter(patient %in% multisite_patients$patient)
+
+plot(as.dendrogram(
+  hclust(
+    dist(x = as.data.frame(multisite_data[multisite_data$patient == "BRITROC-232",c("ith")],
+                           row.names = as.character(multisite_data[multisite_data$patient == "BRITROC-232",c("sample")]))))))
+                
+```
+
+

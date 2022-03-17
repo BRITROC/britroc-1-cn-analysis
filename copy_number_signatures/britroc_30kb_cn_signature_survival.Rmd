@@ -1,0 +1,397 @@
+---
+title: "Britroc CN signature survival replication"
+author: "Philip Smith"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+---
+
+## Init
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r library}
+library(car)
+library(kableExtra)
+library(RPostgres)
+library(survival)
+library(survcomp)
+library(tidyverse)
+library(zoo)
+```
+
+```{r load_funs}
+source("../copy_number_signatures/data/britroc_30kb_functions.R")
+```
+
+## Load data and Funs.
+
+```{r sig_data}
+load("britroc_30kb_signature_data.rds")
+
+tcga_samp_comp <- generateSampleByComponentMatrix(readRDS("data/tcga_CN_features.rds"))
+tcga_sigs <- quantifySignatures(tcga_samp_comp)
+sig_pat_mat_tcga <- tcga_sigs
+
+
+pcawg_samp_comp <- generateSampleByComponentMatrix(readRDS("data/pcawg_CN_features.rds"))
+pcawg_sigs <- quantifySignatures(pcawg_samp_comp)
+sig_pat_mat_pcawg <- pcawg_sigs
+```
+
+
+```{r survival_analysis}
+survival_data <- read.table("../britroc_cohort_patient_data.tsv",header = T,sep = "\t")
+survival_data$britroc_number <- as.character(survival_data$britroc_number)
+survival_samples <- patient.meta %>%
+                      filter(grepl(x = SAMPLE_ID,pattern = "IM_")) %>%
+                      filter(!duplicated(PATIENT_ID)) %>%
+                      mutate(PATIENT_ID=gsub(pattern = "BRITROC-",replacement = "",x = PATIENT_ID))
+
+britroc_surv_dat <- right_join(survival_data,survival_samples,by = c("britroc_number"="PATIENT_ID"))
+rownames(britroc_surv_dat) <- britroc_surv_dat$SAMPLE_ID
+britroc_surv_dat <- britroc_surv_dat[colnames(sig_quants)[colnames(sig_quants)%in%rownames(britroc_surv_dat)],]
+
+britroc_surv_dat <- britroc_surv_dat[!(is.na(britroc_surv_dat$int_start) | is.na(britroc_surv_dat$int_end)),]
+```
+
+## NatGen Replication
+
+### External survival information
+
+```{r survival_ext}
+tcga_clin<-read.table("data/tcga_sample_info.txt",stringsAsFactors = F,header=T,sep="\t")
+pcawg_clin<-read.table("data/pcawg_sample_info.txt",sep="\t",header=T,stringsAsFactors = F)
+pcawg_cohort<-read.table("data/pcawg_cohort_info.txt",header=T,sep="\t",stringsAsFactors = F)
+
+#pcawg survival data
+pdat<-pcawg_cohort[pcawg_cohort$tumor_wgs_aliquot_id%in%colnames(sig_pat_mat_pcawg),c("tumor_wgs_aliquot_id","icgc_donor_id","dcc_project_code")]
+pdat<-merge(pdat,pcawg_clin[,c("icgc_donor_id","donor_vital_status","donor_survival_time","donor_interval_of_last_followup","donor_age_at_diagnosis")],by.x=2,by.y=1)
+pdat<-pdat[!duplicated(pdat$tumor_wgs_aliquot_id),]
+rownames(pdat)<-pdat$tumor_wgs_aliquot_id
+pdat<-pdat[colnames(sig_pat_mat_pcawg),]
+pcawg_surv_dat<-pdat
+pcawg_os<-pcawg_surv_dat$donor_survival_time
+pcawg_os[is.na(pcawg_os)]<-pcawg_surv_dat$donor_interval_of_last_followup[is.na(pcawg_os)]
+pcawg_surv_dat$os<-pcawg_os
+pcawg_event<-pcawg_surv_dat$donor_vital_status
+pcawg_event<-plyr::revalue(pcawg_event,c("deceased"=1,"alive"=0))
+pcawg_surv_dat$event<-pcawg_event
+
+#tcga survival data
+tcga_surv_dat<-tcga_clin
+tcga_surv_dat<-tcga_surv_dat[!is.na(tcga_surv_dat$age_at_initial_pathologic_diagnosis),]
+tcga_surv_dat<-tcga_surv_dat[tcga_surv_dat$bcr_aliquot_barcode%in%colnames(sig_pat_mat_tcga),]
+tcga_surv_dat<-tcga_surv_dat[!is.na(tcga_surv_dat$days_to_last_followup),]
+tcga_survival_sigmat<-sig_pat_mat_tcga
+tcga_os<-tcga_surv_dat$days_to_death
+tcga_status<-!is.na(tcga_os)
+tcga_surv_dat$status<-tcga_status
+tcga_os[is.na(tcga_os)]<-tcga_surv_dat$days_to_last_followup[is.na(tcga_os)]
+tcga_surv_dat$os<-tcga_os
+```
+
+### Signatures & survival object
+
+```{r survive_sigs}
+survival_sig_quants <- sig_quants
+
+combined_sig_pat_mat<-cbind(survival_sig_quants[,rownames(britroc_surv_dat)],
+                            sig_pat_mat_pcawg[,rownames(pcawg_surv_dat)],
+                            sig_pat_mat_tcga[,tcga_surv_dat$bcr_aliquot_barcode])
+
+combined_sig_pat_mat[combined_sig_pat_mat<=0.02]<-0.02
+
+# Old OS with correction for incorrect Deceased or alive assignment described above
+# survival_os <-survival::Surv(time= c(britroc_surv_dat$int_start,
+#                                    rep(1,length(pcawg_os)),
+#                                    rep(1,length(tcga_os))),
+#                            time2=c(britroc_surv_dat$int_end,
+#                                    pcawg_surv_dat$os,
+#                                    tcga_surv_dat$os),
+#                            event=c(!britroc_surv_dat$status,
+#                                    as.numeric(pcawg_surv_dat$event)==1,
+#                                    tcga_surv_dat$status))
+
+survival_os <-survival::Surv(time= c(britroc_surv_dat$int_start,
+                                   rep(1,length(pcawg_os)),
+                                   rep(1,length(tcga_os))),
+                           time2=c(britroc_surv_dat$int_end,
+                                   pcawg_surv_dat$os,
+                                   tcga_surv_dat$os),
+                           event=c(britroc_surv_dat$status,
+                                   as.numeric(pcawg_surv_dat$event)==1,
+                                   tcga_surv_dat$status))
+
+survival_ids<-c(rownames(britroc_surv_dat),rownames(pcawg_surv_dat),rownames(tcga_surv_dat))
+
+sig_data<-data.frame(t(combined_sig_pat_mat),
+                     study=c(rep("britroc",nrow(britroc_surv_dat)),
+                             pcawg_surv_dat$dcc_project_code,rep("TCGA",nrow(tcga_surv_dat))),
+                     age=c(britroc_surv_dat$age,
+                           pcawg_surv_dat$donor_age_at_diagnosis,
+                           tcga_surv_dat$age_at_initial_pathologic_diagnosis),
+                     stringsAsFactors = F)
+
+age_recode <- case_when(
+                sig_data$age <= 39 ~ 1,
+                sig_data$age >= 40 & sig_data$age <= 44  ~ 2,
+                sig_data$age >= 45 & sig_data$age <= 49  ~ 3,
+                sig_data$age >= 50 & sig_data$age <= 54  ~ 4,
+                sig_data$age >= 55 & sig_data$age <= 59  ~ 5,
+                sig_data$age >= 60 & sig_data$age <= 64  ~ 6,
+                sig_data$age >= 65 & sig_data$age <= 69  ~ 7,
+                sig_data$age >= 70 & sig_data$age <= 74  ~ 8,
+                sig_data$age >= 75 & sig_data$age <= 79  ~ 9,
+                sig_data$age >= 50 ~ 10,
+             )
+sig_data$age_recode <- age_recode
+head(sig_data)
+```
+
+### Normalise by variance 
+
+```{r sig_norm_var}
+nsig <- 7
+sig_low_var <- which.min(apply(combined_sig_pat_mat,1,var))
+sig_data[,1:nsig] <- apply(sig_data[,1:nsig],2,function(x){log2(mapply("/",x,sig_data[,sig_low_var]))})
+sig_low_var
+```
+
+### Split test and training
+
+```{r generate_sig_data}
+set.seed(77777)
+samp_num<-0.7
+
+#### Original Geoff code - no sampling ####
+#britroc_train <- rownames(britroc_surv_dat)
+#britroc_test <- rownames(britroc_surv_dat)[!rownames(britroc_surv_dat)%in%britroc_train]
+
+## Issue with strata in test group not occuring in training group - while loop samples groups until all in test are present in training
+## May need additional fix
+len.fact <- 1
+while(len.fact > 0){
+  britroc_train <- sample(rownames(britroc_surv_dat),round(samp_num*nrow(britroc_surv_dat)))
+  britroc_test <- rownames(britroc_surv_dat)[!rownames(britroc_surv_dat)%in%britroc_train]
+
+  pcawg_train <- sample(rownames(pcawg_surv_dat),round(samp_num*nrow(pcawg_surv_dat)))
+  pcawg_test <- rownames(pcawg_surv_dat)[!rownames(pcawg_surv_dat)%in%pcawg_train]
+
+  tcga_train <- sample(rownames(tcga_surv_dat),round(samp_num*nrow(tcga_surv_dat)))
+  tcga_test <- rownames(tcga_surv_dat)[!rownames(tcga_surv_dat)%in%tcga_train]
+
+  train.factors <- interaction(sig_data$study[survival_ids %in% c(britroc_train,pcawg_train,tcga_train)],
+                             sig_data$age_recode[survival_ids %in% c(britroc_train,pcawg_train,tcga_train)])
+  test.factors <- interaction(sig_data$study[survival_ids %in% c(britroc_test,pcawg_test,tcga_test)],
+                             sig_data$age_recode[survival_ids %in% c(britroc_test,pcawg_test,tcga_test)])
+
+  len.fact <- length(test.factors[which(!test.factors %in% train.factors)])
+}
+
+sig_data_train <- sig_data[survival_ids %in% c(britroc_train,pcawg_train,tcga_train),]
+sig_data_test <- sig_data[survival_ids %in% c(britroc_test,pcawg_test,tcga_test),]
+combined_os_survival_train <- survival_os[survival_ids %in% c(britroc_train,pcawg_train,tcga_train)]
+combined_os_survival_test <- survival_os[survival_ids %in% c(britroc_test,pcawg_test,tcga_test)]
+```
+
+### Fit training
+
+```{r fitting_training}
+os_coxph <- coxph(combined_os_survival_train ~ s1+s2+s3+s4+s6+s7 + strata(study,age_recode,na.group=T), data = sig_data_train)
+#os_coxph <- coxph(combined_os_survival_train ~ s1+s2+s3+s4+s5+s7 + strata(study,age_recode,na.group=T), data = sig_data_train)
+summary(os_coxph)
+```
+
+### Hazard proportions training
+
+```{r nonprop_test}
+cox.zph(os_coxph)
+```
+
+### Fit test
+
+```{r predict_test}
+train_predict <- predict(os_coxph,type="risk")
+test_predict <- predict(os_coxph,newdata=sig_data_test,type="risk")
+
+perf <- survcomp::concordance.index(x = test_predict, surv.time = combined_os_survival_test[,"stop"],
+                          surv.event = combined_os_survival_test[, "status"], method = "noether",na.rm = TRUE)
+perf[1:5]
+```
+
+### Fit all data
+
+```{r fit_os_all}
+os_coxph <- coxph(survival_os~ s1+s2+s3+s4+s6+s7 + strata(study,age_recode,na.group=T), data = sig_data)
+#os_coxph <- coxph(survival_os~ s1+s2+s3+s4+s5+s7 + strata(study,age_recode,na.group=T), data = sig_data)
+summary(os_coxph)
+```
+
+### Hazard proportion all
+
+```{r nonpro_os_all}
+cox.zph(os_coxph)
+```
+
+### Hazard fitting results
+
+```{r hazard_table}
+predicted_survival <- predict(os_coxph,type="risk")
+
+HR <- round(exp(coef(os_coxph)), 2)
+CI <- round(exp(confint(os_coxph)), 2)
+P <- round(coef(summary(os_coxph))[,5], 3)
+colnames(CI) <- c("Lower", "Higher")
+hazard_table <- as.data.frame(cbind(HR, CI, P))
+hazard_table <- cbind(Signature=row.names(hazard_table),hazard_table)
+kable(hazard_table,row.names = F) %>%
+  kable_styling(full_width = F)
+```
+
+```{r original_hr}
+orig_hr_tb <- data.frame(Signature=c("s1","s2","s3","s4","s6","s7"),
+                         HR=c(1.15,1.12,0.91,1.00,1.01,0.88),
+                         Lower=c(1.06,1.01,0.83,0.91,0.93,0.81),
+                         Higher=c(1.25,1.23,1.00,1.10,1.10,0.97),
+                         P=c(0.001,0.029,0.049,0.970,0.734,0.006))
+kable(orig_hr_tb,row.names = F) %>%
+  kable_styling(full_width = F)
+```
+
+## New britroc fitting
+
+### Signatures & survival object
+
+```{r survive_sigs_britroc}
+britroc_sig_pat_mat <- survival_sig_quants[,rownames(britroc_surv_dat)]
+
+britroc_sig_pat_mat[britroc_sig_pat_mat<=0.02]<-0.02
+
+survival_os_britroc <-survival::Surv(time=britroc_surv_dat$int_start,
+                           time2=britroc_surv_dat$int_end,
+                           event=britroc_surv_dat$status)
+
+survival_ids_britroc <- rownames(britroc_surv_dat)
+
+sig_data_britroc <- data.frame(t(britroc_sig_pat_mat),
+                     study=rep("britroc",nrow(britroc_surv_dat)),
+                     age=britroc_surv_dat$age,stringsAsFactors = F)
+
+age_recode <- case_when(
+                sig_data_britroc$age <= 39 ~ 1,
+                sig_data_britroc$age >= 40 & sig_data_britroc$age <= 44  ~ 2,
+                sig_data_britroc$age >= 45 & sig_data_britroc$age <= 49  ~ 3,
+                sig_data_britroc$age >= 50 & sig_data_britroc$age <= 54  ~ 4,
+                sig_data_britroc$age >= 55 & sig_data_britroc$age <= 59  ~ 5,
+                sig_data_britroc$age >= 60 & sig_data_britroc$age <= 64  ~ 6,
+                sig_data_britroc$age >= 65 & sig_data_britroc$age <= 69  ~ 7,
+                sig_data_britroc$age >= 70 & sig_data_britroc$age <= 74  ~ 8,
+                sig_data_britroc$age >= 75 & sig_data_britroc$age <= 79  ~ 9,
+                sig_data_britroc$age >= 50 ~ 10,
+             )
+sig_data_britroc$age_recode <- age_recode
+head(sig_data_britroc)
+```
+
+### Normalise by variance 
+
+```{r sig_norm_var_britroc}
+nsig_britroc <- 7
+sig_low_var_britroc <- which.min(apply(britroc_sig_pat_mat,1,var))
+sig_data_britroc[,1:nsig_britroc] <- apply(sig_data_britroc[,1:nsig_britroc],
+                                         2,
+                                         function(x){log2(mapply("/",x,sig_data_britroc[,sig_low_var_britroc]))})
+sig_low_var_britroc
+```
+
+### Split test and training
+
+```{r generate_sig_data_britroc}
+#### Original Geoff code - no sampling ####
+#britroc_train <- rownames(britroc_surv_dat)
+#britroc_test <- rownames(britroc_surv_dat)[!rownames(britroc_surv_dat)%in%britroc_train]
+
+## Issue with strata in test group not occuring in training group - while loop samples groups until all in test are present in training
+## May need additional fix
+len.fact_britroc <- 1
+while(len.fact_britroc > 0){
+  britroc_train_britroc <- sample(rownames(britroc_surv_dat),round(samp_num*nrow(britroc_surv_dat)))
+  britroc_test_britroc <- rownames(britroc_surv_dat)[!rownames(britroc_surv_dat)%in%britroc_train_britroc]
+
+  # pcawg_train <- sample(rownames(pcawg_surv_dat),round(samp_num*nrow(pcawg_surv_dat)))
+  # pcawg_test <- rownames(pcawg_surv_dat)[!rownames(pcawg_surv_dat)%in%pcawg_train]
+  # 
+  # tcga_train <- sample(rownames(tcga_surv_dat),round(samp_num*nrow(tcga_surv_dat)))
+  # tcga_test <- rownames(tcga_surv_dat)[!rownames(tcga_surv_dat)%in%tcga_train]
+
+  train.factors_britroc <- interaction(sig_data_britroc$study[survival_ids_britroc %in% c(britroc_train_britroc)],
+                             sig_data_britroc$age_recode[survival_ids_britroc %in% c(britroc_train_britroc)])
+  test.factors_britroc <- interaction(sig_data_britroc$study[survival_ids_britroc %in% c(britroc_test_britroc)],
+                             sig_data_britroc$age_recode[survival_ids_britroc %in% c(britroc_test_britroc)])
+
+  len.fact_britroc <- length(test.factors_britroc[which(!test.factors_britroc %in% train.factors_britroc)])
+}
+
+sig_data_train_britroc <- sig_data_britroc[survival_ids_britroc %in% c(britroc_train_britroc),]
+sig_data_test_britroc <- sig_data_britroc[survival_ids_britroc %in% c(britroc_test_britroc),]
+britroc_os_survival_train <- survival_os_britroc[survival_ids_britroc %in% c(britroc_train_britroc)]
+britroc_os_survival_test <- survival_os_britroc[survival_ids_britroc %in% c(britroc_test_britroc)]
+```
+
+### Fit training
+
+```{r fitting_training_britroc}
+os_coxph_britroc <- coxph(britroc_os_survival_train ~ s1+s2+s3+s4+s5+s7 + strata(age_recode,na.group=T),
+                          data = sig_data_train_britroc)
+summary(os_coxph_britroc)
+```
+
+### Hazard proportions training
+
+```{r nonprop_test_britroc}
+cox.zph(os_coxph_britroc)
+```
+
+### Fit test
+
+```{r predict_test_britroc}
+train_predict_britroc <- predict(os_coxph_britroc,type="risk")
+test_predict_britroc <- predict(os_coxph_britroc,newdata=sig_data_test_britroc,type="risk")
+
+perf <- survcomp::concordance.index(x = test_predict_britroc, surv.time = britroc_os_survival_test[,"stop"],
+                          surv.event = britroc_os_survival_test[, "status"], method = "noether",na.rm = TRUE)
+perf[1:5]
+```
+
+### Fit all data
+
+```{r fit_os_britroc}
+os_coxph_britroc <- coxph(survival_os_britroc ~ s1+s2+s3+s4+s5+s7 + strata(age_recode,na.group=T), data = sig_data_britroc)
+summary(os_coxph_britroc)
+```
+
+### Hazard proportion all
+
+```{r nonpro_os_britroc}
+cox.zph(os_coxph_britroc)
+```
+
+### Hazard fitting results
+
+```{r hazard_table_britroc}
+predicted_survival <- predict(os_coxph_britroc,type="risk")
+
+HR_britroc <- round(exp(coef(os_coxph_britroc)), 2)
+CI_britroc <- round(exp(confint(os_coxph_britroc)), 2)
+P_britroc <- round(coef(summary(os_coxph_britroc))[,5], 3)
+colnames(CI_britroc) <- c("Lower", "Higher")
+hazard_table_britroc <- as.data.frame(cbind(HR_britroc, CI_britroc, P_britroc))
+hazard_table_britroc <- cbind(Signature=row.names(hazard_table_britroc),hazard_table_britroc)
+kable(hazard_table_britroc,row.names = F) %>%
+  kable_styling(full_width = F)
+```

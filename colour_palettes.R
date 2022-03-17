@@ -1,0 +1,29 @@
+# colour_palettes set
+
+primary_colour_setting <- "#E1BE6A"
+relapse_colour_setting <- "#40B0A6"
+gain_colour_setting <- "firebrick1"
+amp_colour_setting <- "firebrick3"
+loss_colour_setting <- "dodgerblue1"
+del_colour_setting <- "dodgerblue4"
+
+colour_palettes <- list(arx_rlps=c(arx=primary_colour_setting,
+                                   rlps=relapse_colour_setting),
+                        diagnosis_relapse=c(diagnosis=primary_colour_setting,
+                                            relapse=relapse_colour_setting),
+                        primary_relapse=c(primary=primary_colour_setting,
+                                          relapse=relapse_colour_setting),
+                        amplification_deletion=c(gain=gain_colour_setting,
+                                                 amplification=amp_colour_setting,
+                                                 loss=loss_colour_setting,
+                                                 deletion=del_colour_setting),
+                        amp_del=c(gain=gain_colour_setting,
+                                  amplification=amp_colour_setting,
+                                  loss=loss_colour_setting,
+                                  deletion=del_colour_setting),
+                        AMP_DEL=c(GAIN=gain_colour_setting,
+                                   AMP=amp_colour_setting,
+                                   LOSS=loss_colour_setting,
+                                   DEL=del_colour_setting))
+
+rm(list = ls()[grep("*_colour_setting",ls())])

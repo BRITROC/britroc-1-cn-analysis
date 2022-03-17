@@ -1,0 +1,256 @@
+---
+title: "Generate survival data"
+author: "Philip Smith"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libs}
+library(RPostgres)
+library(config)
+library(tidyverse)
+library(ggnewscale)
+library(zoo)
+```
+
+```{r db_open}
+clin_config <- config::get("clinDB")
+britroc_con <- dbConnect(RPostgres::Postgres(),
+                         dbname=clin_config$dbname,
+                         host=clin_config$host,
+                         port = clin_config$port,
+                         user = clin_config$user,
+                         password = clin_config$password
+)
+```
+
+## Survival data generation
+
+```{r read_tables}
+pat.data <- RPostgres::dbReadTable(britroc_con, 'patients')
+chemo_lines <- RPostgres::dbReadTable(britroc_con, 'chemotherapy_lines')
+chemo_drugs <- RPostgres::dbReadTable(britroc_con, 'chemotherapy_lines_drugs')
+```
+
+```{r filter_tables}
+paste0("Patients with pat.data data: ",length(unique(pat.data$britroc_number)))
+
+chemo_lines <- chemo_lines %>%
+  group_by(fk_britroc_number) %>%
+  mutate(total_reg_chemo = max(chemotherapy_line)) %>%
+  mutate(pre_reg_chemo = max(chemotherapy_line[time_relation_to_image_guided_biopsy == "before"])) %>%
+  mutate(post_reg_chemo = total_reg_chemo - pre_reg_chemo)
+
+paste0("Patients with chemo_line data: ",length(unique(chemo_lines$fk_britroc_number)))
+
+## Remove patients with no progression date information (TO BE CHANGED)
+chemo_lines <- chemo_lines %>%
+  filter(!c(is.na(progression_date) & is.na(progression_date_misc)))
+
+paste0("Patients with chemo_line progression data: ",length(unique(chemo_lines$fk_britroc_number)))
+
+chemo_drugs <- chemo_drugs %>%
+                group_by(fk_britroc_number,chemotherapy_line) %>%
+                mutate(course = row_number()) %>%
+                dplyr::select(-id)
+
+paste0("Patients with chemo_drug data: ",length(unique(chemo_drugs$fk_britroc_number)))
+missing_chemo <- sort(unique(c(setdiff(chemo_lines$fk_britroc_number,chemo_drugs$fk_britroc_number),
+       setdiff(chemo_drugs$fk_britroc_number,chemo_lines$fk_britroc_number))))
+paste0("Patients not in both chemo_tables: ",paste0(missing_chemo,collapse = ","))
+```
+
+```{r combine_tables}
+chemo_data <- as.data.frame(full_join(x=chemo_lines,y=chemo_drugs,by = c("fk_britroc_number","chemotherapy_line")))
+paste0("Patients with chemo data: ",length(unique(chemo_data$fk_britroc_number)))
+
+survival_data <- as.data.frame(full_join(x = pat.data,y = chemo_data, by = c("britroc_number"="fk_britroc_number")) %>%
+                    dplyr::select(britroc_number,
+                           age,
+                           diagnosis_date,
+                           diagnosis_date_misc,
+                           tumour_stage_at_diagnosis,
+                           registration_date,
+                           date_of_death,
+                           date_alive,
+                           progression_date,
+                           progression_date_misc,
+                           drug,
+                           pt_sensitivity_at_reg,
+                           total_reg_chemo,
+                           pre_reg_chemo,
+                           post_reg_chemo) %>%
+                    mutate(plat=grepl(x = drug,pattern = "plat",ignore.case = T)) %>%
+                    mutate(britroc_number = as.character(britroc_number)) %>%
+                    group_by(britroc_number) %>%
+                    mutate(drugs = paste0(drug, collapse = ",")) %>%
+                    mutate(plat = paste0(plat, collapse = ",")) %>%
+                    dplyr::select(-drug) %>%
+                    distinct())
+
+paste0("Available patient data: ",length(unique(survival_data$britroc_number)))
+```
+
+```{r date_fixes}
+date_cols <- c("diagnosis_date","registration_date","date_of_death","progression_date","date_alive")
+survival_data[date_cols] <- lapply(survival_data[date_cols],as.Date, "%m/%d/%Y")
+
+## Split diagnosis_date_misc to save diagnosis dates with month and year data but no day
+survival_data$diagnosis_date_misc_month <- str_split(survival_data$diagnosis_date_misc,pattern = " ",n = 2,simplify = T)[,1]
+survival_data$diagnosis_date_misc_year <- str_split(survival_data$diagnosis_date_misc,pattern = " ",n = 2,simplify = T)[,2]
+## NA converted to characters during database gen - revert to NA characters
+survival_data$diagnosis_date_misc_month[which(survival_data$diagnosis_date_misc_month == "NA")] <- NA
+## Index usable month/year data
+diag_data_idx <- which(is.na(survival_data$diagnosis_date) & !is.na(survival_data$diagnosis_date_misc_month) & !is.na(survival_data$diagnosis_date_misc_year))
+## Generate date-format data to add to 
+diag_dates <- paste0(survival_data$diagnosis_date_misc_month[diag_data_idx],survival_data$diagnosis_date_misc_year[diag_data_idx])
+survival_data$diagnosis_date[diag_data_idx] <- as.Date(as.yearmon(diag_dates, format = "%b%Y"))
+
+## Split progression_date_misc to save progression dates with month and year data but no day
+survival_data$progression_date_misc_month <- str_split(survival_data$progression_date_misc,pattern = " ",n = 2,simplify = T)[,1]
+survival_data$progression_date_misc_year <- str_split(survival_data$progression_date_misc,pattern = " ",n = 2,simplify = T)[,2]
+## NA converted to characters during database gen - revert to NA characters
+survival_data$progression_date_misc_month[which(survival_data$progression_date_misc_month == "NA")] <- NA
+## Index usable month/year data
+prog_data_idx <- which(is.na(survival_data$progression_date) & !is.na(survival_data$progression_date_misc_month) & !is.na(survival_data$progression_date_misc_year))
+## Generate date-format data to add to 
+prog_dates <- paste0(survival_data$progression_date_misc_month[prog_data_idx],survival_data$progression_date_misc_year[prog_data_idx])
+survival_data$progression_date[prog_data_idx] <- as.Date(as.yearmon(prog_dates, format = "%b%Y"))
+```
+
+```{r progress_filter}
+missing_prog <- survival_data %>%
+                  group_by(britroc_number) %>%
+                  mutate(prog_reg_closest = all(is.na(progression_date))) %>%
+                  filter(prog_reg_closest)
+## Take progression date closest to registration (TO BE REMOVED)
+survival_data <- survival_data %>%
+                  group_by(britroc_number) %>%
+                  filter(!is.na(progression_date)) %>%
+                  mutate(prog_reg_closest = abs(as.numeric(progression_date - registration_date)) == 
+                           min(abs(as.numeric(progression_date - registration_date)),na.rm = T)) %>%
+                  filter(prog_reg_closest) %>%
+                  dplyr::select(-prog_reg_closest)
+
+
+
+paste0("Patients with progression date: ",length(unique(survival_data$britroc_number)))
+paste0("Patients missing any progression date: ",paste0(unique(missing_prog$britroc_number),collapse = ", "))
+```
+
+```{r exlc_diag}
+missing_diag <- survival_data[is.na(survival_data$diagnosis_date),]
+survival_data <- survival_data[!is.na(survival_data$diagnosis_date),]
+paste0("Patients with diagnosis date: ",length(unique(survival_data$britroc_number)))
+paste0("Patients missing any diagnosis date: ",paste0(unique(missing_diag$britroc_number),collapse = ", "))
+```
+
+```{r add_surv_metrics}
+# GEOFF CODE WITH POTENTIAL ERROR
+# # DTLAST: DTALIVE or DOD
+# # STATUS: a death event was recorded as 1 and survival as 0  
+# merged$DTLAST <- merged$DTALIVE
+# survidx <- which(!is.na(merged$DOD))
+# merged$DTLAST[survidx] <- merged$DOD[survidx]
+# merged$STATUS <- 1  
+# merged$STATUS[survidx] <- 0
+
+## last documented clinical outcome 
+survival_data$doc_date <- survival_data$date_alive
+survidx <- which(!is.na(survival_data$date_of_death))
+survival_data$doc_date[survidx] <- survival_data$date_of_death[survidx]
+survival_data$status <- 0
+survival_data$status[survidx] <- 1
+
+## Add OS,PFS,time from diag to registration (int_Start), and time from diag to end time point (int_end)
+survival_data$os <- difftime(survival_data$doc_date,survival_data$diagnosis_date)
+survival_data$pfs <- difftime(survival_data$progression_date,survival_data$diagnosis_date)
+survival_data$int_start <- difftime(survival_data$registration_date,survival_data$diagnosis_date)
+survival_data$int_end <- difftime(survival_data$doc_date,survival_data$diagnosis_date)
+```
+
+```{r filter_surv_metrics}
+# note odd group of patients with time to progression greater than time to registration - given that progression is the reason for registration
+diff_pfs_int <- survival_data[which(survival_data$int_start < survival_data$pfs),] %>%
+                  mutate(diff_int_pfs = pfs - int_start)
+paste0("Patients with Progression greater than time to registration: ",length(unique(survival_data$britroc_number[which(survival_data$int_start < survival_data$pfs)])))
+diff_pfs_int[,c(1,23:ncol(diff_pfs_int))]
+```
+
+```{r write_table}
+paste0("Patients with clinical data: ",length(unique(survival_data$britroc_number)))
+paste0("Patients missing: ",paste0(which(!seq.int(1,276,1) %in% unique(survival_data$britroc_number)),collapse = ", "))
+paste0("Duplicated patient rows: ",length(which(any(duplicated(survival_data$britroc_number)))))
+
+## Final table
+write.table(x = survival_data,file = "britroc_cohort_patient_data.tsv",quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
+```{r summary_plot}
+plot_data <- survival_data[order(survival_data$pt_sensitivity_at_reg,survival_data$os,decreasing = FALSE),]
+plot_chemo_drugs <- RPostgres::dbReadTable(britroc_con, 'chemotherapy_lines_drugs')
+plot_chemo_drugs$fk_britroc_number <- as.character(plot_chemo_drugs$fk_britroc_number)
+
+diag_date <- plot_data
+
+plot_chemo_lines <- plot_chemo_drugs %>%
+                    right_join(.,diag_date,by = c("fk_britroc_number"="britroc_number")) %>%
+                    mutate(line_start=difftime(start_date,registration_date,units = "days")) %>%
+                    mutate(line_end=difftime(completion_date,registration_date,units = "days")) %>%
+                    mutate(britroc_number = fk_britroc_number)
+
+plot_data$britroc_number <- factor(plot_data$britroc_number,levels = plot_data$britroc_number)
+plot_chemo_lines$britroc_number <- factor(plot_chemo_lines$britroc_number,levels = plot_data$britroc_number)
+plot_chemo_lines <- plot_chemo_lines[order(plot_chemo_lines$britroc_number),]
+plot_chemo_lines <- plot_chemo_lines[which(!is.na(plot_chemo_lines$chemotherapy_line)),]
+plot_chemo_lines$chemotherapy_line[plot_chemo_lines$chemotherapy_line > 4] <- "5+"
+
+write.table(plot_chemo_lines,file = "britroc_patient_treatment_data.tsv",quote = F,sep = "\t",row.names = F,col.names = T)
+plot_data$status <- ifelse(plot_data$status == 0, "alive","deceased")
+
+plot_data <- plot_data %>%
+      dplyr::select(britroc_number,pt_sensitivity_at_reg,status,os,int_start) %>%
+      mutate(diag=0-int_start,os=os-int_start,int_start=int_start-int_start) %>%
+      dplyr::select(-int_start) %>%
+      pivot_longer(values_to= "time",names_to = "event",cols = c(diag,os))
+
+year_breaks <- -seq(-730*2,730*10,730)
+year_labs <- year_breaks / 365
+year_labs[year_labs == 0] <- "Reg. date"
+
+sum_plot <- ggplot() +
+              geom_hline(data = plot_data,aes(yintercept = britroc_number),color = "grey95") +
+              geom_point(data = plot_data,aes(x = as.numeric(time),y = britroc_number,shape = status,color = event)) +
+              geom_vline(xintercept = 0) +
+              scale_shape_manual(values = c(15,0)) +
+              geom_point(data = plot_data[plot_data$event == "diag",],aes(x = as.numeric(time),y = britroc_number,color = event),shape = 15) +
+              scale_color_manual(values = c("deeppink2","#2171b5"),labels = c("diagnosis","last follow up")) +
+              new_scale_color() +
+              geom_linerange(data = plot_chemo_lines,
+                             aes(y = britroc_number,xmin = as.numeric(line_start),xmax = as.numeric(line_end),color = chemotherapy_line),
+                             size = 1,alpha = 0.8) +
+              scale_color_brewer(name = "chemotherapy line",palette = "Oranges") +
+              ylab("Patient (grouped by platinum sensitivity)") +
+              xlab("Years") +
+              labs(title = "BriTROC cohort clinical timeline") +
+              scale_x_continuous(expand = c(0,0),
+                                 limits = c(min(plot_data$time)*1.05,max(plot_data$time)*1.05),
+                                 breaks = year_breaks,labels = year_labs) +
+              facet_grid(space = "free_y",scales = "free_y",rows = vars(pt_sensitivity_at_reg),switch = "y") +
+              theme_bw() +
+              theme(axis.text.y = element_blank(),
+                    axis.ticks.y = element_blank(),
+                    legend.position = "bottom",
+                    panel.grid = element_blank())
+
+sum_plot
+saveRDS(object = sum_plot,file = "cohort_plot.RDS")
+ggsave(filename = "cohort_summary_plot.png",plot = sum_plot,device = "png",width = 12,height = 9,dpi = "retina",units = "in")
+```

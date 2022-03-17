@@ -1,0 +1,570 @@
+---
+title: "Medicc2 britroc analysis"
+author: "Philip Smith"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libs}
+library(data.table)
+library(GenomicRanges)
+library(tidyverse)
+library(ggplotify)
+library(ape)
+```
+
+```{r funcs}
+get_first_sample <- function(trees){
+  l <- length(trees)
+  s <- lapply(1:l,FUN = function(x){
+    trees[[x]]$tip.label[1]  
+  })
+  return(unlist(s))
+  
+}
+
+get_second_sample <- function(trees){
+  l <- length(trees)
+  s <- lapply(1:l,FUN = function(x){
+    trees[[x]]$tip.label[2]  
+  })
+  return(unlist(s))
+  
+}
+
+name_trees <- function(trees){
+  fs <- get_first_sample(trees)
+  ss <- get_second_sample(trees)
+  p <- meta.data$PATIENT_ID[match(fs,meta.data$SAMPLE_ID)]
+  names(trees) <- paste0(p,"_",fs,"_",ss)
+  return(trees)
+}
+
+add_clin_data <- function(table,clin){
+  coln <- colnames(table)
+  for(i in clin){
+    matches <- match(as.numeric(gsub(pattern = "BRITROC-",replacement = "",table$PATIENT_ID)),clin.data$britroc_number)
+    #print(matches)
+    v <- clin.data[matches,which(colnames(clin.data) == i)]
+    table <- cbind(table,v)
+  }
+  colnames(table) <- c(coln,clin)
+  return(table)
+}
+
+get_grouped_branch_lengths <- function(trees,method="median"){
+  group.branches <- do.call(rbind,lapply(trees,FUN = function(x){
+    
+    if(sum(x$tip.label %in% primary.samples) == length(x$tip.label) - 1){
+      primary.branches <- NA
+    } else {
+      primary.branches <- cophenetic(drop.tip(x,x$tip.label[x$tip.label %in% primary.samples]))["diploid",]
+    }
+    
+    if(sum(x$tip.label %in% relapse.samples) == length(x$tip.label) - 1){
+      relapse.branches <- NA
+    } else {
+      relapse.branches <- cophenetic(drop.tip(x,x$tip.label[x$tip.label %in% relapse.samples]))["diploid",]
+    }
+    
+    if(method == "median"){
+      primary.branches <- median(primary.branches[primary.branches != 0])
+    } else if(method == "mean"){
+      primary.branches <- mean(primary.branches[primary.branches != 0])
+    } else {
+      stop("unknown summary method - use mean or median")
+    }
+    if(method == "median"){
+      relapse.branches <- median(relapse.branches[relapse.branches != 0])
+    } else if(method == "mean"){
+      relapse.branches <- mean(relapse.branches[relapse.branches != 0])
+    } else {
+      stop("unknown summary method - use mean or median")
+    }
+    branches <- c(primary.branches,relapse.branches)
+    return(branches)
+  }))
+  colnames(group.branches) <- c("primary.branches","relapse.branches")
+  return(group.branches)
+}
+
+get_tree_stats <- function(trees,method="median"){
+  if(is.null(trees)){
+    stop("Trees object not provided")
+  }
+  ## samples (including diploid)
+  nsamples <- lapply(trees,FUN = function(x){
+    l <- length(x$tip.label)
+  })
+  nsamples <- unlist(nsamples)
+  ## Longest branch
+  longest.branch <- lapply(trees,FUN = function(x){
+    l <- max(cophenetic.phylo(x)["diploid",])  
+  })
+  longest.branch <- unlist(longest.branch)
+  ## Tree length
+  tree.length <- lapply(trees,FUN = function(x){
+    l <- sum(x$edge.length)  
+  })
+  tree.length <- unlist(tree.length)
+  ## mean branch length
+  mean.branch.length <- lapply(trees,FUN = function(x){
+    l <- mean(x$edge.length[x$edge.length != 0])  
+  })
+  mean.branch.length <- unlist(mean.branch.length)
+  ## median branch length
+  median.branch.length <- lapply(trees,FUN = function(x){
+    l <- median(x$edge.length[x$edge.length != 0])  
+  })
+  median.branch.length <- unlist(median.branch.length)
+  ## min branch length
+  min.branch.length <- lapply(trees,FUN = function(x){
+    l <- min(x$edge.length[x$edge.length != 0])   
+  })
+  min.branch.length <- unlist(min.branch.length)
+  ## max branch length
+  max.branch.length <- lapply(trees,FUN = function(x){
+    l <- max(x$edge.length)  
+  })
+  max.branch.length <- unlist(max.branch.length)
+  
+  grouped.branches <- get_grouped_branch_lengths(trees = all.trees,method = "median")
+  ## Combine stats
+  table <- as.data.frame(cbind(nsamples=nsamples,
+                longest.branch,
+                tree.length,
+                mean.branch.length,
+                median.branch.length,
+                min.branch.length,
+                max.branch.length,
+                grouped.branches)) %>%
+          rownames_to_column(var = "SET_ID") 
+  ## Return table
+  return(table)
+}
+
+add_sample_info <- function(x){
+  x %>%
+    mutate(paired = ifelse(grepl(SET_ID,pattern = "IM") & grepl(SET_ID,pattern = "JB"),TRUE,FALSE)) %>%
+    mutate(primary_only = ifelse(grepl(SET_ID,pattern = "IM") & !grepl(SET_ID,pattern = "JB"),TRUE,FALSE)) %>%
+    mutate(relapse_only = ifelse(!grepl(SET_ID,pattern = "IM") & grepl(SET_ID,pattern = "JB"),TRUE,FALSE)) %>%
+    mutate(sample_types = ifelse(paired == TRUE,"paired",
+                                            ifelse(primary_only == TRUE,"primary_only",
+                                                   ifelse(relapse_only == TRUE,"relapse_only",NA))))
+}
+
+get_binned_segment_table <- function(segtable = NULL,binsize = 30000,seqlengths){
+  if(is.null(segtable)){
+    stop("no segment table")
+  }
+  # Make Granges from data.frame format
+  table_gr <- makeGRangesFromDataFrame(segtable,keep.extra.columns = T,ignore.strand = T)
+  # Generate tiled genome of given bin size and seq.length
+  tiles <- unlist(tileGenome(seqlengths = seqlengths,tilewidth = binsize))
+  # Merge bins and segment tables to form annotated bins
+  binned <- as.data.frame(mergeByOverlaps(tiles,table_gr))
+  binned_mat <- as.data.frame(binned %>%
+                                dplyr::select(-c(contains("table_gr"),"tiles.strand","tiles.width")) %>%
+                                pivot_wider(values_from = "segVal",names_from = "sample",) %>%
+                                dplyr::rename(c("chromosome"="tiles.seqnames","start"="tiles.start","end"="tiles.end")))
+  
+  # binned <- as.data.frame(tiles)[,1:3]
+  # for(i in unique(table_gr$sample)){
+  #   s.tiles <- tiles
+  #   subtable <- table_gr[table_gr$sample == i,]
+  #   overlaps <- findOverlaps(s.tiles,table_gr,select = "first")
+  #   s.tiles$segVal <- table_gr$segVal[overlaps]
+  #   samplecol <- as.data.frame(s.tiles) %>%
+  #     dplyr::select(-seqnames,-start,-end,-strand,-width) %>%
+  #     dplyr::rename(!!as.character(i) := "segVal")
+  #   binned <- cbind(binned,samplecol)
+  # }
+  # binned_mat <- as.data.frame(binned %>%
+  #                 dplyr::rename(c("chromosome"="seqnames")))
+  
+  rowN <- paste0(binned_mat[,1],":",binned_mat[,2],"-",binned_mat[,3])
+  binned_mat <- binned_mat[,-c(1:3)]
+  binned_mat <- apply(binned_mat,MARGIN = 2,FUN = function(x) as.numeric(x))
+  rownames(binned_mat) <- rowN
+  naRows <- which(apply(binned_mat,1,FUN = function(x) any(is.na(x))))
+  if(length(naRows) > 0){
+    binned_mat <- binned_mat[-c(naRows),]
+  }
+  return(as.data.frame(binned_mat))
+}
+
+bin_profiles <- function(x){
+  seqlengths <- get_seq_lengths(x)
+  bins <- lapply(X = all.profiles,
+            FUN = function(x){
+              get_binned_segment_table(segtable = x,seqlengths = seqlengths)
+              })
+  nas <- lapply(bins[1],FUN = function(z){
+    n <- apply(z,MARGIN = 1,FUN = function(y) all(is.na(y)))
+    r <- rownames(z)[n]
+    return(r)
+  })
+  naRows <- unique(unlist(nas))
+  binsNA <- lapply(bins,FUN = function(x){
+    x <- x[!c(rownames(x) %in% naRows),]
+    return(x)
+  })
+}
+
+read_profiles <- function(dir="results/medicc2_output/",pattern = "*_final_cn_profiles.tsv",sep="\t"){
+  filelist <- paste0(dir,list.files(path = dir,pattern = pattern))
+  patname <- gsub(x = gsub(x = filelist,pattern = dir,replacement = ""),pattern = pattern,replacement = "")
+  profile.list <- lapply(seq_along(filelist),FUN = function(x){
+    file <- read.table(filelist[x],header = T,sep = sep)
+    return(file)
+  })
+  names(profile.list) <- patname
+  return(profile.list)
+}
+
+modify_profiles <- function(profiles = NULL){
+  if(is.null(profiles)){
+    stop("No profiles provided")
+  }
+  mod_profs <- lapply(profiles,FUN = function(x){
+  x %>%
+    dplyr::select(chrom,start,end,cn_a,sample_id) %>%
+    dplyr::rename("chromosome"="chrom","segVal"="cn_a","sample" = "sample_id")
+  })
+  return(mod_profs)
+}
+
+get_seq_lengths <- function(x){
+  df <- do.call(rbind,lapply(all.profiles,FUN = function(y){
+    y
+  }))
+  df <- df %>%
+    group_by(chromosome) %>%
+    summarise_at(.vars = vars(end),max) %>%
+    mutate(chromosome = str_sort(chromosome,numeric = TRUE))
+  seqlen <- df$end
+  names(seqlen) <- df$chromosome
+  return(seqlen)
+}
+
+annotate_profile_segments <- function(profiles=NULL){
+  if(is.null(profiles)){
+    stop("no profiles provided")
+  }
+  t <- lapply(profiles,FUN = function(x){
+    col.names <- colnames(x)
+    primary.col <- which(col.names %in% primary.samples)
+    relapse.col <- which(col.names %in% relapse.samples)
+    diploid.col <- which(col.names == "diploid")
+    internal.col <- which(col.names == "internal_1")
+    if(length(primary.col) > 1 | length(primary.col) == 0){
+      stop("no primary or multiple primary samples present")
+    }
+    if(length(relapse.col) > 1 | length(relapse.col) == 0){
+      stop("no relapse or multiple relapse samples present")
+    }
+    if(length(diploid.col) > 1 | length(diploid.col) == 0){
+      stop("no diploid or multiple diploid samples present")
+    }
+    if(length(internal.col) > 1 | length(internal.col) == 0){
+      stop("no internal or multiple internal samples present")
+    }
+    segment.id <- apply(x,MARGIN = 1,FUN = function(y){
+      ifelse(all(y == 2),"diploid",
+       ifelse(y[primary.col] == y[internal.col] & y[relapse.col] == y[internal.col],"internal",
+        ifelse(y[primary.col] != y[internal.col] & y[relapse.col] != y[internal.col] & y[primary.col] == y[relapse.col],"convergent",
+         ifelse(y[primary.col] != y[relapse.col] & y[primary.col] != y[internal.col] & y[relapse.col] == y[internal.col],"primary",
+          ifelse(y[relapse.col] != y[primary.col] & y[relapse.col] != y[internal.col] & y[primary.col] == y[internal.col],"relapse",
+           ifelse(y[primary.col] != y[relapse.col] & y[primary.col] != y[internal.col] & y[relapse.col] != y[internal.col],"divergent",NA))))))
+      })
+    x <- cbind(x,segment.id)
+    return(as.data.frame(x))
+  })
+  return(t)
+}
+
+format_forked_profiles <- function(x){
+    x <- x %>%
+      rownames_to_column(var = "position") %>%
+      mutate(chromosome = str_split(string = position,pattern = ":",simplify = T)[,1]) %>%
+      group_by(chromosome) %>%
+      mutate(plot_start = seq.int(from = 1,to = (n()*30000-1),by = 30000)) %>%
+      mutate(plot_end = seq.int(from = 30000,to = (n()*30000),by = 30000)) %>%
+      dplyr::select(-diploid) %>%
+      relocate(chromosome,plot_start,plot_end) %>%
+      pivot_longer(cols = -c(1:4,ncol(.)))
+    x$chromosome <- factor(x$chromosome,levels = unique(str_sort(x$chromosome,numeric = TRUE)))
+    return(x)
+}
+
+plot_segment_identities <- function(x){
+  x <- format_forked_profiles(x)
+      
+  p1 <- ggplot(x) +
+        geom_hline(yintercept = seq.int(1,10,1),
+                   linetype=1,color = "blue",alpha=0.2) +
+        geom_segment(aes(x = plot_start,xend = plot_end,y = value,yend = value,color = segment.id),size=1) +
+        scale_y_continuous(limits = c(0,10),
+                           expand = c(0,0),
+                           breaks = seq.int(0,10,2)) +
+        facet_grid(cols = vars(chromosome),
+                   rows = vars(name),
+                   scales = "free_x",
+                   space="free") +
+        xlab("") +
+        ylab("absolute copy number") +
+        theme_bw() + 
+        theme(legend.position = "none",
+              axis.text.x = element_blank(),
+              axis.ticks.x = element_blank(),
+              panel.spacing.x = unit(0.05, "lines"),
+              panel.grid = element_blank())
+  
+  p1g <- ggplotGrob(p1)
+  
+  p2 <- ggplot(x) +
+    geom_bar(aes(x = chromosome,fill=segment.id),position="fill") +
+    facet_grid(cols = vars(chromosome),scales="free",space="free") +
+    scale_y_continuous(limits = c(0,1),expand = c(0,0)) +
+    theme_bw() +
+    theme(legend.position = "bottom",
+              axis.text.x = element_blank(),
+              axis.ticks.x = element_blank(),
+              panel.spacing.x = unit(0.05, "lines"),panel.grid = element_blank())
+  
+  p2g <- ggplotGrob(p2)
+  p2g$widths <- p1g$widths
+  p2 <- ggpubr::as_ggplot(p2g)
+  pl <- cowplot::plot_grid(p1,p2g,nrow = 2,rel_heights = c(1.5,1),axis = "l",align = "h")
+  pl
+}
+```
+
+```{r vars}
+binsize <- 30000
+```
+
+```{r load_medicc_data}
+all.trees <- read.tree("results/medicc2_output/all.trees.new")
+
+all.profiles <- read_profiles(dir = "results/medicc2_output/")
+
+all.profiles <- modify_profiles(profiles = all.profiles)
+
+seqlengths <- get_seq_lengths(x = all.profiles)
+
+all.profiles.binned <- bin_profiles(all.profiles)
+```
+
+```{r read_meta_clin}
+meta.data <- read.table("../../copy_number_signatures/britroc_30kb_signature_data_meta.tsv",header = T,sep = "\t")
+clin.data <- read.table("../../britroc_cohort_patient_data.tsv",header = T,sep = "\t")
+
+primary.samples <- meta.data$SAMPLE_ID[meta.data$group == "arx"]
+relapse.samples <- meta.data$SAMPLE_ID[meta.data$group == "rlps"]
+```
+
+```{r name_and_plot_trees}
+all.trees <- name_trees(all.trees)
+#plot(all.trees)
+```
+
+```{r tree_stats}
+## Extract series of tree statistics
+tree_stats <- get_tree_stats(all.trees)
+## Add sample information
+tree_stats <- add_sample_info(tree_stats)
+## Add BRITROC ID back
+tree_stats <- tree_stats %>%
+                mutate(PATIENT_ID = str_split(string = SET_ID,pattern = "_",n = 3,simplify = T)[,1]) %>%
+                relocate(PATIENT_ID,SET_ID,paired,primary_only,relapse_only,sample_types)
+```
+
+```{r add_clin_data}
+tree_stats <- add_clin_data(table = tree_stats,clin = c("pt_sensitivity_at_reg","age","os","pfs","tumour_stage_at_diagnosis","pre_reg_chemo"))
+tree_stats$tumour_stage_at_diagnosis <- as.factor(tree_stats$tumour_stage_at_diagnosis)
+```
+
+```{r profile_annotations}
+fork_profiles <- all.profiles.binned[tree_stats$PATIENT_ID[tree_stats$paired == "TRUE" & tree_stats$nsamples == 3]]
+fork_profiles_ann <- annotate_profile_segments(profiles = fork_profiles)
+
+## segment id plot example
+plot_segment_identities(x = fork_profiles_ann[[1]])
+#ggsave(plot = p,filename = "plots/patient_tree_segIds_example.png",width = 8,height = 4,units = "in",dpi = 300)
+## summarise segment.ids
+
+segment.id.summary <- do.call(rbind,lapply(names(fork_profiles_ann),FUN = function(x){
+  y <- fork_profiles_ann[[x]]
+  t <- data.frame(patient=x,table(y$segment.id))
+}))
+
+ggplot(segment.id.summary) +
+  geom_boxplot(aes(Var1,Freq,fill=Var1)) +
+  coord_flip() +
+  theme_bw()
+```
+
+```{r internal_arx_subtraction}
+
+### BINS NEED TO BE EQUAL ACROSS ALL PATIENTS
+
+do.call(cbind,lapply(fork_profiles_ann,FUN = function(x){
+  col.names <- colnames(x)
+  primary.col <- which(col.names %in% primary.samples)
+  relapse.col <- which(col.names %in% relapse.samples)
+  diploid.col <- which(col.names == "diploid")
+  internal.col <- which(col.names == "internal_1")
+  x <- x %>%
+    mutate(internal_relapse_events = as.numeric(.[[relapse.col]] - .[[internal.col]])) %>%
+    dplyr::select(internal_relapse_events)
+  return(x)
+}))
+
+# get_internal_genome_diffs <- function(data,method="median"){
+#   patients <- names(data)
+#   
+#   arx_int <- do.call(cbind,lapply(patients,FUN = function(x){
+#     pat_name <- x
+#     mat <- data[[pat_name]]
+#     abs_subset <- mat[,colnames(mat) %in% primary.samples]
+#     if(method == "mean"){
+#       arx_bin <- rowMeans(abs_arx_bins,na.rm = T)
+#     } else if(method == "median"){
+#       arx_bin <- rowMedians(abs_arx_bins,na.rm = T)
+#     } else {
+#       stop("unknown method")
+#     }
+#     return(arx_bin)
+#   }))
+#     
+#   })
+#   arxdiffs <- do.call(cbind,lapply(names(sample_by_pat_list),FUN = function(x){
+#     pat_name <- x
+#     abs_samples <- sub_meta$SAMPLE_ID[sub_meta$PATIENT_ID %in% x]
+#     abs_subset <- data[,colnames(data) %in% abs_samples]
+#     arx_samps <- colnames(abs_subset)[colnames(abs_subset) %in% arx_samples]
+#     abs_arx <- abs_subset[,colnames(abs_subset) %in% arx_samps]
+#     abs_arx_bins <- assayDataElement(abs_arx,elt = "segmented")
+#     if(method == "mean"){
+#       arx_bin <- rowMeans(abs_arx_bins,na.rm = T)
+#     } else if(method == "median"){
+#       arx_bin <- rowMedians(abs_arx_bins,na.rm = T)
+#     } else {
+#       stop("unknown method")
+#     }
+#     return(arx_bin)
+#   }))
+#   
+#   rlpsdiffs <- do.call(cbind,lapply(names(sample_by_pat_list),FUN = function(x){
+#     pat_name <- x
+#     abs_samples <- sub_meta$SAMPLE_ID[sub_meta$PATIENT_ID %in% x]
+#     abs_subset <- data[,colnames(data) %in% abs_samples]
+#     rlps_samps <- colnames(abs_subset)[colnames(abs_subset) %in% rlps_samples]
+#     abs_rlps <- abs_subset[,colnames(abs_subset) %in% rlps_samps]
+#     abs_rlps_bins <- assayDataElement(abs_rlps,elt = "segmented")
+#     
+#     if(method == "mean"){
+#       rlps_bin <- rowMeans(abs_rlps_bins,na.rm = T)
+#     } else if(method == "median"){
+#       rlps_bin <- rowMedians(abs_rlps_bins,na.rm = T)
+#     } else {
+#       stop("unknown method")
+#     }
+#     return(rlps_bin)
+#   }))
+#   arxdiffs <- data.frame(arxdiffs)
+#   colnames(arxdiffs) <- paste0(names(sample_by_pat_list),"_arx")
+# 
+#   rlpsdiffs <- data.frame(rlpsdiffs) 
+#   colnames(rlpsdiffs) <- paste0(names(sample_by_pat_list),"_rlps")
+#   
+#   diffs <- cbind(arxdiffs,rlpsdiffs)
+#   rownames(diffs) <- rownames(data)
+#   return(diffs)
+# }
+# 
+# paired_diffs <- get_paired_genome_diffs(data = abs_data[,colnames(abs_data) %in% meta.data$SAMPLE_ID[meta.data$paired == "TRUE"]],
+#                                         method = "median")
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r plot_format}
+tree_stats_long <- tree_stats %>%
+                    pivot_longer(cols = c(7:15),names_to = "tree", values_to = "n")
+
+patient_treelen_order <- tree_stats_long[tree_stats_long$tree == "tree.length",] %>%
+  arrange(n) %>%
+  dplyr::select(SET_ID)
+tree_stats_long$SET_ID <- factor(tree_stats_long$SET_ID,levels = patient_treelen_order$SET_ID)
+```
+
+```{r tree_plots}
+ggplot(tree_stats_long[tree_stats_long$tree == "tree.length",]) +
+  geom_boxplot(aes(sample_types,n,fill=sample_types)) +
+  theme_bw() +
+  coord_flip()
+# ggplot(tree_stats_long) +
+#   geom_point(aes(chemotherapy_lines,n,colour=chemotherapy_lines),position="jitter") +
+#   geom_boxplot(aes(chemotherapy_lines,n),fill=NA,outlier.colour = NA) +
+#   facet_wrap(.~tree,scales = "free") +
+#   theme_bw()
+
+# ggplot(tree_stats_long) +
+#   geom_point(aes(pt_sensitivity_at_reg,n,colour=pt_sensitivity_at_reg),position="jitter") +
+#   geom_boxplot(aes(pt_sensitivity_at_reg,n),fill=NA,outlier.colour = NA) +
+#   facet_wrap(.~tree,scales = "free") +
+#   theme_bw()
+# 
+# ggplot(tree_stats_long) +
+#   geom_point(aes(tumour_stage_at_diagnosis,n,colour=tumour_stage_at_diagnosis),position="jitter") +
+#   geom_boxplot(aes(tumour_stage_at_diagnosis,n),fill=NA,outlier.colour = NA) +
+#   facet_wrap(.~tree,scales = "free") +
+#   theme_bw() +
+#   theme(legend.position = "bottom")
+# 
+# ggplot(tree_stats_long) +
+#   geom_point(aes(os,n,colour=os)) +
+#   #geom_boxplot(aes(os,n),fill=NA,outlier.colour = NA) +
+#   facet_wrap(.~tree,scales = "free") +
+#   theme_bw() +
+#   theme(legend.position = "bottom")
+# 
+# ggplot(tree_stats_long) +
+#   geom_point(aes(pfs,n,colour=pfs)) +
+#   #geom_boxplot(aes(pfs,n),fill=NA,outlier.colour = NA) +
+#   facet_wrap(.~tree,scales = "free") +
+#   theme_bw() +
+#   theme(legend.position = "bottom")
+# 
+# ggplot(tree_stats_long) +
+#   geom_point(aes(tree,n,colour=tree),position="jitter") +
+#   geom_boxplot(aes(tree,n),fill=NA,outlier.colour = NA) +
+#   #facet_wrap(.~tree,scales = "free") +
+#   theme_bw()
+# 
+# ggplot(tree_stats_long) +
+#   geom_point(aes(n,PATIENT_ID,colour=tree),position="jitter") +
+#   #geom_boxplot(aes(tree,n),fill=NA,outlier.colour = NA) +
+#   facet_wrap(.~tree,scales = "free") +
+#   theme_bw() +
+#   theme(legend.position = "bottom",axis.text.y = element_blank())
+```
+

@@ -1,0 +1,401 @@
+---
+title: "Analysis of patient heterogeneity"
+author: "Philip Smith"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+---
+
+### Clonality parameters
+
+In this context `clonality` is referring to the error parameter used in the fitting of absolute copy number profiles and is described as a measure of fitting error for a given profile based on the distance of segments from integer values (see [details](https://github.com/Phil9S/swgs-absolutecn/blob/master/resources/quality_control_guide.md#clonality-error-parameter)). In correctly fitted profiles, non-integer segments are more likely to be as a consequence of tumour heterogeneity than of a sample being incorrectly fit to the wrong ploidy and purity combination.
+
+This `clonality` parameter therefore acts as a proxy for the degree of tumour heterogeneity within a sample and can therefore be interrogated as a biological feature of the samples, with some limitations in terms of variables with which the clonality variable will correlate.
+
+```{r get_clonality}
+clonality <- get_clonality(abs_data = abs_data,
+                           weighted = FALSE,
+                           smooth = FALSE)
+
+clonality_table <- add_clonality_meta(clonality)
+```
+
+```{r group_clonaliy}
+kableExtra::kable(clonality_table) %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
+```
+
+The density of clonality of the samples included in this analysis are broadly represented between near zero (values lower than 0.05 are attributable to low genomic variance and/or no underlying copy number changes which uncharacteristic of HGSOV) and 0.25 (clonality values greater than this were exclusively seen in unfitted profiles which were excluded during QC).
+
+```{r plot_clonaltiy_dens}
+ggplot(clonality_table) +
+  geom_density(aes(clonality)) +
+  theme_bw()
+```
+
+A rudimentary approach to take is to utilise the clonality value without modification but this fails to account for inherent noise in higher ploidy and lower purity samples, as well as ignoring the impact of smaller segments on the clonality sample mean. The clonality metric is known to correlate with ploidy and inversely correlate with purity as profile noise and deviation from integer values increase and decrease as ploidy and purity increase, respectively. Smaller segments are given too much weight when calculating the mean clonality as larger segments indicate a greater proportion of the genome is heterogeneous. These problems can be solved by accounting for these features. The noise can be treated by limiting the distance from integer allowed in the heterogeneity calculation and the segment size can be accounted for by weighting the segment clonality values by the segment length.
+
+This method is implemented below in the `get_clonality` function in which segments can be weight by length using `weighed = TRUE` and combining `smooth = TRUE`, `wiggle = FLOAT` and `limit = FLOAT` removes segments with clonality values too close or far from integer.
+
+```{r get_clonality_approaches}
+clonalityws <- get_clonality(abs_data = abs_data,
+                             weighted = TRUE,
+                             smooth = TRUE,
+                             wiggle = 0.1,
+                             limit = 1)
+
+clonalitys <- get_clonality(abs_data = abs_data,
+                            weighted = FALSE,
+                            smooth = TRUE,
+                            wiggle = 0.1,
+                            limit = 1)
+
+clonalityw <- get_clonality(abs_data = abs_data,
+                            weighted = TRUE,
+                            smooth = FALSE,
+                            wiggle = 0.1,
+                            limit = 1)
+
+clonalityn <- get_clonality(abs_data = abs_data,
+                            weighted = FALSE,
+                            smooth = FALSE,
+                            wiggle = 0.1,
+                            limit = 1)
+```
+
+As seen in the correlation plot for the 4 differing clonality methods, weighting is easy but also changes very little about the underlying data, suggesting that segment length is having a minimal effect on the estimates for tumour heterogeneity in these samples. Regardless, weighting should be included to account for potential edge cases with unusual clonality-segment distributions.
+
+```{r clonality_approaches_corr}
+corrplot::corrplot(cor(cbind(clonalityws,clonalityw,clonalitys,clonalityn)),
+                   method = "color",
+                   diag = FALSE,
+                   type = "upper",
+                   addCoef.col = "black",
+                   tl.col = "black")
+```
+
+The more important parameter to define is the `wiggle` and `limit` applied to the clonality values, which are assigned to `0.1` and `1`, respectively, so that segments within `0.1` of integer are not included and the limit is essentially not applied as a clonality value of `1` is not numerically possible. Its clear that ploidy and purity are correlated with clonality, which poses an issue when trying to assess heterogeneity in a independent manner.
+
+```{r plot_clonality_ploidy}
+ggplot(clonality_table) +
+  geom_point(aes(ploidy,clonality)) +
+  geom_smooth(aes(ploidy,clonality),method = "lm") +
+  theme_bw()
+
+cor.test(clonality_table$ploidy,clonality_table$clonality,method = "kendal")
+```
+
+```{r plot_clonality_purity}
+ggplot(clonality_table) +
+  geom_point(aes(purity,clonality)) +
+  geom_smooth(aes(purity,clonality),method = "lm") +
+  theme_bw()
+
+cor.test(clonality_table$purity,clonality_table$clonality,method = "kendal")
+```
+
+```{r clonality_corr_limits}
+# limits <- seq.int(0.01,0.5,0.01)
+# limit_correlation <- data.frame(limit=numeric(),puritycorr=numeric(),ploidycorr=numeric())
+# for(i in limits){
+#   table <- add_clonality_meta(get_clonality(abs_data = abs_data,
+#                              weighted = FALSE,
+#                              smooth = TRUE,
+#                              wiggle = 0,
+#                              limit = i))
+#   limit_correlation <- add_corr(table,type = "limit")
+# }
+# 
+# kableExtra::kable(limit_correlation) %>%
+#   kable_styling() %>%
+#   scroll_box(height = "200px")
+# 
+# ggplot(pivot_longer(data = limit_correlation,cols = 2:ncol(limit_correlation),names_to = "feature")) +
+#   geom_smooth(aes(limit,value),method = "loess",alpha = 0.2) +
+#   geom_line(aes(limit,value,color=feature)) +
+#   facet_wrap(. ~ feature) +
+#   theme_bw()
+```
+
+```{r clonality_corr_wiggle}
+wiggles <- seq.int(0.01,0.4,0.01)
+wiggle_correlation <- data.frame(wiggle=numeric(),
+                                 puclonality=numeric(),
+                                 plclonality=numeric(),
+                                 puzscore=numeric(),
+                                 plzscore=numeric(),
+                                 pucorrected=numeric(),
+                                 plcorrected=numeric())
+for(i in wiggles){
+  table <- add_clonality_meta(get_clonality(abs_data = abs_data,
+                             weighted = FALSE,
+                             smooth = TRUE,
+                             wiggle = i))
+  wiggle_correlation <- add_corr(table,type = "wiggle")
+}
+
+kableExtra::kable(wiggle_correlation) %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
+
+ggplot(pivot_longer(data = wiggle_correlation,cols = 2:ncol(wiggle_correlation),names_to = "feature")) +
+  geom_smooth(aes(wiggle,value),method = "loess",alpha = 0.2) +
+  geom_line(aes(wiggle,value,color=feature)) +
+  facet_wrap(. ~ feature) +
+  theme_bw()
+```
+
+Plotting the range of `limit` values from `0.01` to `0.5` stepwise by `0.01` shows that clonality-ploidy increases as the limit on clonality is increased up until approximately ~0.15 clonality, at which point the correlation between clonality and ploidy stabilise. The same is true for the inverse correlation seen in the clonality-purity correlation, where the negative correlation strengthens until approximately ~-0.15 at which point it stabilises.
+
+Plotting across the range of `wiggle` values from `0.01` to `0.4` stepwise by `0.01`, dictating the minimum distance from integer allowed shows two diverging trends for ploidy and purity in relation to their correlation with clonality. The correlation between clonality and ploidy continually decreases as the `wiggle` value becomes increasingly restrictive. Conversely, the purity-clonality correlation appears to stabilise and partially reverse as `wiggle` becomes increasingly distance from integer, with stabilisation occurring at between 0.1 and 0.15.
+
+From evidence in these correlation plots, ploidy is more structured in how it impacts clonality compared to purity. Ploidy ranges centre about each integer ploidy state, which in the context of paired samples (which have near identical ploidy values across primary and relapse cases) suggest that each increased copy of a haploid genome leads to some fixed increase in clonality. This can be explained by the biological features of high CN profiles. If heterogeneity in a hypothetical tumour remains constant, a corresponding tumour with a higher ploidy state has a great range of copy states at which segments can fit. Greater difference between the copy state of the clonal population compared to the sub clonal population increases the clonality.
+
+Therefore accounting for these features, purity for a given sample is incorporated into the clonality value, smoothing is `TRUE` with a wiggle value of `0.1` and no limit is applied to the smoothing.
+
+##### Arx clonality survival
+
+```{r clonality_arx_mean}
+clonality_change_mean <- mean(arx_clonality_table$clonality)
+arx_clonality_table$clonality_mean <- ifelse(arx_clonality_table$clonality < clonality_change_mean,"low","high")
+```
+
+```{r clonality_arx_surv_os}
+ggsurvplot(survfit(Surv(os, status) ~ clonality_mean,
+           data = arx_clonality_table),
+           pval = T,surv.median.line = "hv",legend = "right")
+```
+
+```{r clonality_arx_surv_pfs}
+ggsurvplot(survfit(Surv(pfs, status) ~ clonality_mean,
+           data = arx_clonality_table),
+           pval = T,surv.median.line = "hv",legend = "right")
+```
+
+```{r clonality_arx_surv_os_univariate}
+univar_surv(surv = Surv(arx_clonality_table$os, arx_clonality_table$status),
+            covariates = c("clonality","age","tumour_stage_at_diagnosis","ploidy","purity","pt_sensitivity_at_reg"),
+            data = arx_clonality_table)
+```
+
+```{r clonality_arx_surv_pfs_univariate}
+univar_surv(surv = Surv(arx_clonality_table$pfs, arx_clonality_table$status),
+            covariates = c("clonality","age","tumour_stage_at_diagnosis","ploidy","purity","pt_sensitivity_at_reg"),
+            data = arx_clonality_table)
+```
+
+```{r clonality_arx_surv_censor_univariate}
+univar_surv(surv = Surv(time = arx_clonality_table$int_start, time2 = arx_clonality_table$int_end, event = arx_clonality_table$status),
+     covariates = c("clonality","age","tumour_stage_at_diagnosis","ploidy","purity","pt_sensitivity_at_reg"),
+     data = arx_clonality_table)
+```
+
+```{r clonality_arx_surv_os_multi}
+multivar_surv(surv = Surv(arx_clonality_table$os, arx_clonality_table$status),
+            covariates = c("clonality","age","tumour_stage_at_diagnosis","ploidy","purity","pt_sensitivity_at_reg"),
+            data = arx_clonality_table)
+```
+
+```{r clonality_arx_surv_pfs_multi}
+multivar_surv(surv = Surv(arx_clonality_table$pfs, arx_clonality_table$status),
+            covariates = c("clonality","age","tumour_stage_at_diagnosis","ploidy","purity","pt_sensitivity_at_reg"),
+            data = arx_clonality_table)
+```
+
+```{r clonality_arx_surv_censor_multi}
+multivar_surv(surv = Surv(time = arx_clonality_table$int_start, time2 = arx_clonality_table$int_end, event = arx_clonality_table$status),
+     covariates = c("clonality","age","tumour_stage_at_diagnosis","ploidy","purity","pt_sensitivity_at_reg"),
+     data = arx_clonality_table)
+```
+
+#### Clonality / signature correlations
+
+Though the copy number signatures are based on the underlying copy number features present in the bulk sample profile, no features specifically measure the deviation from integer state. Here correlations are performed on a sample-level to compare the clonality of a given profile to signature exposures.
+
+Signature exposure data is loaded and z-score normalised after which the transposed signature exposure matrix is left joined with the clonality table and samples (with zero exposure removed).
+
+```{r load_signature_data}
+load("../copy_number_signatures/britroc_30kb_signature_data.rds")
+
+sig_quants[sig_quants == 0] <- NA
+
+signatures_z <- as.data.frame(t(sig_quants)) %>%
+  apply(.,MARGIN = 2, FUN = function(x) (x-mean(x,na.rm=T))/sd(x,na.rm = T))
+
+signatures_z <- as.data.frame(signatures_z) %>%
+  rownames_to_column("sample")
+
+clonality_signature_table <- clonality_table %>%
+  left_join(.,signatures_z,by = "sample") %>%
+  pivot_longer(cols = 8:14,names_to="signature",values_to="exposure") %>%
+  filter(!is.na(exposure))
+```
+
+```{r clonality_sig_corr_plot}
+ggplot(clonality_signature_table) +
+  geom_point(aes(clonality,exposure,color=group)) +
+  geom_smooth(aes(clonality,exposure,color=group),method = "lm") +
+  facet_wrap(. ~ signature,scales = "free_x") +
+  theme_bw()
+```
+
+```{r clonality_sig_corr}
+cor <- as.data.frame(do.call(rbind,
+                             lapply(split(clonality_signature_table,
+                                                f = list(clonality_signature_table$group,clonality_signature_table$signature)),
+                                          FUN = function(x){ 
+  c(tau=as.numeric(cor.test(x$clonality,x$exposure,method = "kendal")$estimate),
+  p.value=as.numeric(cor.test(x$clonality,x$exposure,method = "kendal")$p.value))
+  })
+))
+cor[order(cor$tau,cor$p.value,decreasing = T),]
+```
+
+
+### Survival
+
+Clonality difference indicated some level of biological signal associated with change in clonality, in particular relating to platinum sensitivity. Splitting the clonality change value into two groups based on the mean observed clonality difference (named `change_group`) was examined in relation to patient survival (OS & PFS).
+
+```{r clonality_diff_survival_split}
+clonality_change_mean <- mean(patient_clonality_diffs$clonality_change)
+patient_clonality_diffs$change_group <- ifelse(patient_clonality_diffs$clonality_change < clonality_change_mean,"low","high")
+```
+
+Overall survival showed no difference in survival between high and low clonality change groups but progression-free survival showed a marked change in survival based on high or low difference in clonality.
+
+```{r clonality_diff_survival_os}
+ggsurvplot(survfit(Surv(os, status) ~ change_group,
+           data = patient_clonality_diffs),
+           pval = T,surv.median.line = "hv",legend = "right")
+```
+
+```{r clonality_diff_survival_pfs}
+ggsurvplot(survfit(Surv(pfs, status) ~ change_group,
+           data = patient_clonality_diffs),
+           pval = T,surv.median.line = "hv",legend = "right")
+```
+
+#### Univariate cox proportional
+
+To examine these survival features more closely, univariate cox proportional hazard models were applied to relevant clinical features, as well as the clonality difference value (rather than the group assignment). For univariate analysis of OS, only platinum sensitivity was statistically signifcant (diagnosis distance was statistically signifcant but the 95% HR was equal to 1 both low and hight). 
+
+```{r coxph_diff_full_os}
+univar_surv(surv = Surv(patient_clonality_diffs$os, patient_clonality_diffs$status),
+            covariates = c("clonality_change","age","tumour_stage_at_diagnosis","diagnosis_distance","ploidy","purity","pt_sensitivity_at_reg"),
+            data = patient_clonality_diffs)
+```
+
+For univariate analysis of survival, clonality change, platinum sensitivity and tumour stage at diagnosis were statistically significant. Usign the right censored, left truncated PFS methodology decsribed in the copy number signatures natGen. paper (Macintyre et al. 2018) only platinum sensitivity was statistcally significant.
+
+```{r coxph_diff_full_pfs}
+univar_surv(surv = Surv(patient_clonality_diffs$pfs, patient_clonality_diffs$status),
+            covariates = c("clonality_change","age","tumour_stage_at_diagnosis","diagnosis_distance","ploidy","purity","pt_sensitivity_at_reg"),
+            data = patient_clonality_diffs)
+```
+
+```{r coxph_diff_full_censor}
+univar_surv(surv = Surv(time=patient_clonality_diffs$int_start,time2=patient_clonality_diffs$int_end,event=patient_clonality_diffs$status),
+            covariates = c("clonality_change","age","tumour_stage_at_diagnosis","diagnosis_distance","ploidy","purity","pt_sensitivity_at_reg"),
+            data = patient_clonality_diffs)
+```
+
+#### Clonality change and pt sens
+
+Since differences in survival, particularly progression-free survival is known to be associated platinum sensitivity, survival differences observed in clonality differences could be associated with platinum sensitivity (as seen in the previous plot). Including platinum sensitivity (`pt_sensitivity_at_reg`) as an additional strata in the survival analysis shows that survival in this instances is primarily driven by platinum sensitivity. OS only showed differences in survival related to platinum sensitivity but PFS separated platinum sensitive samples into two distinct groups based on clonality differences, with high clonality difference / platinum sensitive patients having much longer survival compared to the three other groups.
+
+```{r clonality_diff_ptsens_survival_os}
+ggsurvplot(survfit(Surv(os, status) ~ change_group + pt_sensitivity_at_reg,
+           data = patient_clonality_diffs),
+           pval = T,surv.median.line = "hv",legend = "right")
+```
+
+```{r clonality_diff_sens_survival_pfs}
+ggsurvplot(survfit(Surv(pfs, status) ~ change_group + pt_sensitivity_at_reg,
+                   data = patient_clonality_diffs),
+           pval = T,surv.median.line = "hv",legend = "right")
+```
+
+#### Multivariate cox proportional
+
+```{r multi_pt_diff_cox_os}
+multivar_surv(surv = Surv(patient_clonality_diffs$os, patient_clonality_diffs$status),
+              covariates = c("clonality_change","age","tumour_stage_at_diagnosis","ploidy","purity","pt_sensitivity_at_reg"),
+              data = patient_clonality_diffs)
+```
+
+```{r multi_pt_diff_cox_pfs}
+multivar_surv(surv = Surv(patient_clonality_diffs$pfs, patient_clonality_diffs$status),
+              covariates = c("clonality_change","age","tumour_stage_at_diagnosis","ploidy","purity","pt_sensitivity_at_reg"),
+              data = patient_clonality_diffs)
+```
+
+```{r multi_pt_diff_cox_censor}
+multivar_surv(surv = Surv(time=patient_clonality_diffs$int_start,time2=patient_clonality_diffs$int_end,event=patient_clonality_diffs$status),
+              covariates = c("clonality_change","age","tumour_stage_at_diagnosis","ploidy","purity","pt_sensitivity_at_reg"),
+              data = patient_clonality_diffs)
+```
+
+#### Sensitive patients only
+
+```{r clonality_diff_sens_extract}
+patient_clonality_diffs_sens <- patient_clonality_diffs[patient_clonality_diffs$pt_sensitivity_at_reg == "sensitive",]
+```
+
+```{r clonality_diff_sens_surv_os}
+ggsurvplot(survfit(Surv(os, status) ~ change_group, data = patient_clonality_diffs_sens),
+           #risk.table = T,
+           pval = T,
+           surv.median.line = "hv",legend = "right")
+```
+
+```{r clonality_diff_sens_surv_pfs}
+ggsurvplot(survfit(Surv(pfs, status) ~ change_group, data = patient_clonality_diffs_sens),
+           #risk.table = T,
+           pval = T,
+           surv.median.line = "hv",legend = "right")
+```
+
+```{r uni_diff_full_os_sens}
+univar_surv(surv = Surv(patient_clonality_diffs_sens$os, patient_clonality_diffs_sens$status),
+            covariates = c("clonality_change","age","tumour_stage_at_diagnosis","diagnosis_distance","ploidy","purity"),
+            data = patient_clonality_diffs_sens)
+```
+
+```{r uni_diff_full_pfs_sens}
+univar_surv(surv = Surv(patient_clonality_diffs_sens$pfs, patient_clonality_diffs_sens$status),
+            covariates = c("clonality_change","age","tumour_stage_at_diagnosis","diagnosis_distance","ploidy","purity"),
+            data = patient_clonality_diffs_sens)
+```
+
+```{r uni_diff_full_censor_sens}
+univar_surv(surv = Surv(time=patient_clonality_diffs_sens$int_start,
+                        time2=patient_clonality_diffs_sens$int_end,
+                        event=patient_clonality_diffs_sens$status),
+            covariates = c("clonality_change","age","tumour_stage_at_diagnosis","diagnosis_distance","ploidy","purity"),
+            data = patient_clonality_diffs_sens)
+```
+
+```{r multi_diff_cox_os_sens}
+multivar_surv(surv = Surv(patient_clonality_diffs_sens$os, patient_clonality_diffs_sens$status),
+              covariates = c("clonality_change","age","tumour_stage_at_diagnosis","ploidy","purity"),
+              data = patient_clonality_diffs_sens)
+```
+
+```{r multi_diff_cox_pfs_sens}
+multivar_surv(surv = Surv(patient_clonality_diffs_sens$pfs, patient_clonality_diffs_sens$status),
+              covariates = c("clonality_change","age","tumour_stage_at_diagnosis","ploidy","purity"),
+              data = patient_clonality_diffs_sens)
+```
+
+```{r multi_diff_cox_censor_sens}
+multivar_surv(surv = Surv(time=patient_clonality_diffs_sens$int_start,
+                          time2=patient_clonality_diffs_sens$int_end,
+                          event=patient_clonality_diffs_sens$status),
+              covariates = c("clonality_change","age","tumour_stage_at_diagnosis","ploidy","purity"),
+              data = patient_clonality_diffs_sens)
+```
+
+

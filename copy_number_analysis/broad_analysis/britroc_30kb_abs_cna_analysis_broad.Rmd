@@ -1,0 +1,783 @@
+---
+title: "BriTROC 30kb - Analysis of broad absolute CNAs"
+author: "Philip Smith"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+---
+
+## Initial steps
+### Load libraries
+
+```{r load_libraries}
+# Load libraries
+suppressPackageStartupMessages(library(Biobase))
+suppressPackageStartupMessages(library(QDNAseqmod))
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(cowplot))
+suppressPackageStartupMessages(library(kableExtra))
+suppressPackageStartupMessages(library(limma))
+suppressPackageStartupMessages(library(UpSetR))
+suppressPackageStartupMessages(library(ggrepel))
+suppressPackageStartupMessages(library(ggpubr))
+suppressPackageStartupMessages(suppressWarnings(library(biomaRt)))
+```
+
+### Functions
+
+```{r funcs}
+## Get CN bins for gene bed
+source("data/britroc_broad_cn_funcs.R")
+source("../../colour_palettes.R")
+```
+
+## Load data
+
+### Read meta data
+
+Cytobanding data was pulled from USCS table schema for hg19. Acrocentromeric and stalk bands were dropped.
+
+```{r read_meta}
+meta.data <- read.table("../../copy_number_signatures/britroc_30kb_signature_data_meta.tsv",header = TRUE,sep = "\t")
+clinical.data <- read.table("../../britroc_cohort_patient_data.tsv",header = TRUE,sep = "\t")
+
+cytoband <- read.table("data/hg19_cytobands.tsv",header = T,sep = "\t")
+cytoband$length <- cytoband$end - cytoband$start
+
+focal_genes <- read.table("../focal_analysis/data/focal_CNA_pseudo_bed.txt",header = T,sep = "\t") %>%
+                rename(chr = "Chromosome.scaffold.name",start="Gene.start..bp.",end="Gene.end..bp.",gene = "Gene.name") %>%
+                dplyr::select(chr,start,end,gene,expected)
+positions <- paste0(focal_genes$chr,":",focal_genes$start,"-",focal_genes$end)
+```
+
+```{r biomart}
+ensembl <- useEnsembl(biomart = "ENSEMBL_MART_ENSEMBL", dataset = "hsapiens_gene_ensembl",GRCh = 37)
+protein_coding_genes <- getBM(attributes = c("chromosome_name","start_position","end_position","hgnc_symbol"),
+                                             filters = "biotype",
+                                             values = "protein_coding",
+                                             mart = ensembl,
+                                             useCache = FALSE)
+protein_coding_genes <- protein_coding_genes[protein_coding_genes$chromosome_name %in% seq.int(1,22,1),]
+protein_coding_genes <- protein_coding_genes[protein_coding_genes$hgnc_symbol != "",]
+```
+
+### Read abs data
+
+```{r read_abs}
+abs_data <- readRDS("../../absolute_POST_down_sampling/britroc_30kb_ds_absCopyNumber.rds")
+abs_data <- abs_data[,which(colnames(abs_data) %in% meta.data$SAMPLE_ID[meta.data$use == "TRUE"])]
+```
+
+```{r samples}
+arx_samples <- meta.data$SAMPLE_ID[meta.data$group == "arx"]
+rlps_samples <- meta.data$SAMPLE_ID[meta.data$group == "rlps"]
+```
+
+## Analysis
+https://www.sciencedirect.com/science/article/pii/S1535610818301119
+https://www.sciencedirect.com/science/article/pii/S1535610818301119
+https://www.sciencedirect.com/science/article/pii/S1535610818301119
+https://www.sciencedirect.com/science/article/pii/S1535610818301119
+https://www.sciencedirect.com/science/article/pii/S1535610818301119
+https://www.sciencedirect.com/science/article/pii/S1535610818301119
+https://www.sciencedirect.com/science/article/pii/S1535610818301119
+https://www.sciencedirect.com/science/article/pii/S1535610818301119
+https://www.sciencedirect.com/science/article/pii/S1535610818301119
+https://www.sciencedirect.com/science/article/pii/S1535610818301119
+https://www.sciencedirect.com/science/article/pii/S1535610818301119
+https://www.sciencedirect.com/science/article/pii/S1535610818301119
+https://www.sciencedirect.com/science/article/pii/S1535610818301119
+https://www.sciencedirect.com/science/article/pii/S1535610818301119
+https://www.sciencedirect.com/science/article/pii/S1535610818301119
+
+### Extracting segment values for protein-coding genes
+
+#### Definitions
+
+- Broad events are defined on the basis of the proportion of annotated cytoband affected by the CNA. In this case the threshold is 80% of a cytoband called as either AMP or DEL for the entire cytoband to be called as such.
+
+##### COSMIC definitions
+- AMP:
+  average genome ploidy <= 2.7 AND total copy number >= 5
+  OR
+  average genome ploidy > 2.7 AND total copy number >= 9
+
+- DELETION:
+  average genome ploidy <= 2.7 AND total copy number = 0
+  OR 
+  average genome ploidy > 2.7 AND total copy number < ( average genome ploidy - 2.7 )
+
+### Genome plot
+
+```{r broad_genome_plot}
+bin_cna_arx <- get_bin_cna(abs_data = abs_data[,colnames(abs_data) %in% arx_samples],
+                           ploidys = get_named_ploidy(data = abs_data[,colnames(abs_data) %in% arx_samples]))
+bin_cna_arx <- bin_cna_arx %>%
+                pivot_longer(cols = 3:7,names_to = "cna",values_to="frequency") %>%
+                mutate(group = rep("arx",times=nrow(.)))
+                       
+bin_cna_rlps <- get_bin_cna(abs_data = abs_data[,colnames(abs_data) %in% rlps_samples],
+                            ploidys = get_named_ploidy(data = abs_data[,colnames(abs_data) %in% rlps_samples]))
+bin_cna_rlps <- bin_cna_rlps %>%
+                pivot_longer(cols = 3:7,names_to = "cna",values_to="frequency") %>%
+                mutate(group = rep("rlps",times=nrow(.)))
+
+bin_cna <- rbind(bin_cna_arx,bin_cna_rlps)
+
+bin_cna$cna <- factor(bin_cna$cna,levels = c("neutral","gain","loss","amplification","deletion"))
+
+genome_plot <- ggplot(bin_cna[bin_cna$cna != "neutral",]) +
+  geom_col(aes(pos,frequency*100,fill=cna)) +
+  ylab("frequency (%)") +
+  xlab("") +
+  facet_grid(cols = vars(chr),
+             rows = vars(group),
+             scales = "free",
+             space = "free",
+             switch = "both",labeller = labeller(group = c(arx="diagnosis",rlps="relapse"))) +
+  scale_y_continuous(limits = c(-100,100)) +
+  scale_fill_manual(values = colour_palettes$amplification_deletion) +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks = element_blank(),
+        panel.spacing.x = unit(0.1, "lines"),
+        legend.position = "bottom")
+
+ggsave("plots/cna_freq_plot.png",plot = genome_plot,device = "png",width = 12,height = 6,units = "in",dpi = 300)
+genome_plot
+```
+
+### Genome plot subtraction
+
+```{r broad_genome_plot_paired}
+paired_diffs <- get_paired_genome_diffs(data = abs_data[,colnames(abs_data) %in% meta.data$SAMPLE_ID[meta.data$paired == "TRUE"]],
+                                        method = "median")
+paired_diffs[paired_diffs <= 0] <- 0.005
+
+paired_diffs_stats <- data.frame(paired_diffs) %>%
+            rownames_to_column() %>%
+            mutate(chr = as.numeric(str_split(string = rowname,pattern = ":",simplify = T)[,1])) %>%
+            mutate(pos = str_split(string = str_split(string = rowname,pattern = ":",simplify = T)[,2],pattern = "-",simplify = T)[,2]) %>%
+            dplyr::select(chr,pos)
+paired_diffs_stats$idx <- seq.int(1,nrow(paired_diffs_stats),1)
+
+diff_matrix <- as.matrix(paired_diffs[,c(((ncol(paired_diffs)/2)+1):ncol(paired_diffs))]) - as.matrix(paired_diffs[,1:(ncol(paired_diffs)/2)])
+paired_diffs_stats$change <- rowMedians(diff_matrix)
+paired_diffs_stats$sd <- apply(diff_matrix,MARGIN = 1,sd)
+
+## Wilcox paired (wilcoxon signed-rank)
+paired_diffs_stats$wilcox_pval <- sapply(1:nrow(paired_diffs), function(i){
+  unlist(wilcox.test(as.numeric(paired_diffs[i,1:(ncol(paired_diffs)/2)]),
+                     as.numeric(paired_diffs[i,c(((ncol(paired_diffs)/2)+1):ncol(paired_diffs))]),
+                     paired = TRUE,exact = FALSE)[c("p.value")])})
+paired_diffs_stats$wilcox_adj <- p.adjust(paired_diffs_stats$wilcox_pval,method = "fdr")
+paired_diffs_stats$wilcox_sig <- ifelse(paired_diffs_stats$wilcox_pval < 0.05,"significant","non-significant")
+
+# ## Limma design
+# fittable <- data.frame(sample=colnames(paired_diffs),
+#                        pairing=seq.int(1,ncol(paired_diffs)/2,1),
+#                        group=c(rep("arx",times=ncol(paired_diffs)/2),rep("rlps",times=ncol(paired_diffs)/2)))
+# 
+# pairing <- factor(fittable$pairing)
+# group <- factor(fittable$group,levels = c("arx","rlps"))
+# design <- model.matrix(~pairing+group)
+# 
+# ## Limma non-log2 fitting
+# fit <- lmFit(object = paired_diffs, design)
+# fit <- eBayes(fit = fit)
+# top <- topTable(fit = fit,coef="grouprlps",number = nrow(paired_diffs),adjust.method = "fdr",sort.by = "none")
+# paired_diffs_stats$limma_pval <- top$P.Value
+# paired_diffs_stats$limma_adj <- top$adj.P.Val
+# paired_diffs_stats$limma_sig <- ifelse(paired_diffs_stats$limma_pval < 0.05,"significant","non-significant")
+# 
+# ## Limma log2 fitting
+# fit2 <- lmFit(object = log2(paired_diffs), design)
+# fit2 <- eBayes(fit = fit2)
+# top2 <- topTable(fit = fit2,coef="grouprlps",number = nrow(paired_diffs),adjust.method = "fdr",sort.by = "none")
+# paired_diffs_stats$limma2_pval <- top2$P.Value
+# paired_diffs_stats$limma2_adj <- top2$adj.P.Val
+# paired_diffs_stats$limma2_sig <- ifelse(paired_diffs_stats$limma2_pval < 0.05,"significant","non-significant")
+```
+
+```{r broad_genome_plot_paired_fig}
+## UpsetR diagram
+# sig_list <- list(wilcoxon=rownames(paired_diffs_stats[paired_diffs_stats$wilcox_sig == "significant",]),
+#                  limma=rownames(paired_diffs_stats[paired_diffs_stats$limma_sig == "significant",]),
+#                  limma2=rownames(paired_diffs_stats[paired_diffs_stats$limma2_sig == "significant",]))
+# upset(data = fromList(sig_list))
+
+## Get closest gene bin
+focal_genes$idx <- paired_diffs_stats[sapply(X = positions,FUN = function(x) get_gene_seg(target = x,abs_data = abs_data)[1]),]$idx
+focal_genes$wilcox_sig <- paired_diffs_stats$wilcox_sig[focal_genes$idx]
+
+## Get breaks
+breaks <- paired_diffs_stats %>%
+            group_by(chr) %>%
+            summarise_at(vars(idx),max) %>%
+            filter(chr != 22)
+chrlabs <- paired_diffs_stats %>%
+            group_by(chr) %>%
+            summarise_at(vars(idx),min)
+
+## Plot genome
+p <- ggplot() +
+  geom_col(data=paired_diffs_stats,aes(idx,change,fill=wilcox_sig)) +
+  geom_label_repel(data = focal_genes,
+                  aes(x = idx,y=0,label=gene),
+                  color=ifelse(focal_genes$wilcox_sig == "significant","darkorchid4","black"),
+                  min.segment.length = 0,
+                  nudge_y = ifelse(focal_genes$expected == "AMP",0.4,-0.4)) +
+  geom_text(data = chrlabs,aes(x = idx+500,y=-0.95,label=chr),size = 2) +
+  scale_y_continuous(limits = c(-1,1),expand = c(0,0)) +
+  scale_x_continuous(expand = c(0,0),
+                     breaks = breaks$idx,
+                     minor_breaks = NULL) +
+  scale_fill_manual(name="p.value",
+                    values = c("grey50","darkorchid1")) +
+  xlab("genomic position") +
+  ylab("median copy number change") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position = "bottom")
+
+p
+saveRDS(object = p,file = "plots/genome_paired_substractionPlot.RDS")
+ggsave(filename = "plots/genome_paired_substractionPlot.png",
+       plot = p,
+       width = 12,
+       height = 6,
+       units = "in",
+       dpi = 300)
+```
+
+```{r substraction_stats}
+paired_diffs_sig <- paired_diffs_stats[paired_diffs_stats$wilcox_sig == "significant",]
+summary(paired_diffs_sig$change)
+table(paired_diffs_stats$wilcox_sig)
+table(paired_diffs_stats$wilcox_sig) / nrow(paired_diffs_stats) * 100
+```
+
+```{r substraction_gene_overlaps}
+protein_gRanges <- GenomicRanges::makeGRangesFromDataFrame(protein_coding_genes,
+                                                           start.field = "start_position",
+                                                           end.field = "end_position",
+                                                           keep.extra.columns = T)
+paired_diffs_sigGRange <- GenomicRanges::makeGRangesFromDataFrame(paired_diffs_sig,start.field = "pos",end.field = "pos")
+
+proteinOverlaps <- unique(protein_gRanges$hgnc_symbol[GenomicRanges::findOverlaps(protein_gRanges,paired_diffs_sigGRange)@from])
+any(focal_genes$gene %in% proteinOverlaps)
+writeLines(text = proteinOverlaps,con = "data/substraction_protein_overlaps.txt",sep = "\n")
+```
+
+### Segments
+
+The code below extracts segments for each patient in the QDNAseq object and returns a table containing the number of segments for each paired patient at primary and relapse. 
+
+Analysis of the segment numbers within paired samples demonstrates that segments are highly correlated between primary and relapse cases within patients and that there is no coordinated shift in the number of segments from primary to relapse tumours.
+
+```{r segment_counts}
+nsegs <- apply(assayDataElement(abs_data,elt = "segmented"),MARGIN = 2,FUN = function(x) length(rle(x)$values))
+
+paired_segs <- data.frame(nsegs=nsegs) %>%
+  rownames_to_column(var = "sample") %>%
+  inner_join(.,meta.data,by = c("sample"="SAMPLE_ID")) %>%
+  filter(paired == "TRUE") %>%
+  group_by(PATIENT_ID,group) %>%
+  summarise(segs=mean(nsegs)) %>%
+  pivot_wider(id_cols = "PATIENT_ID",names_from = "group",values_from = "segs") %>%
+  rename(diagnosis="arx",relapse="rlps")
+```
+
+```{r plot_segs_violin}
+# Plot primary/relapse boxplot
+seg_paired_long <- pivot_longer(data = paired_segs,cols = 2:3,names_to = "group",values_to = "segments") %>%
+  mutate(platinum_treatment = clinical.data$pt_sensitivity_at_reg[match(PATIENT_ID,paste0("BRITROC-",clinical.data$britroc_number))]) %>%
+  filter(!is.na(platinum_treatment))
+
+segs_paired <- ggplot(seg_paired_long) +
+  geom_jitter(aes(group,segments,colour=group)) +
+  geom_violin(aes(group,segments,fill=group),alpha = 0.4) +
+  scale_y_continuous(limits = c(NA,510)) +
+  geom_signif(aes(group,segments),
+              comparisons = list(c("diagnosis","relapse")),
+              test = "wilcox.test",
+              test.args = list(paired = TRUE)) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_colour_manual(values = colour_palettes$diagnosis_relapse) +
+  theme_bw()
+segs_paired
+ggsave(plot = segs_paired,filename = "plots/seg_counts_paired.png",width = 5,height = 7,units = "in",dpi = 300)
+```
+
+```{r plot_segs_pt}
+segs_paired_pt <- ggplot(seg_paired_long) +
+  geom_jitter(aes(group,segments,colour=group)) +
+  geom_violin(aes(group,segments,fill=group),alpha = 0.4) +
+  scale_y_continuous(limits = c(NA,510)) +
+  geom_signif(aes(group,segments),
+              comparisons = list(c("diagnosis","relapse")),
+              test = "wilcox.test",
+              test.args = list(paired = TRUE)) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_colour_manual(values = colour_palettes$diagnosis_relapse) +
+  facet_grid(cols = vars(platinum_treatment)) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+segs_paired_pt
+ggsave(plot = segs_paired_pt,filename = "plots/seg_counts_pt_paired.png",width = 5,height = 7,units = "in",dpi = 300)
+```
+
+```{r segs_corr}
+# Test segment count correlation
+seg.kenall <- cor.test(paired_segs$diagnosis,paired_segs$relapse,method = "kendal")
+
+# Plot segment number correlation
+seg_Corr <- ggplot(paired_segs) +
+        geom_point(aes(diagnosis,relapse)) +
+        geom_smooth(aes(diagnosis,relapse),method = "lm") +
+        xlab("primary tumour") +
+        ylab("relapse tumour") +
+        theme_bw() + annotate(geom = "text",x = 375,y=10,label=paste0("kendall tau:",round(seg.kenall$estimate,digits = 3)))
+seg_Corr
+```
+
+```{r seg_plot_main}
+seg_plot <- cowplot::plot_grid(plot_grid(segs_paired+theme(legend.position = "none"),seg_Corr,labels = c("A","B",""),ncol = 2),
+                               segs_paired_pt,nrow = 2,labels = c("","C"))
+seg_plot
+seg.kenall
+ggsave2(plot = seg_plot,filename = "plots/segments_combined_plot.png",width = 6,height = 7,units = "in",dpi = 300)
+```
+
+Re-testing the segment count distribution across all samples, without accounting for pairing, also confirmed that no coordinated change in segment counts occur between primary and relapse tumours.
+
+```{r seg_counts_all}
+all_segs <- data.frame(nsegs=nsegs) %>%
+              rownames_to_column(var = "sample") %>%
+              inner_join(.,meta.data,by = c("sample"="SAMPLE_ID")) %>%
+              group_by(PATIENT_ID,group) %>%
+              summarise(segments=mean(nsegs)) %>%
+              mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse"))
+  
+
+ggplot(all_segs) +
+  geom_boxplot(aes(group,segments,fill=group)) +
+  geom_signif(aes(group,segments),
+              comparisons = list(c("diagnosis","relapse")),
+              test = "wilcox.test",
+              test.args = list(paired = FALSE)) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  theme_bw()
+```
+
+### Ploidy changes
+
+```{r get_patient_ploidy}
+ploidy_summary <- meta.data %>%
+                    group_by(PATIENT_ID,group) %>%
+                    summarise(across(.cols = c("ploidy","paired"),.fns = median)) %>%
+                    mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse")) %>%
+                    mutate(paired = ifelse(paired == 1,TRUE,FALSE)) %>%
+                    ungroup() %>%
+                    mutate(platinum_status = clinical.data$pt_sensitivity_at_reg[match(PATIENT_ID,paste0("BRITROC-",clinical.data$britroc_number))])
+  
+ploidy_summary_paired <- ploidy_summary %>%
+                            filter(paired == TRUE) %>%
+                            pivot_wider(names_from = group,values_from = c(ploidy)) %>%
+                            mutate(ploidy_diff = relapse - diagnosis) %>%
+                            mutate(ploidy_change = abs(ploidy_diff) >= 1) %>%
+                            pivot_longer(cols = c(diagnosis,relapse),names_to = "group",values_to = "ploidy") %>%
+                            mutate(platinum_status = clinical.data$pt_sensitivity_at_reg[match(PATIENT_ID,paste0("BRITROC-",clinical.data$britroc_number))])
+```
+
+```{r plot_unpaired_ploidy}
+ploidy_plot <- ggplot(ploidy_summary) +
+  geom_jitter(aes(group,ploidy),width = 0.3) +
+  geom_violin(aes(group,ploidy,fill=group),alpha = 0.5) +
+  ggsignif::geom_signif(aes(group,ploidy),comparisons = list(c("diagnosis","relapse")),
+                        test = "wilcox.test") +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_y_continuous(limits = c(1,6.8)) +
+  xlab("") +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+ploidy_pt_plot <- ggplot(ploidy_summary[!is.na(ploidy_summary$platinum_status),]) +
+  geom_jitter(aes(group,ploidy),width = 0.3) +
+  geom_violin(aes(group,ploidy,fill=group),alpha = 0.5) +
+  facet_wrap(. ~ platinum_status) +
+  ggsignif::geom_signif(aes(group,ploidy),comparisons = list(c("diagnosis","relapse")),
+                        test = "wilcox.test") +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_y_continuous(limits = c(1,6.8)) +
+  xlab("") +
+  theme_bw() +
+  theme(legend.position = "bottom")
+  
+ploidy_plot
+ploidy_pt_plot
+```
+
+```{r plot_paired_ploidy}
+ploidy_paired_plot <- ggplot(ploidy_summary_paired) +
+  geom_point(aes(group,ploidy)) +
+  geom_line(aes(group,ploidy,group=PATIENT_ID,colour=ploidy_change),alpha = 0.7) +
+  geom_violin(aes(group,ploidy,fill=group),alpha = 0.5) +
+  scale_y_continuous(limits = c(1,5.6)) +
+  ggsignif::geom_signif(aes(group,ploidy),comparisons = list(c("diagnosis","relapse")),
+                        test = "wilcox.test",
+                        test.args = list(paired=TRUE)) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_colour_manual(name = "ploidy change",values = c("TRUE"="red","FALSE"="black")) +
+  xlab("") +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+ploidy_paired_pt_plot <- ggplot(ploidy_summary_paired) +
+  geom_point(aes(group,ploidy),
+             position = position_jitter(width = 0.05,height = 0,seed = 111),alpha = 0.7) +
+  geom_line(aes(group,ploidy,group=PATIENT_ID,colour=ploidy_change),
+            position = position_jitter(width = 0.05,height = 0,seed = 111),alpha = 0.7) +
+  geom_violin(aes(group,ploidy,fill=group),alpha = 0.5) +
+  facet_wrap(. ~ platinum_status) +
+  scale_y_continuous(limits = c(1,5.6)) +
+  ggsignif::geom_signif(aes(group,ploidy),comparisons = list(c("diagnosis","relapse")),
+                        test = "wilcox.test",
+                        test.args = list(paired=TRUE)) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_colour_manual(name = "ploidy change",values = c("TRUE"="red","FALSE"="black")) +
+  xlab("") +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+ploidy_paired_plot
+ploidy_paired_pt_plot
+```
+
+```{r plot_ploidy}
+prow <- plot_grid(ploidy_plot+theme(legend.position = "none"),
+          ploidy_paired_plot+theme(legend.position = "none"),
+          ploidy_pt_plot+theme(legend.position = "none"),
+          ploidy_paired_pt_plot+theme(legend.position = "none"),
+          nrow = 2,
+          labels = c("A","B","C","D"))
+
+legend_b <- get_legend(
+  ploidy_paired_pt_plot + 
+    guides(color = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+
+ploidy_plots <- plot_grid(prow, legend_b, ncol = 1, rel_heights = c(1, .1))
+ggsave2(filename = "plots/ploidy_plots.png",plot = ploidy_plots,width = 8,height = 8,units = "in",dpi = 300)
+ploidy_plots
+```
+
+```{r ploidy_changes}
+ploidy_change_table <- ploidy_summary_paired[ploidy_summary_paired$ploidy_change == TRUE,]
+ploid_change_pats <- str_sort(unique(ploidy_summary_paired$PATIENT_ID[ploidy_summary_paired$ploidy_change == TRUE]),numeric = T)
+cat("Ploidy change patients: ",paste0(as.character(ploid_change_pats),collapse = ", "))
+cat(length(ploid_change_pats))
+```
+
+```{r test_pt_ploidy_change}
+fisher.test(matrix(ncol = 2,
+                   rbind(c(table(clinical.data$pt_sensitivity_at_reg[!paste0("BRITROC-",clinical.data$britroc_number) %in% ploid_change_pats])),
+                         c(table(clinical.data$pt_sensitivity_at_reg[paste0("BRITROC-",clinical.data$britroc_number) %in% ploid_change_pats])))))
+
+wilcox.test(x = clinical.data$age[!paste0("BRITROC-",clinical.data$britroc_number) %in% ploid_change_pats],
+            y = clinical.data$age[paste0("BRITROC-",clinical.data$britroc_number) %in% ploid_change_pats])
+```
+
+### purity changes
+
+```{r get_patient_purity}
+purity_summary <- meta.data %>%
+                    group_by(PATIENT_ID,group) %>%
+                    summarise(across(.cols = c("purity","paired"),.fns = median)) %>%
+                    mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse")) %>%
+                    mutate(paired = ifelse(paired == 1,TRUE,FALSE)) %>%
+                    ungroup() %>%
+                    mutate(platinum_status = clinical.data$pt_sensitivity_at_reg[match(PATIENT_ID,paste0("BRITROC-",clinical.data$britroc_number))])
+  
+purity_summary_paired <- purity_summary %>%
+                            filter(paired == TRUE) %>%
+                            pivot_wider(names_from = group,values_from = c(purity)) %>%
+                            mutate(purity_diff = relapse - diagnosis) %>%
+                            mutate(purity_change = abs(purity_diff) >= 0.2) %>%
+                            pivot_longer(cols = c(diagnosis,relapse),names_to = "group",values_to = "purity") %>%
+                            mutate(platinum_status = clinical.data$pt_sensitivity_at_reg[match(PATIENT_ID,paste0("BRITROC-",clinical.data$britroc_number))])
+```
+
+```{r plot_unpaired_purity}
+purity_plot <- ggplot(purity_summary) +
+  geom_jitter(aes(group,purity),width = 0.3) +
+  geom_violin(aes(group,purity,fill=group),alpha = 0.5) +
+  ggsignif::geom_signif(aes(group,purity),comparisons = list(c("diagnosis","relapse")),
+                        test = "wilcox.test") +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_y_continuous(limits = c(NA,1.1)) +
+  xlab("") +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+purity_pt_plot <- ggplot(purity_summary[!is.na(purity_summary$platinum_status),]) +
+  geom_jitter(aes(group,purity),width = 0.3) +
+  geom_violin(aes(group,purity,fill=group),alpha = 0.5) +
+  facet_wrap(. ~ platinum_status) +
+  ggsignif::geom_signif(aes(group,purity),comparisons = list(c("diagnosis","relapse")),
+                        test = "wilcox.test") +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_y_continuous(limits = c(NA,1.1)) +
+  xlab("") +
+  theme_bw() +
+  theme(legend.position = "bottom")
+  
+purity_plot
+purity_pt_plot
+```
+
+```{r plot_paired_purity}
+purity_paired_plot <- ggplot(purity_summary_paired) +
+  geom_point(aes(group,purity)) +
+  geom_line(aes(group,purity,group=PATIENT_ID),alpha = 0.7) +
+  geom_violin(aes(group,purity,fill=group),alpha = 0.5) +
+  scale_y_continuous(limits = c(NA,1.1)) +
+  ggsignif::geom_signif(aes(group,purity),comparisons = list(c("diagnosis","relapse")),
+                        test = "wilcox.test",
+                        test.args = list(paired=TRUE)) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_colour_manual(name = "purity change",values = c("TRUE"="red","FALSE"="black")) +
+  xlab("") +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+purity_paired_pt_plot <- ggplot(purity_summary_paired) +
+  geom_point(aes(group,purity)) +
+  geom_line(aes(group,purity,group=PATIENT_ID),alpha = 0.7) +
+  geom_violin(aes(group,purity,fill=group),alpha = 0.5) +
+  facet_wrap(. ~ platinum_status) +
+  scale_y_continuous(limits = c(NA,1.1)) +
+  ggsignif::geom_signif(aes(group,purity),comparisons = list(c("diagnosis","relapse")),
+                        test = "wilcox.test",
+                        test.args = list(paired=TRUE)) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_colour_manual(name = "purity change",values = c("TRUE"="red","FALSE"="black")) +
+  xlab("") +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+purity_paired_plot
+purity_paired_pt_plot
+```
+
+```{r plot_purity}
+prow <- plot_grid(purity_plot+theme(legend.position = "none"),
+          purity_paired_plot+theme(legend.position = "none"),
+          purity_pt_plot+theme(legend.position = "none"),
+          purity_paired_pt_plot+theme(legend.position = "none"),
+          nrow = 2,
+          labels = c("A","B","C","D"))
+
+legend_b <- get_legend(
+  purity_paired_pt_plot + 
+    guides(color = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+
+purity_plots <- plot_grid(prow, legend_b, ncol = 1, rel_heights = c(1, .1))
+ggsave2(filename = "plots/purity_plots.png",plot = purity_plots,width = 8,height = 8,units = "in",dpi = 300)
+purity_plots
+```
+
+### Copy number events
+
+Using the parameters described above, copy number events were counted using segments as a proxy for total copy number events. The table below lists the amplification, deletion, and total number of copy number events for all samples. In this instance, each segment was assumed to account for an independent copy number event.
+
+```{r cna_event_segments}
+CNA_events_orig <- count_CNA_events_broad(data = abs_data,ploidys = get_named_ploidy(data = abs_data))
+
+CNA_events <- CNA_events_orig %>%
+                pivot_longer(cols = 2:4) %>%
+                mutate(group=meta.data$group[match(sample,meta.data$SAMPLE_ID)])
+
+kable(CNA_events_orig[order(CNA_events_orig$total_events,decreasing = T),]) %>%
+  kable_styling(full_width = T) %>%
+  scroll_box(height = "200px")
+```
+
+##### Plot of CNA events
+
+No statistical difference was seen between archival and relapse samples in an unpaired setting across amplification, deletion or total copy number events (t.test p=0.13,p=0.97,p=0.29, respectively).
+
+```{r CNA_events}
+CNA_events <- count_CNA_events_broad(data = abs_data,
+                                      ploidys = get_named_ploidy(data = abs_data)) %>%
+                      mutate(group=meta.data$group[match(sample,meta.data$SAMPLE_ID)]) %>%
+                      mutate(patient=meta.data$PATIENT_ID[match(sample,meta.data$SAMPLE_ID)]) %>%
+                      mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse")) %>%
+                      group_by(group,patient) %>%
+                      dplyr::select(-sample) %>%
+                      summarise_all(mean)
+
+
+CNA_events_mean <- CNA_events %>%
+  group_by(group) %>%
+  dplyr::select(-patient) %>%
+  summarise_all(mean)
+CNA_events_mean
+
+CNA_events <- CNA_events %>%
+                pivot_longer(cols = 3:5)
+CNA_events$platinum_treatment <- clinical.data$pt_sensitivity_at_reg[match(CNA_events$patient,paste0("BRITROC-",clinical.data$britroc_number))]
+
+cnv_event_means_broad(data = CNA_events) +
+  ggpubr::stat_compare_means(method = "wilcox.test",label.x = 0.6,label.y = 50)
+
+cnv_event_means_broad(data = CNA_events[!is.na(CNA_events$platinum_treatment),]) +
+  facet_grid(rows = vars(name),cols = vars(platinum_treatment),labeller = labeller(name = c(amp_events="amplifications",
+                                                                            del_events="deletions",
+                                                                            total_events="all"))) +
+  ggpubr::stat_compare_means(method = "wilcox.test",label.x = 0.6,label.y = 50)
+
+```
+
+Performing the same analysis when restricted to paired samples revealed the same trend with no statistical difference in copy number events between archival and relapse samples across amplification, deletion or total copy number events. Results from CNA the number of events per sample do not show any differences, contrary to results identified by GISTIC (see GISTIC analysis document).
+
+```{r CNA_events_paired}
+CNA_events_paired <- count_CNA_events_broad(data = abs_data[,meta.data$SAMPLE_ID[meta.data$paired == TRUE]],
+                                      ploidys = get_named_ploidy(data = abs_data[,meta.data$SAMPLE_ID[meta.data$paired == TRUE]])) %>%
+                      mutate(group=meta.data$group[match(sample,meta.data$SAMPLE_ID)]) %>%
+                      mutate(patient=meta.data$PATIENT_ID[match(sample,meta.data$SAMPLE_ID)]) %>%
+                      mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse")) %>%
+                      group_by(group,patient) %>%
+                      dplyr::select(-sample) %>%
+                      summarise_all(mean)
+
+CNA_events_paired_mean <- CNA_events_paired %>%
+  group_by(group) %>%
+  dplyr::select(-patient) %>%
+  summarise_all(.funs = list(mean=mean,median=median,iqr=stats::IQR,samples=length))
+CNA_events_paired_mean
+
+CNA_events_paired$platinum_treatment <- clinical.data$pt_sensitivity_at_reg[match(CNA_events_paired$patient,paste0("BRITROC-",
+                                                                                                                   clinical.data$britroc_number))]
+```
+
+```{r CNA_events_paired_plot}
+CNA_events_paired_long <- CNA_events_paired %>%
+                      pivot_longer(cols = 3:5)
+
+cemb <- cnv_event_means_broad(data = CNA_events_paired_long) +
+  ggpubr::stat_compare_means(method = "wilcox.test",paired = T,label.x = 0.6,label.y = 40)
+
+cembp <- cnv_event_means_broad(data = CNA_events_paired_long[!is.na(CNA_events_paired_long$platinum_treatment),]) +
+  facet_grid(rows = vars(name),cols = vars(platinum_treatment),labeller = labeller(name = c(amp_events="amplifications",
+                                                                            del_events="deletions",
+                                                                            total_events="all"))) +
+  ggpubr::stat_compare_means(method = "wilcox.test",paired = T,label.x = 0.6,label.y = 25)
+
+cemb
+saveRDS(object = cemb,file = "plots/cnv_event_means_broad_paired.RDS")
+ggsave(filename = "plots/cnv_event_means_broad_paired.png",
+       plot = cemb,
+       width = 6,
+       height = 6,
+       units = "in",
+       dpi = 300)
+
+cembp
+saveRDS(object = cembp,file = "plots/cnv_event_means_broad_ptsen_paired.RDS")
+ggsave(filename = "plots/cnv_event_means_broad__ptsen_paired.png",
+       plot = cembp,
+       width = 6,
+       height = 6,
+       units = "in",
+       dpi = 300)
+```
+
+### Broad-level alterations - cytoband-level events
+
+Assessment of broad (cytoband-level) alterations, overall amplification involved the assessment of cytoband-resolution alterations. At the cytoband level, at least 80% of bins overlapping with a given cytoband were required to support the CN call. Additionally, where cytoband length to bin ratio exceeded a ratio greater than the 90th percentile  over all cytobands were removed as these cytobands had minimal number of bins supporting a large genomic region, typically in close proximity to centromeric or telomeric regions. 
+
+```{r extract_broad_CNA}
+broad_CNA_arx <- extract_broad_CNA(data = abs_data[,colnames(abs_data) %in% arx_samples],
+                                   cyto = cytoband,
+                                   threshold = 0.8,
+                                   percentile = 0.9,
+                                   ploidys = get_named_ploidy(data = abs_data[,colnames(abs_data) %in% arx_samples]))
+
+broad_CNA_rlps <- extract_broad_CNA(data = abs_data[,colnames(abs_data) %in% rlps_samples],
+                                   cyto = cytoband,
+                                   threshold = 0.8,
+                                   percentile = 0.9,
+                                   ploidys = get_named_ploidy(data = abs_data[,colnames(abs_data) %in% rlps_samples]))
+```
+
+```{r count_broad_amp}
+broad_counts_arx <- count_broad(data = broad_CNA_arx,cohort="arx")
+broad_counts_rlps <- count_broad(data = broad_CNA_rlps,cohort="rlps")
+```
+
+```{r cyto_fishers}
+cytoband_fishers_arx_rlps <- calc_broad_freq_fishers(a = broad_counts_arx,b = broad_counts_rlps)
+cytoband_fishers_arx_rlps
+```
+
+```{r cytoband_plot}
+
+```
+
+### Broad-level alterations - Arm-level events
+
+```{r get_arms}
+arms <- cytoband %>%
+  group_by(chromosome,arm) %>%
+  summarise_at(.vars = c("start","end"),.funs = c(min,max)) %>%
+  ungroup() %>%
+  dplyr::select(c(1,3,6,2)) %>%
+  mutate(chrarm = paste0(chromosome,arm)) %>%
+  mutate(length = end_fn2 - start_fn1)
+colnames(arms) <- c("chromosome","start","end","arm","band","length")
+```
+
+```{r extract_arm_cna}
+arm_CNA_arx <- extract_broad_CNA(data = abs_data[,colnames(abs_data) %in% arx_samples],
+                                   cyto = arms,
+                                   threshold = 0.5,
+                                   percentile = 1,
+                                   ploidys = get_named_ploidy(data = abs_data[,colnames(abs_data) %in% arx_samples]))
+
+arm_CNA_rlps <- extract_broad_CNA(data = abs_data[,colnames(abs_data) %in% rlps_samples],
+                                   cyto = arms,
+                                   threshold = 0.5,
+                                   percentile = 1,
+                                   ploidys = get_named_ploidy(data = abs_data[,colnames(abs_data) %in% rlps_samples]))
+```
+
+```{r count_arm_amp}
+arm_counts_arx <- count_broad(data = arm_CNA_arx,cohort="arx")
+arm_counts_rlps <- count_broad(data = arm_CNA_rlps,cohort="rlps")
+```
+
+```{r arm_fishers}
+arm_fishers_arx_rlps <- calc_broad_freq_fishers(a = arm_counts_arx,b = arm_counts_rlps)
+arm_fishers_arx_rlps
+```
+
+```{r arm_rate_plots}
+
+```
+
+```{r cyto_arm_cn_value_analysis}
+
+```
+
+```{r session_info}
+sessionInfo()
+```
+
+##### end

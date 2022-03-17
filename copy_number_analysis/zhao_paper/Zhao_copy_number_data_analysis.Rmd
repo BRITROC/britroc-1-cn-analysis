@@ -1,0 +1,273 @@
+---
+title: "Zhao copy number data analysis"
+author: "Philip Smith"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Load libraries
+
+```{r load_libraries}
+# Load libraries
+suppressPackageStartupMessages(suppressWarnings(library(tidyverse)))
+suppressPackageStartupMessages(suppressWarnings(library(kableExtra)))
+suppressPackageStartupMessages(suppressWarnings(library(biomaRt)))
+suppressPackageStartupMessages(suppressWarnings(library(Biobase)))
+suppressPackageStartupMessages(suppressWarnings(library(QDNAseqmod)))
+suppressPackageStartupMessages(suppressWarnings(library(cowplot)))
+```
+
+### Assign int. functions
+
+```{r functions}
+source("../focal_analysis/data/focal_cna_analysis_funcs.R")
+source("../focal_analysis/data/nbclustfixed.R")
+
+getSampNames<-function(abs_profiles)
+{
+    if(class(abs_profiles)=="QDNAseqCopyNumbers")
+    {
+        samps<-colnames(abs_profiles)
+    }
+    else
+    {
+        samps<-names(abs_profiles)
+    }
+    samps
+}
+
+getPloidy<-function(abs_profiles)
+{
+  out<-c()
+  samps<-getSampNames(abs_profiles)
+  for(i in samps)
+  {
+    if(class(abs_profiles)=="QDNAseqCopyNumbers")
+    {
+      segTab<-getSegTable(abs_profiles[,which(colnames(abs_profiles)==i)])
+    }
+    else
+    {
+      segTab<-abs_profiles[[i]]
+      colnames(segTab)[4]<-"segVal"
+    }
+    segLen<-(as.numeric(segTab$end)-as.numeric(segTab$start))
+    ploidy<-sum((segLen/sum(segLen))*as.numeric(segTab$segVal))
+    out<-c(out,ploidy)
+  }
+  data.frame(out,stringsAsFactors = F)
+}
+
+```
+
+```{r read_meta}
+focal_genes_table <- read.table("../focal_analysis/data/focal_CNA_pseudo_bed.txt",header = T,sep = "\t")
+# tcga_gene_rates <- read.table("data/TCGA_gene_CNA_rates.txt",header = T,sep = "\t")
+# tcga_gene_rates <- tcga_gene_rates %>%
+#                     dplyr::select(-Cytoband) %>%
+#                     relocate(Gene,Freq,CNA) %>%
+#                     rename(c(gene="Gene",group="CNA",rate="Freq"))
+
+meta.data <- read.table("../../copy_number_signatures/britroc_30kb_signature_data_meta.tsv",header = TRUE,sep = "\t")
+# patient_data <- read.table("../../britroc_cohort_patient_data.tsv",header = T,sep = "\t")
+
+# cytoband <- read.table("data/hg19_cytobands.tsv",header = T,sep = "\t")
+# cytoband$length <- cytoband$end - cytoband$start
+```
+
+```{r biomart}
+ensembl <- useEnsembl(biomart = "ENSEMBL_MART_ENSEMBL", dataset = "hsapiens_gene_ensembl",GRCh = 37)
+protein_coding_genes <- getBM(attributes = c("chromosome_name","start_position","end_position","hgnc_symbol"),
+                                             filters = "biotype",
+                                             values = "protein_coding",
+                                             mart = ensembl,
+                                             useCache = FALSE)
+protein_coding_genes <- protein_coding_genes[protein_coding_genes$chromosome_name %in% seq.int(1,22,1),]
+protein_coding_genes <- protein_coding_genes[protein_coding_genes$hgnc_symbol != "",]
+```
+
+```{r read_abs}
+abs_data <- readRDS("../../absolute_POST_down_sampling/britroc_30kb_ds_absCopyNumber.rds")
+abs_data <- abs_data[,which(colnames(abs_data) %in% meta.data$SAMPLE_ID[meta.data$use == "TRUE"])]
+```
+
+Ploidy as defined by the grid search process for each sample are added to a named vector for use in downstream filtering of copy number states.
+
+```{r set_ploidy}
+ploidys <- pData(abs_data)$ploidy
+names(ploidys) <- pData(abs_data)$name
+phil_ploidys <- ploidys
+```
+
+```{r zhao_read_abs}
+zhao_abs_data <- readRDS("data/30kb_ds_absCopyNumber_late_stage.rds")
+#abs_data <- abs_data[,which(colnames(abs_data) %in% meta.data$SAMPLE_ID[meta.data$use == "TRUE"])]
+```
+
+Ploidy as defined by the grid search process for each sample are added to a named vector for use in downstream filtering of copy number states.
+
+```{r set_ploidy}
+zhao_ploidys <- pData(zhao_abs_data)$ploidy
+names(zhao_ploidys) <- pData(zhao_abs_data)$name
+```
+
+```{r compare_ploidys}
+inter_ploidy <- intersect(names(zhao_ploidys),names(phil_ploidys))
+all(zhao_ploidys[names(zhao_ploidys) %in% inter_ploidy] == phil_ploidys[names(phil_ploidys) %in% inter_ploidy])
+plot(zhao_ploidys[names(zhao_ploidys) %in% inter_ploidy],phil_ploidys[names(phil_ploidys) %in% inter_ploidy])
+```
+
+```{r extract}
+if(file.exists("data/extracted_output.RDS")){
+  zhao_extracted <- readRDS("data/extracted_output.RDS")
+} else {
+  zhao_extracted <- extract_abs_segs(abs_data = zhao_abs_data,genes = protein_coding_genes) # long execution times
+  saveRDS(zhao_extracted,file = "data/extracted_output.RDS") 
+}
+```
+
+```{r cna_class_by_ploidy_gene}
+ploidys <- zhao_ploidys
+zhao_cna_calls <- get_cna_calls(data = zhao_extracted)
+#saveRDS(object = cna_calls,file = "data/cna_calls_output.RDS")
+```
+
+```{r count_focal_amp}
+focal_cna_rates <- get_cna_rates(data = zhao_cna_calls,genes = focal_genes_table$Gene.name)
+focal_cna_rates[order(focal_cna_rates$rate,decreasing = T),]
+```
+
+```{r compare}
+zhao_high_ploidy <- read.table("data/high_ploidy_britroc_abscn.txt",header = T,sep = "\t")
+zhao_high_ploidy$group <- rep("zhao_method",times=nrow(zhao_high_ploidy))
+
+zhao_extracted_sub <- zhao_extracted[rownames(zhao_extracted) %in% zhao_high_ploidy$name,colnames(zhao_extracted) %in% colnames(zhao_high_ploidy)]
+zhao_extracted_sub <- zhao_extracted_sub[,colnames(zhao_high_ploidy)[c(-1,-ncol(zhao_high_ploidy))]] %>%
+  rownames_to_column("name") %>%
+  mutate(group = rep("phil_method",times=nrow(.))) %>%
+  arrange(name)
+  
+extracted_reformat <- rbind(zhao_extracted_sub,zhao_high_ploidy) %>%
+  relocate(name,group) %>%
+  pivot_longer(names_to = "sample",cols = 3:ncol(.)) %>%
+  arrange(sample,name) %>%
+  group_by(sample,name) %>%
+  mutate(abs_diff = abs(signif(value[group == "phil"] - value[group == "zhao"],digits = 3)))
+extracted_reformat[order(extracted_reformat$abs_diff,decreasing = T),]
+
+```
+
+```{r calls_analysis}
+cna_call_sub <- cna_calls[rownames(cna_calls) %in% focal_genes_table$Gene.name,]
+recalled_cna_calls <- do.call(rbind,apply(cna_call_sub,MARGIN = 1,FUN = function(x) data.frame(N=sum(x ==  "N"),
+                                                                                               AMP=sum(x == "AMP"),
+                                                                                               DEL=sum(x == "DEL"),stringsAsFactors = F))) %>%
+                      rownames_to_column("gene") %>%
+                      mutate(amp_rate = (AMP / (N+AMP+DEL)) * 100) %>%
+                      mutate(del_rate = (DEL / (N+AMP+DEL)) * 100) %>%
+                      arrange(gene)
+focal_cna_rates[order(focal_cna_rates$gene),]
+recalled_cna_calls
+```
+
+```{r zhao calling_code}
+#ploidy<-read.table("data/high_ploidy_britroc_cn.txt",sep = "\t",header = T)
+#ploidy<-as.data.frame(zhao)
+ploidy_z<-zhao_high_ploidy[,c(-1,-ncol(zhao_high_ploidy))]
+
+late1<-read.table("data/low_ploidy_britroc_abscn.txt",sep="\t",header = T)
+late2<-read.table("data/high_ploidy_britroc_abscn.txt",sep = "\t",header = T)
+late1<-as.data.frame(late1)
+rownames(late1)<-late1[,1]
+final_late1<-late1[,-1]
+late2<-as.data.frame(late2)
+rownames(late2)<-late2[,1]
+final_late2<-late2[,-1]
+
+# For our definition of gene amplification and deletions.
+# When the ploidy<=2.7,choose the ab copy number >=5 as amplification
+# When average genome ploidy <= 2.7 AND total copy number = 0
+final_late1<-round(final_late1[,1:26],digits=0)
+a1<-replace(final_late1,final_late1>=5,"Amp")
+b1<-replace(a1,a1<=0,"Del")
+c1<-replace(b1,b1>=1&b1<=4,"")
+c1_reformat <- do.call(rbind,apply(c1,MARGIN = 1,FUN = function(x) data.frame(N=sum(x ==  ""),
+                                                                                               AMP=sum(x == "Amp"),
+                                                                                               DEL=sum(x == "Del")))) %>%
+                      rownames_to_column("gene") %>%
+                      mutate(amp_rate = (AMP / (N+AMP+DEL)) * 100) %>%
+                      mutate(del_rate = (DEL / (N+AMP+DEL)) * 100)
+
+# When the ploidy>2.7,choose the ab copy number >=9 as amplification
+# When average genome ploidy >2.7 AND total copy number<(average genome ploidy-2.7)
+final_late2 <-round(final_late2[,1:42],digits=0)
+a2<-replace(final_late2 ,final_late2 >=9,"Amp")
+b2<-(ploidy_z-2.7)
+c2<-replace(a2,a2<b2,"Del")
+d2<-replace(c2,c2>=b2&c2<9,"")
+d2_reformat <- do.call(rbind,apply(d2,MARGIN = 1,FUN = function(x) data.frame(N=sum(x ==  ""),
+                                                                                               AMP=sum(x == "Amp"),
+                                                                                               DEL=sum(x == "Del")))) %>%
+                      rownames_to_column("gene") %>%
+                      mutate(amp_rate = (AMP / (N+AMP+DEL)) * 100) %>%
+                      mutate(del_rate = (DEL / (N+AMP+DEL)) * 100) %>%
+                      arrange(gene)
+d2_reformat
+recalled_cna_calls
+```
+
+```{r minimal_repo}
+sample_ploidys <- c(sample1=2.4,sample2=1.5,sample3=3.6,sample4=3.2)
+minimal_input <- data.frame(sample1 = c(6.2,3.1,0,2.5),
+           sample2 = c(2.1,0,2.8,2.3),
+           sample3 = c(5.2,9.2,2.4,0.8),
+           sample4 = c(2.3,12.1,2.9,3.3),
+           row.names = paste0("gene",LETTERS[1:4]))
+minimal_input
+```
+
+```{r expected_out}
+minimal_input
+sample_ploidys
+
+data.frame(sample1 = c("AMP","N","DEL","N"),
+           sample2 = c("N","DEL","N","N"),
+           sample3 = c("N","AMP","N","DEL"),
+           sample4 = c("N","AMP","N","N"),
+           row.names = paste0("gene",LETTERS[1:4]))
+```
+
+```{r test_minimal_ps}
+get_cna_calls <- function(data=NULL){
+  # COSMIC definitions
+  #Gain:
+  ## average genome ploidy <= 2.7 AND total copy number >= 5
+  ## OR average genome ploidy > 2.7 AND total copy number >= 9
+  #Loss:
+  ## average genome ploidy <= 2.7 AND total copy number = 0
+  ## OR average genome ploidy > 2.7 AND total copy number < ( average genome ploidy - 2.7 )
+  cna_calls <- do.call(cbind,lapply(colnames(data),FUN = function(x){
+    ploidy <- sample_ploidys[x]
+    abs_col <- data[,x]
+    if(ploidy > 2.7){
+      abs_col <- ifelse(abs_col >= 9,"AMP",ifelse(abs_col < (ploidy - 2.7),"DEL","N"))
+    } else {
+      abs_col <- ifelse(abs_col >= 5,"AMP",ifelse(abs_col <= 0,"DEL","N"))
+    }
+    abs_col <- data.frame(sample=abs_col)
+    colnames(abs_col) <- x
+    return(abs_col)
+  }))
+  rownames(cna_calls) <- rownames(data)
+  return(cna_calls)
+}
+
+get_cna_calls(data = minimal_input)
+```

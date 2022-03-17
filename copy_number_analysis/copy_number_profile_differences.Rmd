@@ -1,0 +1,266 @@
+---
+title: "Copy number profile differences"
+author: "Philip Smith"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libs}
+library(tidyverse)
+library(doParallel)
+library(CNpare)
+```
+
+```{r parallel}
+ncores <- detectCores() - 1
+```
+
+```{r data_load}
+segment.table <- read.table("../absolute_POST_down_sampling/britroc_30kb_ds_absCopyNumber_segmentTable.tsv",header = T,sep = "\t")
+meta.data <- read.table("../copy_number_signatures/britroc_30kb_signature_data_meta.tsv",header = T,sep = "\t")
+
+# segment.table <- read.table("britroc_30kb_ds_absCopyNumber_segmentTable.tsv",header = T,sep = "\t")
+# meta.data <- read.table("britroc_30kb_signature_data_meta.tsv",header = T,sep = "\t")
+
+meta.data.paired <- meta.data[meta.data$paired == "TRUE",]
+```
+
+```{r functions}
+getPatientList <- function(meta.data = meta.data){
+    patient.lists <- split(meta.data$SAMPLE_ID,f = as.factor(meta.data$PATIENT_ID))
+    patient.lists2 <- lapply(patient.lists,FUN = function(x){
+                            if(length(x) > 1){
+                                return(x)        
+                            }
+                        })
+    patient.listsDrop <- patient.lists2[lengths(patient.lists2) != 0]
+    return(patient.listsDrop)
+}
+
+joint_diff_table <- function(patient.list = patient.list,mc=TRUE,cores = 8){
+    if(mc == TRUE){
+        cat("running with mc")
+        no_cores <- cores  
+        registerDoParallel(cores=no_cores)  
+        cl <- makeCluster(no_cores, type="SOCK")
+        clusterEvalQ(cl = cl,library("CNpare"))
+        clusterExport(cl = cl,varlist = c("posBins","segment.table"))
+        cn_list <- parLapply(cl,X = patient.list,fun = function(x){
+            cn_table <- getCNbins(posBins=posBins,
+                           data=segment.table[segment.table$sample %in% x,],
+                           samples=unique(x))
+            cn_table <- cn_table[complete.cases(cn_table),]
+            return(cn_table)
+        })
+        return(cn_list)
+        stopCluster(cl)
+    } else {
+        cat("running without mc")
+        cn_list <- lapply(patient.list,FUN = function(x){
+            cn_table <- getCNbins(posBins=posBins,
+                           data=segment.table[segment.table$sample %in% x,],
+                           samples=unique(x))
+            cn_table <- cn_table[complete.cases(cn_table),]
+            return(cn_table)
+        })
+        return(cn_list)
+    }
+}
+
+joint_similarities <- function(cn_diffs_patients = cn_diffs_patients){
+    diff_table <- do.call(rbind,lapply(names(cn_diffs_patients),FUN = function(x){
+        cn_sims <- as.data.frame(getSimilarities(dat1 = cn_diffs_patients[[x]],dat2 = cn_diffs_patients[[x]],pvalue = TRUE))
+        cn_sims$patient <- rep(as.character(x),times = nrow(cn_sims))
+        return(cn_sims)
+        })
+    )
+    diff_table_filt <- diff_table %>%
+                        distinct() %>%
+                        mutate(sample_sample = ifelse(fileid == id,TRUE,FALSE)) %>%
+                        filter(sample_sample == "FALSE") %>%
+                        select(-sample_sample)
+    return(diff_table_filt)
+}
+
+r_sample_patient <- function(patient_groups = 10,mins=2,maxs=4,sample_data = meta.data.paired){
+  paired.arx <- meta.data.paired$SAMPLE_ID[meta.data.paired$group == "arx"]
+  paired.rlps <- meta.data.paired$SAMPLE_ID[meta.data.paired$group == "rlps"]
+  patient.r.list <- list()
+  patient.r.names <- c()
+  for(i in seq(patient_groups)){
+    p.arx <- sample(paired.arx,size = 1,replace = F)
+    p.rlps <- sample(paired.rlps,size = 1,replace = F)
+    samples <- c(p.arx,p.rlps)
+    s <- sample(c(mins:maxs),size = 1)
+    if(s > 0){
+      choices <- c(paired.arx,paired.rlps)
+      choices <- choices[which(!choices %in% samples)]
+      additional <- sample(choices,size = s,replace = FALSE)
+      samples <- append(samples,additional)
+    }
+  patient.r.names <- append(patient.r.names,paste0("PATIENT-",i))
+  patient.r.list <- append(patient.r.list,list(samples))
+  }
+  names(patient.r.list) <- patient.r.names
+  return(patient.r.list)
+}
+
+get_diff <- function(x, y){
+  t1 <- segment.table[segment.table$sample == x,]
+  t2 <- segment.table[segment.table$sample == y,]
+  p <- getDifference(events = t1,events_2 = t2,method = "non-normalized")
+  return(p)
+}
+
+calc_diffs_table <- function(data = NULL,name = NULL){
+  if(is.null(data)){
+    stop("No data")
+  }
+  if(is.null(name)){
+    stop("No name")
+  }
+  pct_diffs <- unlist(lapply(data,FUN = function(a){ 
+                      pct <- sapply(a, function(y) mapply(get_diff,a,y))
+                      mean(pct)
+                     }))
+  pct_diffs_table <- as.data.frame(cbind(diffs=pct_diffs,sample_group=rep(name,times=length(pct_diffs)))) %>%
+                      mutate(diffs=as.numeric(diffs)) %>%
+                      rownames_to_column()
+  return(pct_diffs_table)
+}
+```
+
+```{r reformat_segments}
+segment.table <- segment.table[segment.table$sample %in% meta.data.paired$SAMPLE_ID[meta.data.paired$use == "TRUE"],]
+```
+
+```{r bin_formatting}
+allchr=c(1:22)
+lengthChr <- lengthChr
+posBins <- lapply(allchr,function(chr) getBinsStartsEnds(window=30000, chr, lengthChr[chr]))
+```
+
+```{r get_diffs}
+patient.list <- getPatientList(meta.data = meta.data.paired)
+cn_diffs_patients <- joint_diff_table(patient.list = patient.list,
+                                      mc = TRUE,
+                                      cores = ncores)
+```
+
+```{r get_similiarites}
+patient_similiarities <- joint_similarities(cn_diffs_patients = cn_diffs_patients)
+
+patient_similiarities$group <- paste(meta.data.paired$group[match(patient_similiarities$fileid,meta.data.paired$SAMPLE_ID)],
+                                     meta.data.paired$group[match(patient_similiarities$id,meta.data.paired$SAMPLE_ID)],sep = "-")
+
+patient_similiarities %>%
+  mutate(id = paste0(fileid,"-",id)) %>%
+  pivot_longer(cols = c(3,5,7,9)) %>%
+  select(!ends_with("pval"),-fileid) %>%
+  ggplot() +
+    geom_boxplot(aes(group,value)) +
+    facet_wrap(. ~ name,scales = "free")
+```
+
+```{r rand_diffs}
+r.patient.list <- r_sample_patient(patient_groups = length(patient.list))
+r.cn.diffs.patients <- joint_diff_table(patient.list = r.patient.list,
+                                      mc = TRUE,
+                                      cores = ncores)
+```
+
+```{r rand_get_similiarites}
+
+joint_similarities <- function(cn_diffs_patients = cn_diffs_patients,name = NULL){
+  if(is.null(cn_diffs_patients)){
+    stop("no data")
+  }
+  if(is.null(name)){
+    stop("no name")
+  }
+  diff_table <- do.call(rbind,lapply(names(cn_diffs_patients),FUN = function(x){
+        cn_sims <- as.data.frame(getSimilarities(dat1 = cn_diffs_patients[[x]],dat2 = cn_diffs_patients[[x]],pvalue = TRUE))
+        cn_sims$patient <- rep(as.character(x),times = nrow(cn_sims))
+        return(cn_sims)
+        })
+    )
+    diff_table_filt <- diff_table %>%
+                        distinct() %>%
+                        mutate(sample_sample = ifelse(fileid == id,TRUE,FALSE)) %>%
+                        filter(sample_sample == "FALSE") %>%
+                        select(-sample_sample)
+    diff_table_filt$group <- paste(meta.data.paired$group[match(diff_table_filt$fileid,meta.data.paired$SAMPLE_ID)],
+                                     meta.data.paired$group[match(diff_table_filt$id,meta.data.paired$SAMPLE_ID)],sep = "-")
+    
+    diff_table_filt_plot <- diff_table_filt %>%
+                                    mutate(id = paste0(fileid,"-",id)) %>%
+                                    pivot_longer(cols = c(3,5,7,9)) %>%
+                                    select(!ends_with("pval"),-fileid) %>%
+                                    mutate(sample_group = rep(name,times=nrow(.)))
+    
+    return(list(diff_table_filt,diff_table_filt_plot))
+}
+
+
+r_patient_similiarities <- joint_similarities(cn_diffs_patients = r.cn.diffs.patients,name = "random")
+
+r_patient_similiarities$group <- paste(meta.data.paired$group[match(r_patient_similiarities$fileid,meta.data.paired$SAMPLE_ID)],
+                                     meta.data.paired$group[match(r_patient_similiarities$id,meta.data.paired$SAMPLE_ID)],sep = "-")
+
+r_patient_similiarities %>%
+  mutate(id = paste0(fileid,"-",id)) %>%
+  pivot_longer(cols = c(3,5,7,9)) %>%
+  select(!ends_with("pval"),-fileid)# %>%
+  
+  
+  ggplot(r_patient_similiarities[[2]]) +
+    geom_boxplot(aes(group,value)) +
+    facet_wrap(. ~ name,scales = "free") +
+    theme_bw()
+```
+
+```{r distance_compare}
+r_patient_similiarities_compare <- r_patient_similiarities %>%
+                                    mutate(id = paste0(fileid,"-",id)) %>%
+                                    pivot_longer(cols = c(3,5,7,9)) %>%
+                                    select(!ends_with("pval"),-fileid) %>%
+                                    mutate(sample_group = rep("random",times=nrow(.)))
+
+
+patient_similiarities_compare <- patient_similiarities %>%
+                                  mutate(id = paste0(fileid,"-",id)) %>%
+                                  pivot_longer(cols = c(3,5,7,9)) %>%
+                                  select(!ends_with("pval"),-fileid) %>%
+                                  mutate(sample_group = rep("real",times=nrow(.)))
+
+distance_compare <- rbind(patient_similiarities_compare,r_patient_similiarities_compare)
+
+ggplot(distance_compare) +
+    geom_boxplot(aes(group,value,fill=sample_group)) +
+    facet_wrap(. ~ name,scales = "free") +
+    theme_bw()
+```
+
+```{r calc_pct_diff}
+patient_pct_diffs <- calc_diffs_table(data = patient.list,name = "real")
+rand_pct_diffs <- calc_diffs_table(data = patient.list,name = "random")
+
+pct_diffs <- rbind(patient_pct_diffs,rand_pct_diffs)
+```
+
+```{r diff_plot}
+ggplot(pct_diffs) +
+  geom_boxplot(aes(sample_group,diffs,fill=sample_group)) +
+  theme_bw() +
+  scale_y_continuous(limits = c(0,100))
+```
+
+```{r session.info}
+sessionInfo()
+```
