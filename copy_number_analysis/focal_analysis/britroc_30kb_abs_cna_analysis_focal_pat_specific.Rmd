@@ -48,19 +48,6 @@ source("data/nbclustfixed.R")
 
 Meta data for all samples with fitted absolute copy number profiles, as well as genomic loci/annotation data for 16 frequently altered genes linked to high grade serous ovarian cancer.
 
-BriTROC samples (interesting and niche - see misc. fit notes presentation)
-Scoring method (1-3 implementation for these samples - document written to describe work flow)
-BRITROC-26
-BRITROC-67
-BRITROC-14
-BRITROC-17 (Diploid to Tetraploid transition)
-BRITROC-274 (Diploid to Tetraploid transition)
-BRITROC-209 (Diploid to Triploid transition)
-BRITROC-199 (Diploid to Triploid transition)
-BRITROC-266 (Diploid to Tetraploid transition)
-BRITROC-267
-
-
 ```{r read_meta}
 meta.data <- read.table("../../copy_number_signatures/britroc_30kb_signature_data_meta.tsv",header = TRUE,sep = "\t")
 patient_data <- read.table("../../britroc_cohort_patient_data.tsv",header = T,sep = "\t")
@@ -68,16 +55,7 @@ patient_data <- read.table("../../britroc_cohort_patient_data.tsv",header = T,se
 cytoband <- read.table("data/hg19_cytobands.tsv",header = T,sep = "\t")
 cytoband$length <- cytoband$end - cytoband$start
 
-# ploidy_change_samples <- c("BRITROC-14",
-#                            "BRITROC-17",
-#                            "BRITROC-67",
-#                            "BRITROC-26",
-#                            "BRITROC-17",
-#                            "BRITROC-274",
-#                            "BRITROC-209",
-#                            "BRITROC-199",
-#                            "BRITROC-266",
-#                            "BRITROC-267")
+ploidy_change_samples <- readLines(con = "../broad_analysis/data/ploidy_change_pats.txt")
 ```
 
 Frequently altered genes are as listed below:
@@ -160,12 +138,19 @@ norm_paired_changes <- paired_changes %>%
 ### Patient-specific changes
 
 ```{r pat_specific_justification}
+pat_ordering <- norm_paired_changes %>% group_by(PATIENT_ID) %>% summarise(across(change,sum)) %>% arrange(change)
+
+norm_paired_changes$PATIENT_ID <- factor(norm_paired_changes$PATIENT_ID,
+                                         levels = as.character(rev(pat_ordering$PATIENT_ID)))
+
 ggplot(norm_paired_changes) +
-  geom_col(aes(x = PATIENT_ID,y = change,group = gene)) +
-  facet_wrap(. ~ gene) +
-  theme_bw() +
+  geom_hline(yintercept = 0) +
+  geom_col(aes(x = PATIENT_ID,y = change,group = gene,fill=ifelse(PATIENT_ID %in% ploidy_change_samples,"changed","unchanged"))) +
+  facet_wrap(. ~ gene,scales = "free_y",ncol = 3) +
   ylab("copy number change") +
   xlab("patient") +
+  scale_fill_manual(name = "ploidy change",values = c("firebrick2","grey50")) +
+  theme_bw() +
   theme(axis.text.x = element_blank(),axis.ticks = element_blank())
 ```
 

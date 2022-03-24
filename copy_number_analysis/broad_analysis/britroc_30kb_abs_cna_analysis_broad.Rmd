@@ -478,9 +478,10 @@ ploidy_plots
 
 ```{r ploidy_changes}
 ploidy_change_table <- ploidy_summary_paired[ploidy_summary_paired$ploidy_change == TRUE,]
-ploid_change_pats <- str_sort(unique(ploidy_summary_paired$PATIENT_ID[ploidy_summary_paired$ploidy_change == TRUE]),numeric = T)
-cat("Ploidy change patients: ",paste0(as.character(ploid_change_pats),collapse = ", "))
-cat(length(ploid_change_pats))
+ploidy_change_pats <- str_sort(unique(ploidy_summary_paired$PATIENT_ID[ploidy_summary_paired$ploidy_change == TRUE]),numeric = T)
+cat("Ploidy change patients: ",paste0(as.character(ploidy_change_pats),collapse = ", "))
+cat(length(ploidy_change_pats))
+writeLines(text = ploidy_change_pats,con = "data/ploidy_change_pats.txt",sep = "\n")
 ```
 
 ```{r test_pt_ploidy_change}
