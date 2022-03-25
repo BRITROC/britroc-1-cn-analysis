@@ -73,6 +73,9 @@ abs_data <- abs_data[,which(colnames(abs_data) %in% meta.data$SAMPLE_ID[meta.dat
 ```{r samples}
 arx_samples <- meta.data$SAMPLE_ID[meta.data$group == "arx"]
 rlps_samples <- meta.data$SAMPLE_ID[meta.data$group == "rlps"]
+
+arx_samples_paired <- meta.data$SAMPLE_ID[meta.data$group == "arx" & meta.data$paired == "TRUE"]
+rlps_samples_paired <- meta.data$SAMPLE_ID[meta.data$group == "rlps" & meta.data$paired == "TRUE"]
 ```
 
 ## Analysis
@@ -485,12 +488,15 @@ writeLines(text = ploidy_change_pats,con = "data/ploidy_change_pats.txt",sep = "
 ```
 
 ```{r test_pt_ploidy_change}
-fisher.test(matrix(ncol = 2,
-                   rbind(c(table(clinical.data$pt_sensitivity_at_reg[!paste0("BRITROC-",clinical.data$britroc_number) %in% ploid_change_pats])),
-                         c(table(clinical.data$pt_sensitivity_at_reg[paste0("BRITROC-",clinical.data$britroc_number) %in% ploid_change_pats])))))
+cat("pt_sens_ploidy_change ","pval=",fisher.test(matrix(ncol = 2,
+                   rbind(c(table(clinical.data$pt_sensitivity_at_reg[!paste0("BRITROC-",clinical.data$britroc_number) %in% ploidy_change_pats])),
+                         c(table(clinical.data$pt_sensitivity_at_reg[paste0("BRITROC-",clinical.data$britroc_number) %in% ploidy_change_pats])))))$p.value,"\n",sep = "")
 
-wilcox.test(x = clinical.data$age[!paste0("BRITROC-",clinical.data$britroc_number) %in% ploid_change_pats],
-            y = clinical.data$age[paste0("BRITROC-",clinical.data$britroc_number) %in% ploid_change_pats])
+cat("age_ploidy_change ","pval=",wilcox.test(x = clinical.data$age[!paste0("BRITROC-",clinical.data$britroc_number) %in% ploidy_change_pats],
+            y = clinical.data$age[paste0("BRITROC-",clinical.data$britroc_number) %in% ploidy_change_pats])$p.value,"\n",sep="")
+
+cat("prior_chem_ploidy_change ","pval=",wilcox.test(x = clinical.data$pre_reg_chemo[!paste0("BRITROC-",clinical.data$britroc_number) %in% ploidy_change_pats],
+            y = clinical.data$pre_reg_chemo[paste0("BRITROC-",clinical.data$britroc_number) %in% ploidy_change_pats])$p.value,"\n",sep="")
 ```
 
 ### purity changes
@@ -728,8 +734,57 @@ cytoband_fishers_arx_rlps <- calc_broad_freq_fishers(a = broad_counts_arx,b = br
 cytoband_fishers_arx_rlps
 ```
 
-```{r cytoband_plot}
 
+```{r extract_broad_CNA_paired}
+broad_CNA_arx_paired <- extract_broad_CNA(data = abs_data[,colnames(abs_data) %in% arx_samples_paired],
+                                   cyto = cytoband,
+                                   threshold = 0.8,
+                                   percentile = 0.9,
+                                   ploidys = get_named_ploidy(data = abs_data[,colnames(abs_data) %in% arx_samples_paired]))
+
+broad_CNA_rlps_paired <- extract_broad_CNA(data = abs_data[,colnames(abs_data) %in% rlps_samples_paired],
+                                   cyto = cytoband,
+                                   threshold = 0.8,
+                                   percentile = 0.9,
+                                   ploidys = get_named_ploidy(data = abs_data[,colnames(abs_data) %in% rlps_samples_paired]))
+```
+
+```{r count_broad_amp_paired}
+broad_counts_arx_paired <- count_broad(data = broad_CNA_arx_paired,cohort="arx")
+broad_counts_rlps_paired <- count_broad(data = broad_CNA_rlps_paired,cohort="rlps")
+```
+
+```{r cyto_fishers}
+cytoband_fishers_arx_rlps_paired <- calc_broad_freq_fishers(a = broad_counts_arx_paired,b = broad_counts_rlps_paired)
+cytoband_fishers_arx_rlps_paired
+```
+
+```{r cytoband_plot}
+broad_cyto_combined <- rbind(do.call(rbind,lapply(broad_counts_arx_paired,FUN = function(x){return(x)})),
+                             do.call(rbind,lapply(broad_counts_rlps_paired,FUN = function(x){return(x)})))
+
+broad_cyto_combined <- broad_cyto_combined %>%
+                        mutate(rate = ifelse(group == "amp",rate,-rate)) %>%
+                        mutate(group = case_when(group == "amp" ~ "amplification",
+                                                 group == "del" ~ "deletion")) %>%
+                        mutate(cohort = case_when(cohort == "arx" ~ "diagnosis",
+                                                  cohort == "rlps" ~ "relapse"))
+
+cyto_plot_paired <- ggplot(broad_cyto_combined) +
+  geom_hline(yintercept = 0) +
+  geom_col(aes(cytoband,rate,fill=group),width = 1) +
+  facet_grid(rows = vars(cohort),
+             cols = vars(chr),
+             scales = "free_x") +
+  xlab("") +
+  ylab("rate (%)") +
+  scale_y_continuous(limits = c(-15,15),expand = c(0,0)) +
+  scale_fill_manual(values = colour_palettes$amp_del) +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.spacing.x = unit(0,"lines"),
+        legend.position = "none")
 ```
 
 ### Broad-level alterations - Arm-level events
@@ -769,12 +824,72 @@ arm_fishers_arx_rlps <- calc_broad_freq_fishers(a = arm_counts_arx,b = arm_count
 arm_fishers_arx_rlps
 ```
 
-```{r arm_rate_plots}
+```{r extract_arm_cna_paired}
+arm_CNA_arx_paired <- extract_broad_CNA(data = abs_data[,colnames(abs_data) %in% arx_samples_paired],
+                                   cyto = arms,
+                                   threshold = 0.5,
+                                   percentile = 1,
+                                   ploidys = get_named_ploidy(data = abs_data[,colnames(abs_data) %in% arx_samples_paired]))
 
+arm_CNA_rlps_paired <- extract_broad_CNA(data = abs_data[,colnames(abs_data) %in% rlps_samples_paired],
+                                   cyto = arms,
+                                   threshold = 0.5,
+                                   percentile = 1,
+                                   ploidys = get_named_ploidy(data = abs_data[,colnames(abs_data) %in% rlps_samples_paired]))
 ```
 
-```{r cyto_arm_cn_value_analysis}
+```{r count_arm_amp}
+arm_counts_arx_paired <- count_broad(data = arm_CNA_arx_paired,cohort="arx")
+arm_counts_rlps_paired <- count_broad(data = arm_CNA_rlps_paired,cohort="rlps")
+```
 
+```{r arm_fishers}
+arm_fishers_arx_rlps_paired <- calc_broad_freq_fishers(a = arm_counts_arx_paired,b = arm_counts_rlps_paired)
+arm_fishers_arx_rlps_paired
+```
+
+```{r arm_rate_plots}
+broad_arm_combined <- rbind(do.call(rbind,lapply(arm_counts_arx_paired,FUN = function(x){return(x)})),
+                             do.call(rbind,lapply(arm_counts_rlps_paired,FUN = function(x){return(x)})))
+
+broad_arm_combined <- broad_arm_combined %>%
+                        mutate(rate = ifelse(group == "amp",rate,-rate)) %>%
+                        mutate(group = case_when(group == "amp" ~ "amplification",
+                                                 group == "del" ~ "deletion")) %>%
+                        mutate(cohort = case_when(cohort == "arx" ~ "diagnosis",
+                                                  cohort == "rlps" ~ "relapse")) %>%
+                        mutate(cytoband = gsub(x = cytoband,pattern = ".*:",replacement = ""))
+
+arm_plot_paired <- ggplot(broad_arm_combined) +
+  geom_hline(yintercept = 0) +
+  geom_col(aes(cytoband,rate,fill=group),width = 1) +
+  facet_grid(rows = vars(cohort),
+             cols = vars(chr),
+             scales = "free_x") +
+  ylab("rate (%)") +
+  scale_y_continuous(limits = c(-15,15),expand = c(0,0)) +
+  scale_fill_manual(values = colour_palettes$amp_del) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90,vjust = 0.5),
+        panel.spacing.x = unit(0,"lines"),
+        legend.position = "none")
+```
+
+```{r arm_cyto_plotting}
+legend_arm_cyto <- get_legend(
+  cyto_plot_paired + 
+    guides(color = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+
+broad_plot <- plot_grid(cyto_plot_paired,
+                arm_plot_paired,
+                legend_arm_cyto,
+                nrow = 3,
+                rel_heights = c(1,1,0.1),
+                labels = c("A","B",""))
+
+broad_plot
 ```
 
 ```{r session_info}
