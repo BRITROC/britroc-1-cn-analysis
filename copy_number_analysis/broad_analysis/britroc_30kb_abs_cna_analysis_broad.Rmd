@@ -784,7 +784,9 @@ cyto_plot_paired <- ggplot(broad_cyto_combined) +
   theme(axis.text.x = element_blank(),
         axis.ticks.x = element_blank(),
         panel.spacing.x = unit(0,"lines"),
-        legend.position = "none")
+        legend.position = "none",
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank())
 ```
 
 ### Broad-level alterations - Arm-level events
@@ -872,7 +874,9 @@ arm_plot_paired <- ggplot(broad_arm_combined) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90,vjust = 0.5),
         panel.spacing.x = unit(0,"lines"),
-        legend.position = "none")
+        legend.position = "none",
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank())
 ```
 
 ```{r arm_cyto_plotting}
@@ -889,6 +893,8 @@ broad_plot <- plot_grid(cyto_plot_paired,
                 rel_heights = c(1,1,0.1),
                 labels = c("A","B",""))
 
+saveRDS(object = broad_plot,file = "plots/cna_arm_cyto_plot.RDS")
+ggsave2(plot = broad_plot,filename = "plots/cna_arm_cyto_plot.png",width = 10,height = 8,units = "in",dpi = 300)
 broad_plot
 ```
 

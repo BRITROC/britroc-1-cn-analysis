@@ -1,0 +1,97 @@
+---
+title: "Ploidy change patients scoring"
+author: "Philip Smith"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+---
+
+## Initial steps
+
+### knitr options
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Load libraries
+
+```{r load_libraries}
+# Load libraries
+suppressPackageStartupMessages(suppressWarnings(library(tidyverse)))
+suppressPackageStartupMessages(suppressWarnings(library(kableExtra)))
+suppressPackageStartupMessages(suppressWarnings(library(Biobase)))
+suppressPackageStartupMessages(suppressWarnings(library(QDNAseqmod)))
+```
+
+```{r funcs}
+depthtocn<-function(x,purity,seqdepth) #converts readdepth to copy number given purity and single copy depth
+{
+    (x/seqdepth-2*(1-purity))/purity
+}
+
+#Plot absolute CN fits for assessment
+plotProfile <- function(data = NULL,sample = NULL,ploidy = NULL,purity = NULL){
+  x <- data[, sample]
+  
+  cn <- assayDataElement(x,"copynumber")
+  seg <- assayDataElement(x,"segmented")
+  
+  rel_ploidy <- mean(cn,na.rm=T)
+  cellploidy <- ploidy*purity+2*(1-purity)
+  seqdepth <- rel_ploidy/cellploidy
+  
+  temp <- x
+  
+  abs_cn <- depthtocn(cn,purity,seqdepth)
+  abs_seg <- depthtocn(seg,purity,seqdepth)
+  
+  assayDataElement(temp,"copynumber") <- abs_cn
+  assayDataElement(temp,"segmented") <- abs_seg
+  
+  # plot   
+  if(ploidy>5){
+    yrange=15
+  } else {
+    yrange=10
+  }
+  plot(temp,doCalls=FALSE,showSD=TRUE,logTransform=FALSE,ylim=c(0,yrange),ylab="Absolute tumour CN",
+         main=paste(sample," pu=",round(purity,2),
+                    " pl=",round(ploidy,2),
+                    sep=""),cex.main=0.8)
+  abline(h=1:9,col = "blue")
+}
+```
+
+```{r metadata}
+meta.fitting <- read.table("../../absolute_PRE_down_sampling/fit_QC_predownsample_withsmooth.tsv",header = T,sep = "\t")
+ploidy_change_patients <- readLines(con = "data/ploidy_change_pats.txt")
+ploidy_change_patients
+```
+
+```{r cn_data}
+cnData <- readRDS("../../absolute_PRE_down_sampling/britroc_smoothed_copyNumbersSegmented.rds")
+```
+
+```{r ploidy_change_1}
+ploidy_change_patients[1]
+meta.fitting[meta.fitting$PATIENT_ID == ploidy_change_patients[1],]
+meta.fitting[meta.fitting$PATIENT_ID == ploidy_change_patients[1] & meta.fitting$use == "TRUE",]
+meta.fitting$notes[meta.fitting$PATIENT_ID == ploidy_change_patients[1] & meta.fitting$use == "TRUE"]
+```
+
+```{r selected_fits}
+plotProfile(data = cnData,sample = "IM_56",ploidy = 1.9,purity = 0.56)
+plotProfile(data = cnData,sample = "JBLAB-4128",ploidy = 3.6,purity = 0.82)
+```
+
+```{r unselected_fits}
+plotProfile(data = cnData,sample = "JBLAB-4128",ploidy = 1.9,purity = 0.84)
+plotProfile(data = cnData,sample = "JBLAB-4967",ploidy = 3.7,purity = 0.77)
+```
+
+```{r load_ploidy_change_1_all}
+read.table("../../absolute_PRE_down_sampling/clonality_results/IM_56_clonality.csv",sep = ",",header = T)
+```
