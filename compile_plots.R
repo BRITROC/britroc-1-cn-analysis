@@ -19,19 +19,22 @@ focal_rates_clinic <- readRDS("copy_number_analysis/focal_analysis/plots/amp_del
 focal_rates_clinic <- focal_rates_clinic + theme(legend.position = "bottom")
 
 ## Load signature plots 
-signature_stacked <- readRDS("copy_number_signatures/plots/signatures_stacked_bar.RDS")
-signature_stacked <- signature_stacked +
-                      theme(legend.position = "none")
+# signature_stacked <- readRDS("copy_number_signatures/plots/signatures_stacked_bar.RDS")
+# signature_stacked <- signature_stacked +
+#                       theme(legend.position = "none")
 signature_stacked_all <- readRDS("copy_number_signatures/plots/signatures_allSamples_stacked_bar.RDS")
-signature_stacked_all <- signature_stacked_all +
-  theme(legend.position = "bottom")
+signature_stacked_all <- signature_stacked_all + theme(legend.position = "none")
 
-sig_box_paired_wilcox <- readRDS("copy_number_signatures/plots/sig_box_paired_wilcox.RDS")
-sig_box_paired_wilcox <- sig_box_paired_wilcox +
-                          labs(title = "",caption = "")
+# sig_box_paired_wilcox <- readRDS("copy_number_signatures/plots/sig_box_paired_wilcox.RDS")
+# sig_box_paired_wilcox <- sig_box_paired_wilcox +
+#                           labs(title = "",caption = "")
+
+sig_box_wilcox <- readRDS("copy_number_signatures/plots/sig_box_wilcox.RDS")
+sig_box_wilcox <- sig_box_wilcox + labs(title = "",caption = "") + theme(legend.position = "bottom")
+                        
 
 signature_stacked_alt <- readRDS("copy_number_signatures/plots/signatures_stacked_bar_alt.RDS")
-signature_stacked_alt <- signature_stacked_alt + theme(legend.position = "none")
+signature_stacked_alt <- signature_stacked_alt + theme(legend.position = "bottom")
 
 ## Load tissue plots
 cna_tissue_rates <- readRDS("copy_number_analysis/sites_of_relapse/plots/cna_rates_tissue.RDS")
@@ -56,20 +59,11 @@ fig3 <- plot_grid(substraction_plot,focal_rates_clinic,labels = c("A","B"),nrow 
 ggsave2(filename = "figure_3_render.png",plot = fig3,width = 11,height = 8,units = "in",dpi = 300)  
 
 ## Figure 4
-fig4 <- plot_grid(signature_stacked,signature_stacked_all,plot_grid(sig_box_paired_wilcox,empty,ncol = 2,labels = c("C","D")),
-                  nrow = 3,
-                  rel_heights = c(1,1,1),
-                  labels = c("A","B",""))
-ggsave2(filename = "figure_4_render.png",plot = fig4,width = 10,height = 10,units = "in",dpi = 300)  
-
-fig4_alt <- plot_grid(signature_stacked_alt + theme(legend.position = "bottom"),
-                      plot_grid(signature_stacked_all + theme(legend.position = "none"),
-                      plot_grid(sig_box_paired_wilcox+theme(legend.position = "bottom"),empty,ncol = 2,labels = c("C","D")),
-                      nrow=2),
-                  nrow = 1,
-                  rel_widths = c(0.6,1),
-                  labels = c("A","B",""))
-ggsave2(filename = "figure_4_alt_render.png",plot = fig4_alt,width = 10,height = 7,units = "in",dpi = 300)  
+fig4 <- plot_grid(signature_stacked_all,plot_grid(signature_stacked_alt,sig_box_wilcox,ncol = 2,labels = c("B","C")),
+                  nrow = 2,
+                  rel_heights = c(0.4,0.6),
+                  labels = c("A",""))
+ggsave2(filename = "figure_4_render.png",plot = fig4,width = 10,height = 11,units = "in",dpi = 300)  
 
 ## Figure 5
 fig5 <- plot_grid(cna_tissue_rates,

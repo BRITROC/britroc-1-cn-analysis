@@ -441,6 +441,23 @@ delta_itg_pt_sens
 ggsave(filename = "plots/delta_itg_pt_sens.png",plot = delta_itg_pt_sens,width = 8,height = 6,units = "in",dpi = 300)
 ```
 
+```{r clonality_diff_priorlines}
+
+# delta_itg_priorlines <- 
+patient_clonality_diffs$pre_reg_chemo <- as.factor(patient_clonality_diffs$pre_reg_chemo)
+  
+  ggplot(patient_clonality_diffs) +
+  geom_point(aes(pre_reg_chemo,ith_change,fill=pre_reg_chemo),position="jitter") +
+  geom_violin(aes(pre_reg_chemo,ith_change,fill=pre_reg_chemo),alpha=0.6) +
+  geom_signif(aes(as.factor(pre_reg_chemo),ith_change),comparisons = list(c("1","2")),test = "wilcox.test") +
+  ylab(label = paste0("\u0394","ITH")) +
+  xlab("") +
+  scale_fill_discrete(name = "prior lines") +
+  theme_bw()
+delta_itg_pt_sens
+ggsave(filename = "plots/delta_itg_pt_sens.png",plot = delta_itg_pt_sens,width = 8,height = 6,units = "in",dpi = 300)
+```
+
 ##### Clonality patient-level analysis
 
 ```{r arx_multi_sample_data}
