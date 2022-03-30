@@ -67,8 +67,8 @@ plotProfile <- function(data = NULL,sample = NULL,ploidy = NULL,purity = NULL){
 
 ```{r metadata}
 meta.fitting <- read.table("../../absolute_PRE_down_sampling/fit_QC_predownsample_withsmooth.tsv",header = T,sep = "\t")
-ploidy_change_patients <- readLines(con = "data/ploidy_change_pats.txt")
-ploidy_change_patients
+ploidy_change_patients <- read.table(file = "data/ploidy_change_pats.tsv",header = T,sep = "\t")
+ploidy_change_patients <- unique(ploidy_change_patients$PATIENT_ID)
 ```
 
 ```{r cn_data}

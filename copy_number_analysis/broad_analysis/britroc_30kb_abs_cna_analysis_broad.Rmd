@@ -18,8 +18,6 @@ suppressPackageStartupMessages(library(QDNAseqmod))
 suppressPackageStartupMessages(library(tidyverse))
 suppressPackageStartupMessages(library(cowplot))
 suppressPackageStartupMessages(library(kableExtra))
-suppressPackageStartupMessages(library(limma))
-suppressPackageStartupMessages(library(UpSetR))
 suppressPackageStartupMessages(library(ggrepel))
 suppressPackageStartupMessages(library(ggpubr))
 suppressPackageStartupMessages(suppressWarnings(library(biomaRt)))
@@ -79,19 +77,6 @@ rlps_samples_paired <- meta.data$SAMPLE_ID[meta.data$group == "rlps" & meta.data
 ```
 
 ## Analysis
-https://www.sciencedirect.com/science/article/pii/S1535610818301119
-https://www.sciencedirect.com/science/article/pii/S1535610818301119
-https://www.sciencedirect.com/science/article/pii/S1535610818301119
-https://www.sciencedirect.com/science/article/pii/S1535610818301119
-https://www.sciencedirect.com/science/article/pii/S1535610818301119
-https://www.sciencedirect.com/science/article/pii/S1535610818301119
-https://www.sciencedirect.com/science/article/pii/S1535610818301119
-https://www.sciencedirect.com/science/article/pii/S1535610818301119
-https://www.sciencedirect.com/science/article/pii/S1535610818301119
-https://www.sciencedirect.com/science/article/pii/S1535610818301119
-https://www.sciencedirect.com/science/article/pii/S1535610818301119
-https://www.sciencedirect.com/science/article/pii/S1535610818301119
-https://www.sciencedirect.com/science/article/pii/S1535610818301119
 https://www.sciencedirect.com/science/article/pii/S1535610818301119
 https://www.sciencedirect.com/science/article/pii/S1535610818301119
 
@@ -177,40 +162,9 @@ paired_diffs_stats$wilcox_pval <- sapply(1:nrow(paired_diffs), function(i){
                      paired = TRUE,exact = FALSE)[c("p.value")])})
 paired_diffs_stats$wilcox_adj <- p.adjust(paired_diffs_stats$wilcox_pval,method = "fdr")
 paired_diffs_stats$wilcox_sig <- ifelse(paired_diffs_stats$wilcox_pval < 0.05,"significant","non-significant")
-
-# ## Limma design
-# fittable <- data.frame(sample=colnames(paired_diffs),
-#                        pairing=seq.int(1,ncol(paired_diffs)/2,1),
-#                        group=c(rep("arx",times=ncol(paired_diffs)/2),rep("rlps",times=ncol(paired_diffs)/2)))
-# 
-# pairing <- factor(fittable$pairing)
-# group <- factor(fittable$group,levels = c("arx","rlps"))
-# design <- model.matrix(~pairing+group)
-# 
-# ## Limma non-log2 fitting
-# fit <- lmFit(object = paired_diffs, design)
-# fit <- eBayes(fit = fit)
-# top <- topTable(fit = fit,coef="grouprlps",number = nrow(paired_diffs),adjust.method = "fdr",sort.by = "none")
-# paired_diffs_stats$limma_pval <- top$P.Value
-# paired_diffs_stats$limma_adj <- top$adj.P.Val
-# paired_diffs_stats$limma_sig <- ifelse(paired_diffs_stats$limma_pval < 0.05,"significant","non-significant")
-# 
-# ## Limma log2 fitting
-# fit2 <- lmFit(object = log2(paired_diffs), design)
-# fit2 <- eBayes(fit = fit2)
-# top2 <- topTable(fit = fit2,coef="grouprlps",number = nrow(paired_diffs),adjust.method = "fdr",sort.by = "none")
-# paired_diffs_stats$limma2_pval <- top2$P.Value
-# paired_diffs_stats$limma2_adj <- top2$adj.P.Val
-# paired_diffs_stats$limma2_sig <- ifelse(paired_diffs_stats$limma2_pval < 0.05,"significant","non-significant")
 ```
 
 ```{r broad_genome_plot_paired_fig}
-## UpsetR diagram
-# sig_list <- list(wilcoxon=rownames(paired_diffs_stats[paired_diffs_stats$wilcox_sig == "significant",]),
-#                  limma=rownames(paired_diffs_stats[paired_diffs_stats$limma_sig == "significant",]),
-#                  limma2=rownames(paired_diffs_stats[paired_diffs_stats$limma2_sig == "significant",]))
-# upset(data = fromList(sig_list))
-
 ## Get closest gene bin
 focal_genes$idx <- paired_diffs_stats[sapply(X = positions,FUN = function(x) get_gene_seg(target = x,abs_data = abs_data)[1]),]$idx
 focal_genes$wilcox_sig <- paired_diffs_stats$wilcox_sig[focal_genes$idx]
@@ -480,11 +434,29 @@ ploidy_plots
 ```
 
 ```{r ploidy_changes}
-ploidy_change_table <- ploidy_summary_paired[ploidy_summary_paired$ploidy_change == TRUE,]
-ploidy_change_pats <- str_sort(unique(ploidy_summary_paired$PATIENT_ID[ploidy_summary_paired$ploidy_change == TRUE]),numeric = T)
-cat("Ploidy change patients: ",paste0(as.character(ploidy_change_pats),collapse = ", "))
-cat(length(ploidy_change_pats))
-writeLines(text = ploidy_change_pats,con = "data/ploidy_change_pats.txt",sep = "\n")
+ploidy_change_table <- ploidy_summary_paired[ploidy_summary_paired$ploidy_change == TRUE,] %>%
+                        dplyr::select(-paired,-ploidy_change) %>%
+                        mutate(direction = ifelse(ploidy_diff < 0,"decrease","increase")) %>%
+                        mutate(ploidy_change = c("diploid-triploid","diploid-triploid",
+                                                 "diploid-tetraploid","diploid-tetraploid",
+                                                 "diploid-tetraploid","diploid-tetraploid",
+                                                 "diploid-triploid","diploid-triploid",
+                                                 "pentaploid-triploid","pentaploid-triploid",
+                                                 "diploid-tetraploid","diploid-tetraploid",
+                                                 "diploid-triploid","diploid-triploid",
+                                                 "triploid-diploid","triploid-diploid",
+                                                 "diploid-triploid","diploid-triploid"))
+
+ploidy_change_table
+
+lapply(split(ploidy_change_table[ploidy_change_table$direction == "increase",],
+             f = list(ploidy_change_table$group[ploidy_change_table$direction == "increase"])),FUN = function(x) summary(x$ploidy))
+
+table(ploidy_change_table$ploidy_change[ploidy_change_table$group == "relapse"])
+
+write.table(x = ploidy_change_table,
+            file = "data/ploidy_change_pats.tsv",
+            quote = F,row.names = F,col.names = T,sep = "\t")
 ```
 
 ```{r test_pt_ploidy_change}

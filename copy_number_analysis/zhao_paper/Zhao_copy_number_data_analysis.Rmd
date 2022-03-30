@@ -326,7 +326,7 @@ d2_reformat <- do.call(rbind,apply(d2,MARGIN = 1,FUN = function(x) data.frame(N=
 d2_reformat
 recalled_cna_calls
 ```
-
+## calling method (Min Repro)
 ```{r minimal_repo}
 sample_ploidys <- c(sample1=2.4,sample2=1.5,sample3=3.6,sample4=3.2)
 minimal_input <- data.frame(sample1 = c(6.2,3.1,0,2.5),

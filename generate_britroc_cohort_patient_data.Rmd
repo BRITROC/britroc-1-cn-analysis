@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r libs}
+## Load required libraries
 library(RPostgres)
 library(config)
 library(tidyverse)
@@ -21,7 +22,9 @@ library(zoo)
 ```
 
 ```{r db_open}
+## Retrieve clinical database login details
 clin_config <- config::get("clinDB")
+## Establish connection to Postgres DB
 britroc_con <- dbConnect(RPostgres::Postgres(),
                          dbname=clin_config$dbname,
                          host=clin_config$host,
@@ -31,7 +34,7 @@ britroc_con <- dbConnect(RPostgres::Postgres(),
 )
 ```
 
-## Survival data generation
+## Clinical data generation
 
 ```{r read_tables}
 pat.data <- RPostgres::dbReadTable(britroc_con, 'patients')
@@ -130,7 +133,7 @@ missing_prog <- survival_data %>%
                   group_by(britroc_number) %>%
                   mutate(prog_reg_closest = all(is.na(progression_date))) %>%
                   filter(prog_reg_closest)
-## Take progression date closest to registration (TO BE REMOVED)
+## Take progression date closest to registration (BEST CURRENT FIX)
 survival_data <- survival_data %>%
                   group_by(britroc_number) %>%
                   filter(!is.na(progression_date)) %>%
@@ -138,8 +141,6 @@ survival_data <- survival_data %>%
                            min(abs(as.numeric(progression_date - registration_date)),na.rm = T)) %>%
                   filter(prog_reg_closest) %>%
                   dplyr::select(-prog_reg_closest)
-
-
 
 paste0("Patients with progression date: ",length(unique(survival_data$britroc_number)))
 paste0("Patients missing any progression date: ",paste0(unique(missing_prog$britroc_number),collapse = ", "))
@@ -153,15 +154,6 @@ paste0("Patients missing any diagnosis date: ",paste0(unique(missing_diag$britro
 ```
 
 ```{r add_surv_metrics}
-# GEOFF CODE WITH POTENTIAL ERROR
-# # DTLAST: DTALIVE or DOD
-# # STATUS: a death event was recorded as 1 and survival as 0  
-# merged$DTLAST <- merged$DTALIVE
-# survidx <- which(!is.na(merged$DOD))
-# merged$DTLAST[survidx] <- merged$DOD[survidx]
-# merged$STATUS <- 1  
-# merged$STATUS[survidx] <- 0
-
 ## last documented clinical outcome 
 survival_data$doc_date <- survival_data$date_alive
 survidx <- which(!is.na(survival_data$date_of_death))

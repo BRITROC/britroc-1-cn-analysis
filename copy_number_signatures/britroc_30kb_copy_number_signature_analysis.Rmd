@@ -52,7 +52,7 @@ sig_box_plot <- function(sig_quants = NULL,test="t.test",plot_title = NULL,paire
   }
   x <- sig_quants
   if(paired){
-    sig_box_data <- merge(x = rownames_to_column(
+    sig_box_data <- base::merge(x = rownames_to_column(
                                 as.data.frame(t(x)),var = "Sample"),
                           y = patient.meta[patient.meta$SAMPLE_ID %in% colnames(x),c("PATIENT_ID","SAMPLE_ID","group")],
                           by.x = "Sample",
@@ -62,7 +62,7 @@ sig_box_plot <- function(sig_quants = NULL,test="t.test",plot_title = NULL,paire
                           group_by(PATIENT_ID,Signature,group) %>%
                           summarise(across(.cols = value,.fns = median))
   } else {
-    sig_box_data <- merge(x = rownames_to_column(
+    sig_box_data <- base::merge(x = rownames_to_column(
                                 as.data.frame(t(x)),var = "Sample"),
                           y = patient.meta[patient.meta$SAMPLE_ID %in% colnames(x),c("SAMPLE_ID","group")],
                           by.x = "Sample",
@@ -111,17 +111,18 @@ sig_box_plot <- function(sig_quants = NULL,test="t.test",plot_title = NULL,paire
     plot_title <- "Signature exposures by signature between groups"
   }
   ggplot(data = sig_box_data_long) +
-    #geom_jitter(aes(x = Signature,y = value,color=group),alpha=0.4) +
-    geom_boxplot(aes(x = Signature,y = value,fill=group)) +
-    geom_signif(aes(x = Signature,y = value),
-                annotations = ifelse(test.p < 0.01,formatC(test.p,format = "e",digits = 2),signif(test.p,digits = 2)),
-                                     xmin = seq.int(0.5,6.5,1)+0.2,
-                                     xmax = seq.int(1.5,7.5,1)-0.2,
-                                     y_position = 0.9) +
+    geom_jitter(aes(x = Signature,y = value,color=group),
+                alpha=0.3,position = position_jitterdodge(jitter.width = 0.2)) +
+    geom_boxplot(aes(x = Signature,y = value,fill=group),outlier.colour = NA) +
+    # geom_signif(aes(x = Signature,y = value),
+    #             annotations = ifelse(test.p < 0.01,formatC(test.p,format = "e",digits = 2),signif(test.p,digits = 2)),
+    #                                  xmin = seq.int(0.5,6.5,1)+0.2,
+    #                                  xmax = seq.int(1.5,7.5,1)-0.2,
+    #                                  y_position = 0.9) +
     labs(title = plot_title) +
     scale_y_continuous(name = "Exposure",limits = c(0,1)) +
     scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
-    #scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+    scale_color_manual(values = colour_palettes$diagnosis_relapse) +
     theme_bw()
 }
 
@@ -167,14 +168,14 @@ abcel_abs <- readRDS("../absolute_PRE_down_sampling/abcel_absoluteCN_30kbps_refi
 ### Load external data
 
 ```{r ext}
-tcga_samp_comp <- generateSampleByComponentMatrix(readRDS("data/tcga_CN_features.rds"))
-tcga_sigs <- quantifySignatures(tcga_samp_comp)
-
-pcawg_samp_comp <- generateSampleByComponentMatrix(readRDS("data/pcawg_CN_features.rds"))
-pcawg_sigs <- quantifySignatures(pcawg_samp_comp)
-
-natgen_samp_comp <- generateSampleByComponentMatrix(readRDS("data/natgen_CN_features.rds"))
-natgen_sigs <- quantifySignatures(natgen_samp_comp)
+# tcga_samp_comp <- generateSampleByComponentMatrix(readRDS("data/tcga_CN_features.rds"))
+# tcga_sigs <- quantifySignatures(tcga_samp_comp)
+# 
+# pcawg_samp_comp <- generateSampleByComponentMatrix(readRDS("data/pcawg_CN_features.rds"))
+# pcawg_sigs <- quantifySignatures(pcawg_samp_comp)
+# 
+# natgen_samp_comp <- generateSampleByComponentMatrix(readRDS("data/natgen_CN_features.rds"))
+# natgen_sigs <- quantifySignatures(natgen_samp_comp)
 ```
 
 ```{r feat_dists}
@@ -200,14 +201,9 @@ for(i in sort(unique(samp_comp_long$feat))){
 
 ggplot(samp_comp_long,aes(x = value)) +
   geom_density(aes(color=group)) +
-  #geom_tile(aes(x=name)) +
-  # geom_signif(aes(x = name,y=value,group=name),
-  #               annotations = ifelse(test.p$qval < 0.05,"*",NA),
-  #                                    xmin = seq.int(0.5,35.5,1)+0.2,
-  #                                    xmax = seq.int(1.5,36.5,1)-0.2,
-  #                                    y_position = 550,inherit.aes = FALSE) +
   facet_wrap(. ~ name,scales = "free") +
   scale_x_discrete(labels = seq) +
+  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
   theme_bw() +
   theme(axis.text.x = element_blank(),
         axis.title.x = element_blank(),
@@ -296,6 +292,9 @@ patient_order <- rownames(pat_ordering[order(pat_ordering[,1],pat_ordering[,2],p
 
 sig_bar_paired$PATIENT_ID <- factor(sig_bar_paired$PATIENT_ID,
                              levels = patient_order)
+```
+
+```{r temp_data_request}
 # temp data request IM
 # write.table(x = sig_bar_paired,
 #             file = "../data requests/britroc_patient_signatures_medianNorm_IM.tsv",
@@ -321,29 +320,9 @@ saveRDS(object = sig_bar_plot_paired,file = "plots/signatures_stacked_bar.RDS")
 ggsave(sig_bar_plot_paired,filename = "plots/signatures_stacked_bar.png",width = 8,height = 6,units = "in",dpi = 300)
 sig_bar_plot_paired
 
-#sig_bar_plot_paired_alt1
-
-# ggplot(sig_bar_paired) +
-#   geom_col(aes(PATIENT_ID,value,fill=signature,group=group),position = "dodge") +
-#   facet_wrap(. ~ PATIENT_ID,nrow = 1,scales = "free_x") +
-#   scale_y_continuous(expand = c(0,0)) +
-#   scale_fill_manual(values = cbPalette) +
-#   ylab("exposure") +
-#   xlab("patient") +
-#   theme_bw() +
-#   theme(#axis.text.x = element_text(angle = 90),
-#         axis.ticks.x = element_blank(),
-#         legend.position = "bottom") +
-#   theme(panel.spacing = unit(0, "lines"))
-
-# side by side bar plot is not easily implemented in ggplot when including relative bars, stacked bars, and position dodging
-
-#sig_bar_plot_paired_alt2
-
 sig_bar_paired_alt <- sig_bar_paired %>%
                         mutate(value = ifelse(group == "arx",-value,value))
 
-#sig_bar_paired_alt$signature <- factor(sig_bar_paired_alt$signature,levels = rev(unique(sig_bar_paired_alt$signature)))
 sig_bar_paired_alt$PATIENT_ID <- factor(sig_bar_paired_alt$PATIENT_ID,levels = rev(levels(sig_bar_paired_alt$PATIENT_ID)))
 
 sig_bar_plot_paired_alt <- ggplot(sig_bar_paired_alt) +
@@ -358,7 +337,7 @@ sig_bar_plot_paired_alt <- ggplot(sig_bar_paired_alt) +
   theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         legend.position = "right") +
-  annotate(geom = "text",x = 48.3,y = c(-0.85,0.88),label = c("diagnosis","relapse")) +
+  annotate(geom = "text",x = 48.4,y = c(-0.85,0.88),label = c("diagnosis","relapse")) +
   coord_flip(clip = "off",xlim = c(1,47)) +
   theme(plot.margin = unit(c(1,1,1,1),units = "line"))
 
@@ -366,15 +345,12 @@ saveRDS(object = sig_bar_plot_paired_alt,file = "plots/signatures_stacked_bar_al
 ggsave(sig_bar_plot_paired_alt,filename = "plots/signatures_stacked_bar_alt.png",width = 6,height = 8,units = "in",dpi = 300)
 sig_bar_plot_paired_alt
 ```
+
 ### All samples
 
 ```{r sig_box_plot}
-sig_box_plot(sig_quants = sig_quants,
-             plot_title = "Signature exposures by signature between tumour groups (all)",
-             test = "t.test")
-
 sig_box_wilcox <- sig_box_plot(sig_quants = sig_quants,
-             plot_title = "",
+             plot_title = "Signature exposures between tumour groups (all-mann.whitney)",
              test = "wilcox.test")
 sig_box_wilcox
 
@@ -385,13 +361,9 @@ ggsave(sig_bar_plot,filename = "plots/sig_box_wilcox.png",width = 8,height = 6,u
 ### Paired samples
 
 ```{r sig_box_plot_pair}
-sig_box_plot(sig_quants = sig_quants[,colnames(sig_quants) %in% patient.meta$SAMPLE_ID[patient.meta$paired == TRUE]],
-             test = "t.test",paired = TRUE,
-             plot_title = "Signature exposures by signature between tumour groups (paired)")
-
 sig_box_paired_wilcox <- sig_box_plot(sig_quants = sig_quants[,colnames(sig_quants) %in% patient.meta$SAMPLE_ID[patient.meta$paired == TRUE]],
              test = "wilcox.test",paired = TRUE,
-             plot_title = "Signature exposures by signature between tumour groups (paired)")
+             plot_title = "Signature exposures between tumour groups (paired-wilcoxon)")
 sig_box_paired_wilcox
 
 saveRDS(object = sig_box_paired_wilcox,file = "plots/sig_box_paired_wilcox.RDS")
@@ -417,15 +389,9 @@ x <- pivot_longer(data = rbind(sig_box_data,natgen_box_data,tcga_box_data,pcawg_
 
 ggplot(data = x) +
     geom_boxplot(aes(x = Signature,y = value,fill=group)) +
-    # geom_signif(aes(x = Signature,y = value),
-    #             annotations = ifelse(test.p < 0.01,formatC(test.p,format = "e",digits = 2),signif(test.p,digits = 3)),
-    #                                  xmin = seq.int(0.5,6.5,1)+0.2,
-    #                                  xmax = seq.int(1.5,7.5,1)-0.2,
-    #                                  y_position = 0.9) +
-    labs(title = "Signature exposures by signature between cohorts",caption = paste("p-values calculated using ","test",sep = "")) +
+    labs(title = "Signature exposures by signature between cohorts") +
     scale_y_continuous(name = "Exposure",limits = c(0,1)) +
     theme_bw()
-
 ```
 
 ### Signature corr.
