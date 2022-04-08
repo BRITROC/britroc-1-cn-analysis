@@ -1,0 +1,375 @@
+---
+title: "Clustering and correlation in paired absCN profiles"
+author: "Philip Smith"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+    toc_float: yes
+---
+## Summary
+
+_Use of absCN profile data is able to identify sample swaps in limited number of instances but is not robust enough to intra-patient and inter-sample similiarites and differences to effectively cluster and correlate samples with patients. This document should detail the reasons for the aforementioned claim. In conclusion, other more reliable and well-established methods should be utilised for sample swap identification, including but not limited to SNV genotype concordance_
+
+__N.B This was performed on absCN profiles without newer implementations of variance normalisation and absolulte calling (i.e. "ABCEL2" and "Geoff's new method"). Use of newer methods could improve this analysis__
+
+## Pre-processing
+### Load libraries
+```{r setup, include=TRUE, echo=FALSE,warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+library(Biobase)
+library(QDNAseqmod)
+library(tidyverse)
+library(gplots)
+library(RColorBrewer)
+library(ggdendro)
+library(Hmisc)
+```
+
+### Load absCN and metadata
+```{r load}
+rds <- readRDS("../absolute_POST_down_sampling/britroc_30kb_ds_absCopyNumber.rds")
+## Swapped file generated from list of samples/patients provided by I.McNeish
+## https://docs.google.com/document/d/1d9Dqa-8hHYoaA-AglUFdC_wsDV_thjdd8y8u7yaaKbc
+swapped <- read.table("data/BriTROC_swap_flagged_sample_ids.txt",sep="\t",stringsAsFactors = F)
+metadata <- read.table("../absolute_PRE_down_sampling/intermediate files/refitting_parameters_updated.csv",
+                       sep = ",",
+                       header = T,
+                       stringsAsFactors = F)
+
+swapped.pats <- swapped$V2
+swapped.samples <- swapped$V1[swapped$V1 != ""]
+dim(rds)
+dim(metadata)
+```
+
+### Filter metadata
+
+Remove samples not present in the absCN data object
+
+```{r filter1}
+metadata.filt <- metadata[which(metadata$name %in% colnames(rds)),]
+dim(metadata.filt)
+```
+
+Remove samples marked as "failed" in metadata sheet
+
+```{r filter2}
+metadata.filt <- metadata.filt[which(!metadata.filt$Failed == "Y"),]
+dim(metadata.filt)
+```
+
+Filter patients with only a single sample were removed as they will not cluster with their paired samples and add noise to paired samples
+
+```{r filter3}
+metadata.filt <- metadata.filt[metadata.filt$Britroc.No %in% names(which(table(metadata.filt$Britroc.No) > 1)),]
+dim(metadata.filt)
+```
+
+### Functions 
+
+```{r functions}
+## Get Copynumber bins/segments matrix
+get_CN_mat <- function(CN=NULL,method="NULL",type="segmented"){
+  CN <- rds[,which(colnames(rds) %in% metadata.filt$name)]
+  patients <- metadata.filt$Britroc.No
+  bins.to.use <- fData(CN)$use
+  if(type == "segmented"){
+    bin.mat <- assayData(CN)$segmented[bins.to.use,]
+  } else if(type == "copynumber") {
+    bin.mat <- assayData(CN)$copynumber[bins.to.use,]
+  } else {
+    print("unknown type")
+    break 
+  }
+  if(method == "log2"){
+    #bin.mat[bin.mat < 0] <- 0.00000000000001
+    bin.mat <- log2(bin.mat)
+  }
+  return(bin.mat)
+}
+
+## Get patient ids (BriTROC ids)
+get_patients <- function(sample=NULL){
+  p <- metadata.filt$Britroc.No[metadata.filt$name %in% sample]
+  return(p)
+}
+
+## Correlation matrix plot
+corr_plot <- function(mat=NULL,ptype="none"){
+
+res <- cor(mat)
+
+patient_cols <- function(x){
+  patient_reps <- table(x)
+  color_vec <- vector()
+  for(i in 1:length(patient_reps)){
+    if(i %% 2 == 0){
+      color_vec <- append(color_vec,rep("red",patient_reps[i]))
+    } else {
+      color_vec <- append(color_vec,rep("lightblue",patient_reps[i]))
+    }
+  }
+  return(color_vec)
+}
+
+cols <- colorRampPalette(c("white","red"))
+if(ptype == "sub"){
+  sample <- colnames(res)
+  pat_ids <- unique(metadata.filt$Britroc.No[metadata.filt$name %in% sample])
+  print(pat_ids)
+  heatmap.2(x = res,
+              main = paste("Corr matrix - Patient(s) ",paste(pat_ids,collapse = ","),sep = ""),
+              #xlab = "samples",
+              symm = T,
+              #ylab = "samples",
+              na.rm = T,
+              breaks = seq.int(0,1,0.1),
+              key.title = NA,
+              sepcolor = NA,
+              trace = "none",
+              dendrogram = "none",
+              Rowv = FALSE,
+              col = cols,
+              symkey = F,
+              ColSideColors = patient_cols(get_patients(colnames(mat))),
+              RowSideColors = patient_cols(get_patients(colnames(mat))),
+              symbreaks = F)
+  } else if(ptype == "swap"){
+  sample <- colnames(res)
+  pat_ids <- unique(metadata.filt$Britroc.No[metadata.filt$name %in% sample])
+  print(pat_ids)
+  heatmap.2(x = res,
+              main = "Corr matrix - 'Swapped' Patients/samples",
+              #xlab = "samples",
+              symm = T,
+              #ylab = "samples",
+              na.rm = T,
+              breaks = seq.int(0,1,0.1),
+              key.title = NA,
+              sepcolor = NA,
+              trace = "none",
+              dendrogram = "none",
+              Rowv = FALSE,
+              col = cols,
+              symkey = F,
+              ColSideColors = patient_cols(get_patients(colnames(mat))),
+              RowSideColors = patient_cols(get_patients(colnames(mat))),
+              symbreaks = F)
+  } else {
+  heatmap.2(x = res,
+            main = "Correlation matrix - BriTROC absCN profiles",
+            xlab = "samples",
+            symm = T,
+            ylab = "samples",
+            na.rm = T,
+            key.title = NA,
+            labRow = NA,
+            labCol = NA,
+            sepcolor = NA,
+            trace = "none",
+            dendrogram = "none",
+            Rowv = FALSE,
+            col = cols,
+            symkey = F,
+            ColSideColors = patient_cols(get_patients(colnames(mat))),
+            RowSideColors = patient_cols(get_patients(colnames(mat))),
+            symbreaks = F)
+  }
+}
+
+## Hclust dendrogram plot
+plot_subset_hclust <- function(CN=NULL,meta=NULL,patient_num=NULL,clustMethod="complete",assaydata="segments"){
+
+  meta <- meta[which(meta$Britroc.No %in% patient_num),]
+  CN <- CN[,which(colnames(CN) %in% meta$name)]
+  bin.hclust <- hclust(dist(t(CN)))
+  dendro.dat <- as.dendrogram(bin.hclust)
+  dd.dat <- dendro_data(dendro.dat)
+
+  colors.table <- data.frame(patient=levels(as.factor(get_patients(colnames(CN)))),
+                             color=brewer.pal(n = length(levels(as.factor(get_patients(colnames(CN))))),name = 'Paired')
+  )
+  patients <- get_patients(colnames(CN))
+  colors <- as.vector(colors.table$color[match(patients[bin.hclust$order],colors.table$patient)])
+  time_point <- ifelse(meta$time_point[bin.hclust$order] == "archival",16,17)
+
+  p <- ggplot(ggdendro::segment(dd.dat)) +
+    geom_segment(aes(x = x, y = y, xend = xend, yend = yend)) +
+    geom_point(data = ggdendro::label(dd.dat),
+               aes(x = x,
+                   y = -50),
+               size = 4, color = "black") +
+    geom_point(data = ggdendro::label(dd.dat),
+               aes(x = x,
+                   y = -50,
+                   #shape = as.character(meta$time_point[order(match(meta$name,dd.dat$labels$label))]),
+                   color = as.character(meta$Britroc.No[order(match(meta$name,dd.dat$labels$label))]),
+                   ),
+               size = 2.5 ) +
+    geom_text(data = ggdendro::label(dd.dat),
+              aes(label = label,x = x, y = y),
+              angle=90,
+              nudge_y = -100,
+              hjust = 1) +
+    scale_color_manual(name="BriTROC Id",values = unique(colors),guide = guide_legend(nrow = 2)) +
+    scale_y_continuous(limits = c(-500,NA)) +
+    theme(plot.background = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks = element_blank(),
+          axis.title = element_blank(),
+          panel.background = element_blank(),
+          legend.background = element_blank(),
+          legend.position = "bottom",legend.justification = "center",
+          legend.key = element_blank())
+  return(p)
+}
+```
+
+## Correlation and clustering
+### Default hclust heatmap
+
+Overall clustering using both `segment` values and `log2` transformation for the full matrix is relatively uninformative particularly given the number of samples and patients and reveal overarching structure (first 5000 features/segment values used for brevity).
+
+```{r heatmap}
+CN_mat <- get_CN_mat(CN = rds,type = "segmented",method = "log2")
+heatmap.2(x = t(CN_mat[c(1:5000),]),
+            main = "BriTROC absCN profiles",
+            xlab = "Segments",
+            symm = F,
+            ylab = "Samples",
+            na.rm = T,
+            key.title = NA,
+            labRow = NA,
+            labCol = NA,
+            sepcolor = NA,
+            trace = "none",
+            dendrogram = "none",
+            Rowv = FALSE,
+            #col = cols,
+            symkey = F,
+            #RowSideColors = patient_cols(get_patients(colnames(CN_mat))),
+            symbreaks = F)
+```
+
+### Correlation matrix
+
+Correlation matrix was generated from remaining samples present in the absCN object.
+
+1. Plot with default parameters using segmentation values as the input vector and no transformation
+2. Plot with default parameters using segmentation values as the input vector and log2 transformation
+3. Plot with default parameters using bin values as the input vector and no transformation
+4. Plot with default parameters using bin values as the input vector and log2 transformation
+
+Colours on the x and y axis represent patients (Oscilating on patient id)
+
+```{r correlation_data}
+corr_plot(mat = get_CN_mat(CN = rds))
+corr_plot(mat = get_CN_mat(CN = rds,method = "log2"))
+corr_plot(mat = get_CN_mat(CN = rds,type = "copynumber"))
+corr_plot(mat = get_CN_mat(CN = rds,method = "log2",type = "copynumber"))
+```
+
+Correlation plots from log2 transformed bin values results in the "cleanest" correlation but still results in multiple signficanct inter-patient correlations.
+
+```{r corr_mat, warning=F}
+corr.signif <- rcorr(as.matrix(get_CN_mat(CN = rds,type = "copynumber")))
+mean(corr.signif$r,na.rm=T)
+median(corr.signif$r,na.rm=T)
+print(plot(density(corr.signif$r),main="correlation matrix correlation",xlab="correlation"))
+print(plot(density(corr.signif$P,na.rm=T),main="correlation matrix significance",xlab="p-value"))
+```
+
+Additionally, log2 transformation removes a majority of correct intra-patient correlation so is not appropriate, no log transformation was used.
+
+__With log2__
+
+```{r log2_trans}
+pat_names <- metadata.filt$name[metadata.filt$Britroc.No %in% c(3)]
+corr_plot(mat = get_CN_mat(CN = rds,method = "log2",type = "copynumber")[,which(colnames(get_CN_mat(CN = rds)) %in% pat_names)],ptype = "sub")
+```
+
+__Without log2__
+
+```{r log2_trans_f}
+pat_names <- metadata.filt$name[metadata.filt$Britroc.No %in% c(3)]
+corr_plot(mat = get_CN_mat(CN = rds,type = "copynumber")[,which(colnames(get_CN_mat(CN = rds)) %in% pat_names)],ptype = "sub")
+```
+
+### Subselection 
+
+The correlation  distribution appear to be bimodel to some degree (peaks at 0.4 and 1.0). Identifying sample swaps systemically could be peformed by assesing the observed number of highly correlated samples per patient compared to the expected number per patient. Selection threshold for "highly correlated" was set to > 0.6 based on previous plots.
+
+```{r sub_selection}
+corr.mat <- corr.signif$r
+correlated.ob <- apply(X = corr.mat,MARGIN = 2,FUN = function(x) sum(x > 0.6))
+correlated.ex <- sapply(names(correlated.ob),FUN = function(x) length(metadata.filt$Britroc.No[metadata.filt$Britroc.No == get_patients(x)]))
+ob.ex <- as.data.frame(cbind(correlated.ex,correlated.ob))
+ob.ex$diff <- ob.ex$correlated.ob - ob.ex$correlated.ex
+sum(ob.ex$diff != 0)
+head(ob.ex,n = 10)
+```
+
+Subselecting highly correlated samples is confounded by inter and intra sample differences. Some patients correlate well, others do not.
+
+Cases examples below demonstrate while intra-patient samples do correlate, the correlations are often at the same level as those inter-patient interactions (correlation values between 0.2-0.6)
+
+```{r corr_subplots1}
+pat_names <- metadata.filt$name[metadata.filt$Britroc.No %in% c(1)]
+corr_plot(mat = get_CN_mat(CN = rds,type = "copynumber")[,which(colnames(get_CN_mat(CN = rds)) %in% pat_names)],ptype = "sub")
+```
+
+```{r corr_subplots2}
+pat_names <- metadata.filt$name[metadata.filt$Britroc.No %in% c(3)]
+corr_plot(mat = get_CN_mat(CN = rds,type = "copynumber")[,which(colnames(get_CN_mat(CN = rds)) %in% pat_names)],ptype = "sub")
+```
+
+```{r corr_subplots3}
+# pat_names <- metadata.filt$name[metadata.filt$Britroc.No %in% c(79)]
+# corr_plot(mat = get_CN_mat(CN = rds,type = "copynumber")[,which(colnames(get_CN_mat(CN = rds)) %in% pat_names)],ptype = "sub")
+```
+
+## Swapped list examples
+
+Data derived from the manual inspection of TP53 genotypes and allelic freqs resulted in suspected swaps that are as correlated with other patients as they are with the correct patient.
+
+The only clearly identifiable swap appears to be `IM_92` with `IM_95`. 
+
+```{r corr_swapPats}
+# pat_names <- metadata.filt$name[metadata.filt$Britroc.No %in% swapped.pats]
+# corr_plot(mat = get_CN_mat(CN = rds,type = "copynumber")[,which(colnames(get_CN_mat(CN = rds)) %in% pat_names)],ptype = "swap")
+```
+
+```{r corr_swapSamp}
+# pat_names <- metadata.filt$name[metadata.filt$Britroc.No %in% get_patients(swapped.samples)]
+# corr_plot(mat = get_CN_mat(CN = rds,type = "copynumber")[,which(colnames(get_CN_mat(CN = rds)) %in% pat_names)],ptype = "swap")
+```
+
+## Hclust plotting
+
+These plots are default h.clust clustering of batches of BriTROC patients. Samples from the same patients were not split across plots but batches were clustered independently.
+
+```{r random_subset_clusters}
+#rand_n <- sample(x = unique(metadata.filt$Britroc.No))
+rand_n <- unique(metadata.filt$Britroc.No)
+split.size <- max(which(length(rand_n) %% c(1:12) == max(length(rand_n) %% c(1:12))))
+patient.chunk <- split(rand_n, ceiling(seq_along(rand_n)/split.size))
+britroc.n <- unlist(patient.chunk[1])
+```
+
+```{r subset_cluster_plotting}
+plots <- lapply(X = patient.chunk,FUN = function(x){(CN = get_CN_mat(CN = rds),meta = metadata.filt,patient_num = x)})
+
+for(p in plots){
+  print(p)
+}
+```
+
+### Session info
+
+```{r session_info}
+sessionInfo()
+```

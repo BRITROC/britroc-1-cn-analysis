@@ -23,6 +23,7 @@ knitr::opts_chunk$set(echo = TRUE)
 suppressPackageStartupMessages(suppressWarnings(library(tidyverse)))
 suppressPackageStartupMessages(suppressWarnings(library(kableExtra)))
 suppressPackageStartupMessages(suppressWarnings(library(RPostgres)))
+suppressPackageStartupMessages(suppressWarnings(library(config)))
 suppressPackageStartupMessages(suppressWarnings(library(Biobase)))
 suppressPackageStartupMessages(suppressWarnings(library(QDNAseqmod)))
 suppressPackageStartupMessages(suppressWarnings(library(cowplot)))
@@ -66,6 +67,19 @@ get_cna_changes <- function(data=NULL,genes=NULL,patients=NULL){
 
 ```
 
+```{r db_open}
+## Retrieve clinical database login details
+clin_config <- config::get("clinDB")
+## Establish connection to Postgres DB
+britroc_con <- dbConnect(RPostgres::Postgres(),
+                         dbname=clin_config$dbname,
+                         host=clin_config$host,
+                         port = clin_config$port,
+                         user = clin_config$user,
+                         password = clin_config$password
+)
+```
+
 ```{r read_meta}
 meta.data <- read.table("../../copy_number_signatures/britroc_30kb_signature_data_meta.tsv",header = TRUE,sep = "\t")
 patient_data <- read.table("../../britroc_cohort_patient_data.tsv",header = T,sep = "\t")
@@ -88,6 +102,18 @@ head(tissue_data)
 meta.data <- left_join(x = meta.data,
                        y = tissue_data,
                        by = c("PATIENT_ID","SAMPLE_ID"))
+
+patient_data$
+
+head(meta.data)
+```
+
+```{r diag_tissue}
+pat.data.tissue <- dbReadTable(britroc_con, 'patients') %>%
+                    mutate(britroc_number = paste0("BRITROC-",britroc_number)) %>%
+                    select(britroc_number,tumour_location_at_diagnosis) %>%
+                    rename("PATIENT_ID"="britroc_number")
+table(pat.data.tissue$tumour_location_at_diagnosis)
 ```
 
 ```{r summarise_tissues}

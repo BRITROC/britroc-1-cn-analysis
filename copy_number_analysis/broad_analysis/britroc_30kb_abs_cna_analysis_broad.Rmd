@@ -35,7 +35,7 @@ source("../../colour_palettes.R")
 
 ### Read meta data
 
-Cytobanding data was pulled from USCS table schema for hg19. Acrocentromeric and stalk bands were dropped.
+Cytoband data was pulled from USCS table schema for hg19. Acro-centromeric and stalk bands were dropped.
 
 ```{r read_meta}
 meta.data <- read.table("../../copy_number_signatures/britroc_30kb_signature_data_meta.tsv",header = TRUE,sep = "\t")
@@ -60,6 +60,10 @@ protein_coding_genes <- getBM(attributes = c("chromosome_name","start_position",
 protein_coding_genes <- protein_coding_genes[protein_coding_genes$chromosome_name %in% seq.int(1,22,1),]
 protein_coding_genes <- protein_coding_genes[protein_coding_genes$hgnc_symbol != "",]
 ```
+
+```{r load_NCG}
+ncg <- read.table("data/NCG_cancerdrivers_annotation_supporting_evidence.tsv",header = T,sep = "\t")
+```   
 
 ### Read abs data
 
@@ -142,7 +146,7 @@ genome_plot
 ```{r broad_genome_plot_paired}
 paired_diffs <- get_paired_genome_diffs(data = abs_data[,colnames(abs_data) %in% meta.data$SAMPLE_ID[meta.data$paired == "TRUE"]],
                                         method = "median")
-paired_diffs[paired_diffs <= 0] <- 0.005
+paired_diffs[paired_diffs <= 0] <- 0.0005
 
 paired_diffs_stats <- data.frame(paired_diffs) %>%
             rownames_to_column() %>%
@@ -160,8 +164,11 @@ paired_diffs_stats$wilcox_pval <- sapply(1:nrow(paired_diffs), function(i){
   unlist(wilcox.test(as.numeric(paired_diffs[i,1:(ncol(paired_diffs)/2)]),
                      as.numeric(paired_diffs[i,c(((ncol(paired_diffs)/2)+1):ncol(paired_diffs))]),
                      paired = TRUE,exact = FALSE)[c("p.value")])})
-paired_diffs_stats$wilcox_adj <- p.adjust(paired_diffs_stats$wilcox_pval,method = "fdr")
-paired_diffs_stats$wilcox_sig <- ifelse(paired_diffs_stats$wilcox_pval < 0.05,"significant","non-significant")
+## Test adjusted per chromosome
+paired_diffs_stats$wilcox_adj <- unlist(lapply(split(paired_diffs_stats,f = paired_diffs_stats$chr),
+                                               FUN = function(x){p.adjust(x$wilcox_pval,method = "fdr")}),use.names = F)
+
+paired_diffs_stats$wilcox_sig <- ifelse(paired_diffs_stats$wilcox_adj < 0.05,"significant","non-significant")
 ```
 
 ```{r broad_genome_plot_paired_fig}
@@ -225,8 +232,12 @@ protein_gRanges <- GenomicRanges::makeGRangesFromDataFrame(protein_coding_genes,
 paired_diffs_sigGRange <- GenomicRanges::makeGRangesFromDataFrame(paired_diffs_sig,start.field = "pos",end.field = "pos")
 
 proteinOverlaps <- unique(protein_gRanges$hgnc_symbol[GenomicRanges::findOverlaps(protein_gRanges,paired_diffs_sigGRange)@from])
-any(focal_genes$gene %in% proteinOverlaps)
+cat("Signif bins overlapping protein-coding genes: ",length(proteinOverlaps),"\n")
+cat("Any in significant gene list:",any(focal_genes$gene %in% proteinOverlaps),"\n")
 writeLines(text = proteinOverlaps,con = "data/substraction_protein_overlaps.txt",sep = "\n")
+ncg_results <- ncg[ncg$symbol %in% proteinOverlaps,]
+cat("NCG matching genes: ",length(unique(ncg_results$symbol)),"\n")
+write.table(x = ncg_results,file = "data/ncg_analysis_results.tsv",quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ### Segments
@@ -455,20 +466,20 @@ lapply(split(ploidy_change_table[ploidy_change_table$direction == "increase",],
 table(ploidy_change_table$ploidy_change[ploidy_change_table$group == "relapse"])
 
 write.table(x = ploidy_change_table,
-            file = "data/ploidy_change_pats.tsv",
+            file = "data/unique(ploidy_change_table$PATIENT_ID).tsv",
             quote = F,row.names = F,col.names = T,sep = "\t")
 ```
 
 ```{r test_pt_ploidy_change}
 cat("pt_sens_ploidy_change ","pval=",fisher.test(matrix(ncol = 2,
-                   rbind(c(table(clinical.data$pt_sensitivity_at_reg[!paste0("BRITROC-",clinical.data$britroc_number) %in% ploidy_change_pats])),
-                         c(table(clinical.data$pt_sensitivity_at_reg[paste0("BRITROC-",clinical.data$britroc_number) %in% ploidy_change_pats])))))$p.value,"\n",sep = "")
+                   rbind(c(table(clinical.data$pt_sensitivity_at_reg[!paste0("BRITROC-",clinical.data$britroc_number) %in% unique(ploidy_change_table$PATIENT_ID)])),
+                         c(table(clinical.data$pt_sensitivity_at_reg[paste0("BRITROC-",clinical.data$britroc_number) %in% unique(ploidy_change_table$PATIENT_ID)])))))$p.value,"\n",sep = "")
 
-cat("age_ploidy_change ","pval=",wilcox.test(x = clinical.data$age[!paste0("BRITROC-",clinical.data$britroc_number) %in% ploidy_change_pats],
-            y = clinical.data$age[paste0("BRITROC-",clinical.data$britroc_number) %in% ploidy_change_pats])$p.value,"\n",sep="")
+cat("age_ploidy_change ","pval=",wilcox.test(x = clinical.data$age[!paste0("BRITROC-",clinical.data$britroc_number) %in% unique(ploidy_change_table$PATIENT_ID)],
+            y = clinical.data$age[paste0("BRITROC-",clinical.data$britroc_number) %in% unique(ploidy_change_table$PATIENT_ID)])$p.value,"\n",sep="")
 
-cat("prior_chem_ploidy_change ","pval=",wilcox.test(x = clinical.data$pre_reg_chemo[!paste0("BRITROC-",clinical.data$britroc_number) %in% ploidy_change_pats],
-            y = clinical.data$pre_reg_chemo[paste0("BRITROC-",clinical.data$britroc_number) %in% ploidy_change_pats])$p.value,"\n",sep="")
+cat("prior_chem_ploidy_change ","pval=",wilcox.test(x = clinical.data$pre_reg_chemo[!paste0("BRITROC-",clinical.data$britroc_number) %in% unique(ploidy_change_table$PATIENT_ID)],
+            y = clinical.data$pre_reg_chemo[paste0("BRITROC-",clinical.data$britroc_number) %in% unique(ploidy_change_table$PATIENT_ID)])$p.value,"\n",sep="")
 ```
 
 ### purity changes
@@ -589,8 +600,6 @@ kable(CNA_events_orig[order(CNA_events_orig$total_events,decreasing = T),]) %>%
 ```
 
 ##### Plot of CNA events
-
-No statistical difference was seen between archival and relapse samples in an unpaired setting across amplification, deletion or total copy number events (t.test p=0.13,p=0.97,p=0.29, respectively).
 
 ```{r CNA_events}
 CNA_events <- count_CNA_events_broad(data = abs_data,

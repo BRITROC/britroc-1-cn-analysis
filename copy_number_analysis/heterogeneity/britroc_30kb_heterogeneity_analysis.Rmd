@@ -11,8 +11,7 @@ output:
 ## Initial steps
 
 - ANALYSIS of intra/inter group clonality (larger differences between spatial samples than temporal samples?)
-- ANALYSIS of intra/inter group clonality (larger differences between spatial samples than temporal samples?)
-- ANALYSIS of intra/inter group clonality (larger differences between spatial samples than temporal samples?)
+- https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-021-23384-6/MediaObjects/41467_2021_23384_MOESM1_ESM.pdf
 
 ### knitr options
 
@@ -225,6 +224,42 @@ multivar_surv <- function(surv = NULL,covariates = NULL,data = NULL){
   summary(res.cox)
   get_cox_HR(res.cox)
 }
+
+get_segment_noise <- function(data = NULL){
+  if(is.null(data)){
+    stop("no absolute cn data provided")
+  }
+  samples <- colnames(data)
+  segment_noise <- do.call(rbind,lapply(samples,FUN = function(x){
+    sample <- x
+    s <- as.data.frame(assayDataElement(abs_data,"segmented"))
+    b <- as.data.frame(assayDataElement(abs_data,"copynumber"))
+    f <- fData(abs_data)[,1:3]
+    
+    s <- s[sample]
+    b <- b[sample]
+    
+    t <- cbind(f,s,b)
+    
+    colnames(t) <- c("chromosome","start","end","segments","bin")
+    tsd <- t %>%
+      group_by(chromosome) %>%
+      mutate(changepoint = abs(segments - lag(segments))) %>%
+      mutate(change = ifelse(changepoint > 0.1 | is.na(changepoint),TRUE,FALSE)) %>%
+      ungroup() %>%
+      mutate(segment = cumsum(change)) %>%
+      group_by(segment) %>%
+      mutate(bin_count = n()) %>%
+      mutate(bin_sd = sd(bin)) %>%
+      mutate(seg_start = min(start)) %>%
+      mutate(seg_end = max(end)) %>%
+      mutate(segment_noise = weighted.mean(x = bin_sd,w = bin_count)) %>%
+      ungroup() %>%
+      mutate(sample = rep(sample,times=nrow(.)))
+    return(tsd)
+  }))
+  return(segment_noise)
+}
 ```
 
 ### Read meta data
@@ -255,54 +290,129 @@ abs_data <- abs_data[,which(colnames(abs_data) %in% meta.data$SAMPLE_ID[meta.dat
 
 ## Analysis
 
-CORRECTION - No smoothing is now applied to either the upper or lower bounds applied to each segment to more closely conform with the approach seen by van Dijk et al.see [here](https://www.nature.com/articles/s41467-021-23384-6).
+Amendment - No smoothing is now applied to either the upper or lower bounds applied to each segment to more closely conform with the approach seen by van Dijk et al.see [here](https://www.nature.com/articles/s41467-021-23384-6).
 
 ```{r segment_noise}
-samples <- colnames(abs_data)[1:10]
-segment_noise <- do.call(rbind,lapply(samples,FUN = function(x){
-  sample <- x
-  s <- as.data.frame(assayDataElement(abs_data,"segmented"))
-  b <- as.data.frame(assayDataElement(abs_data,"copynumber"))
-  f <- fData(abs_data)[,1:3]
-  
-  s <- s[sample]
-  b <- b[sample]
-  
-  t <- cbind(f,s,b)
-  
-  colnames(t) <- c("chromosome","start","end","segments","bin")
-  tsd <- t %>%
-    group_by(chromosome) %>%
-    mutate(changepoint = abs(segments - lag(segments))) %>%
-    mutate(change = ifelse(changepoint > 0.1 | is.na(changepoint),TRUE,FALSE)) %>%
-    ungroup() %>%
-    mutate(segment = cumsum(change)) %>%
-    group_by(segment) %>%
-    mutate(bin_count = n()) %>%
-    mutate(seg_sd = sd(bin)) %>%
-    mutate(seg_start = min(start)) %>%
-    mutate(seg_end = max(end)) %>%
-    dplyr::select(-change,-bin,-start,-end,-changepoint) %>%
-    distinct() %>%
-    mutate(sample_mean = weighted.mean(seg_sd,w = bin_count))
-    
-  tsd$sample <- rep(sample,times=nrow(tsd))
-  return(tsd)
-}))
-    
-ggplot(segment_noise) + geom_density(aes(seg_sd))
+segment_noise <- get_segment_noise(data = abs_data)
+
+## Values exceeding 2sd from mean excluded
+segment_noise_segs <- segment_noise[segment_noise$change == TRUE,]
+
+segment_threshold <- (mean(segment_noise_segs$segment_noise) +
+                             sd(segment_noise_segs$segment_noise)*2)
+
+segment_noise_segs <- segment_noise_segs %>%
+                          mutate(excluded = ifelse(segment_noise >= segment_threshold,
+                                                TRUE,FALSE))
+
+segment_noise_sample <- segment_noise_segs %>%
+                          group_by(sample) %>%
+                          summarise(across(segment_noise,mean))
+
+sample_threshold <- (mean(segment_noise_sample$segment_noise) +
+                             sd(segment_noise_sample$segment_noise)*2)
+
+segment_noise_sample <- segment_noise_sample %>%
+                          mutate(excluded = ifelse(segment_noise >= sample_threshold,
+                                                TRUE,FALSE))
+```
+
+```{r noise_plots}
+ggplot(segment_noise_sample) +
+  geom_histogram(aes(segment_noise,fill=excluded),binwidth = 0.04) +
+  geom_vline(xintercept = sample_threshold,
+             linetype=2) +
+  xlab("sample noise") +
+  ylab("") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  theme_bw()
+
+ggplot(segment_noise_segs) +
+  geom_histogram(aes(segment_noise,fill=excluded),binwidth = 0.1) +
+  geom_vline(xintercept = segment_threshold,
+             linetype=2) +
+  xlab("segment noise") +
+  ylab("") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  theme_bw()
+
+ggplot(segment_noise_segs) +
+  geom_point(aes(segments,segment_noise,colour=excluded)) +
+  xlab("copy number") +
+  ylab("segment noise") +
+  theme_bw()
+
+ggplot(segment_noise_segs) +
+  geom_bar(aes(excluded,fill=excluded)) +
+  xlab("excluded") +
+  ylab("segments") +
+  theme_bw()
+
+```
+
+```{r noise_stats}
+table(segment_noise_segs$excluded) / nrow(segment_noise_segs) * 100
+segment_stats <- segment_noise_segs %>%
+                  group_by(sample) %>%
+                  mutate(seg_n = max(segment)) %>%
+                  mutate(exc_segs = sum(excluded == TRUE)) %>%
+                  mutate(exc_pct = exc_segs/seg_n*100) %>%
+                  dplyr::select(sample,seg_n,exc_segs,exc_pct) %>%
+                  distinct()
+summary(segment_stats$exc_segs)
 ```
 
 ### Clonality analysis
+```{r apply_sample_filter}
+excluded_samples <- segment_noise_sample$sample[segment_noise_sample$excluded == TRUE]
+excluded_paired_sample <- as.character(meta.data$SAMPLE_ID[meta.data$SAMPLE_ID %in% excluded_samples & meta.data$paired == TRUE])
 
-```{r apply_seg_filter}
-
+cat("Excluded samples: ",paste0(excluded_samples,collapse = ",")," (n=",length(excluded_samples),")",sep = "")
+abs_data_filt <- abs_data[,which(!colnames(abs_data) %in% excluded_samples)]
+```
+```{r noise_stats_post_filt}
+segment_noise_segs_filt <- segment_noise_segs[which(!segment_noise_segs$sample %in% excluded_samples),]
+table(segment_noise_segs_filt$excluded) / nrow(segment_noise_segs_filt) * 100
+segment_stats_filt <- segment_noise_segs_filt %>%
+                  group_by(sample) %>%
+                  mutate(seg_n = max(segment)) %>%
+                  mutate(exc_segs = sum(excluded == TRUE)) %>%
+                  mutate(exc_pct = exc_segs/seg_n*100) %>%
+                  dplyr::select(sample,seg_n,exc_segs,exc_pct) %>%
+                  distinct()
+summary(segment_stats_filt$exc_segs)
 ```
 
-The clonality value was extracted from each sample utilising the parameters defined previously.
+```{r apply_seg_filter}
+segment_noise_filt <- as.data.frame(segment_noise %>%
+                  mutate(exclude_seg = ifelse(segment_noise >= segment_threshold,TRUE,FALSE)) %>%
+                  dplyr::select(sample,chromosome,start,end,segments,exclude_seg))
+                  
+segment_noise_filt <- split(segment_noise_filt,f = segment_noise_filt$sample)
+segment_noise_filt <- segment_noise_filt[which(!names(segment_noise_filt) %in% excluded_samples)]
+
+if(!identical(names(segment_noise_filt),colnames(abs_data_filt))){
+  stop("sample names do not match")
+}
+
+samples <- names(segment_noise_filt)
+for(x in samples){
+  #print(x)
+  segment_filt_sample <- segment_noise_filt[[x]]
+  
+  if(!all(segment_filt_sample$segments == assayDataElement(object = abs_data_filt,"segmented")[,x])){
+    stop(paste0(x," had non-matching segment values - seek help."))
+  }
+  if(sum(segment_filt_sample$exclude_seg) > 0){
+    assayDataElement(object = abs_data_filt,"segmented")[which(segment_filt_sample$exclude_seg == TRUE),x] <- NA
+  }
+}
+```
 
 ```{r set_clonality}
-clonality_table <- add_clonality_meta(get_clonality(abs_data = abs_data,
+clonality_table <- add_clonality_meta(get_clonality(abs_data = abs_data_filt,
                              weighted = TRUE,
                              smooth = FALSE,
                              wiggle = 0.1)) %>%
@@ -343,7 +453,10 @@ ggplot(clonality_table) +
   scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
   theme_bw()
 
+excluded_pats <- as.character(meta.data$PATIENT_ID[meta.data$SAMPLE_ID %in% excluded_samples & meta.data$paired == TRUE])
+
 clonality_table_paired <- clonality_table %>%
+                            filter(!sample %in% meta.data$SAMPLE_ID[meta.data$PATIENT_ID %in% excluded_pats]) %>%
                             filter(paired == TRUE) %>%
                             group_by(patient,group) %>%
                             summarise(across(.cols = c(ploidy,purity,ith),.fns = median))
@@ -375,6 +488,7 @@ arx_clonality_table <- clonality_table %>%
 
 ```{r patient_changes}
 patient_clonality_diffs <- clonality_table %>%
+                            filter(!sample %in% meta.data$SAMPLE_ID[meta.data$PATIENT_ID %in% excluded_pats]) %>%
                             dplyr::filter(paired == "TRUE") %>%
                             group_by(patient,group) %>%
                             summarise(ith=mean(ith)) %>%

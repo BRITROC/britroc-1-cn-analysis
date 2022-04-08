@@ -307,19 +307,19 @@ ggplot(ploidy_change_table) +
 
 ploidyChangeLabelSub <- ifelse(row.names(cor_data_all_sub) %in% ploidy_change_samples,"red","black")
 
-png("temp_heatmap.png",width = 8,height = 8,units = "in",res = 300)
+#png("temp_heatmap.png",width = 8,height = 8,units = "in",res = 300)
 heatmap(as.matrix(t(cor_data_all_sub)),
         labRow = NA,
         scale = "row",
         col=rev(brewer.pal(11,"RdBu")),
         ColSideColors = ploidyChangeLabelSub)
-dev.off()
+#dev.off()
 
 chr_colors_sub <- ifelse(protein_coding_genes$chromosome_name[protein_coding_genes$hgnc_symbol %in% colnames(cor_data_all_sub)] %% 2 == 0,"grey75","grey25")
 gene_change_ordering_sub <- match(protein_coding_genes$hgnc_symbol[protein_coding_genes$hgnc_symbol %in% colnames(cor_data_all_sub)],colnames(cor_data_all_sub))
 cor_data_all_sub_ordered <- cor_data_all_sub[,gene_change_ordering_sub]
 
-#png("temp_heatmap.png",width = 8,height = 8,units = "in",res = 300)
+png("plots/gene_change_heatmap.png",width = 8,height = 8,units = "in",res = 300)
 heatmap(as.matrix(t(cor_data_all_sub_ordered)),
         labRow = NA,
         scale = "row",
@@ -327,8 +327,20 @@ heatmap(as.matrix(t(cor_data_all_sub_ordered)),
         ColSideColors = ploidyChangeLabelSub,
         RowSideColors = chr_colors_sub,
         Rowv = NA)
-#dev.off()
+dev.off()
 
+```
+
+```{r change_cor_heatmap_all_genes_sub_noPloidyChange}
+png("plots/gene_change_noPloidyChange_heatmap.png",width = 8,height = 8,units = "in",res = 300)
+heatmap(as.matrix(t(cor_data_all_sub_ordered[!rownames(cor_data_all_sub_ordered) %in% ploidy_change_samples,])),
+        labRow = NA,
+        scale = "row",
+        col=rev(brewer.pal(11,"RdBu")),
+        ColSideColors = rep("black",times=nrow(cor_data_all_sub_ordered)-9),
+        RowSideColors = chr_colors_sub,
+        Rowv = NA)
+dev.off()
 ```
 
 - Plot gene per chromosome from most variable subset and GOterm analysis
