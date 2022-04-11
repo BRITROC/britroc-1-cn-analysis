@@ -315,44 +315,73 @@ sample_threshold <- (mean(segment_noise_sample$segment_noise) +
 segment_noise_sample <- segment_noise_sample %>%
                           mutate(excluded = ifelse(segment_noise >= sample_threshold,
                                                 TRUE,FALSE))
+cat("Segment threshold (mean+2std): ",segment_threshold)
+cat("Sample threshold (mean+2std):",sample_threshold)
 ```
 
 ```{r noise_plots}
-ggplot(segment_noise_sample) +
-  geom_histogram(aes(segment_noise,fill=excluded),binwidth = 0.04) +
+exclude_colours <- c("TRUE"="darkorange","FALSE"="grey65")
+sample_noise_p <- ggplot(segment_noise_sample) +
+  geom_histogram(aes(segment_noise,fill=excluded),
+                 color="grey15",
+                 binwidth = 0.04) +
   geom_vline(xintercept = sample_threshold,
              linetype=2) +
   xlab("sample noise") +
-  ylab("") +
+  ylab("count") +
+  scale_fill_manual(values = exclude_colours) +
   scale_x_continuous(expand = c(0,0)) +
-  scale_y_continuous(expand = c(0,0)) +
-  theme_bw()
+  #scale_y_continuous(expand = c(0,0)) +
+  theme_bw() + theme(legend.position = "none")
 
-ggplot(segment_noise_segs) +
-  geom_histogram(aes(segment_noise,fill=excluded),binwidth = 0.1) +
+seg_noise_p <- ggplot(segment_noise_segs) +
+  geom_histogram(aes(segment_noise,fill=excluded),
+                 color="grey15",
+                 binwidth = 0.1) +
   geom_vline(xintercept = segment_threshold,
              linetype=2) +
   xlab("segment noise") +
   ylab("") +
-  scale_x_continuous(expand = c(0,0)) +
-  scale_y_continuous(expand = c(0,0)) +
-  theme_bw()
+  scale_fill_manual(values = exclude_colours) +
+  scale_x_continuous(expand = c(0,0),limits = c(0,5)) +
+  #scale_y_continuous(expand = c(0,0)) +
+  theme_bw() + theme(legend.position = "none")
 
-ggplot(segment_noise_segs) +
-  geom_point(aes(segments,segment_noise,colour=excluded)) +
+seg_noise_point_p <- ggplot(segment_noise_segs) +
+  geom_point(aes(segments,segment_noise,colour=excluded),
+             alpha=0.6) +
   xlab("copy number") +
   ylab("segment noise") +
-  theme_bw()
+  scale_colour_manual(values = exclude_colours) +
+  theme_bw() + theme(legend.position = "none")
 
-ggplot(segment_noise_segs) +
-  geom_bar(aes(excluded,fill=excluded)) +
+seg_noise_bar_p <- ggplot(segment_noise_segs) +
+  geom_bar(aes(excluded,fill=excluded),
+           color="grey15") +
   xlab("excluded") +
   ylab("segments") +
-  theme_bw()
+  scale_fill_manual(values = exclude_colours) +
+  theme_bw() + theme(legend.position = "none")
 
+seg_noise_leg <- get_legend(
+  sample_noise_p + 
+    guides(color = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+
+noise_plot <- plot_grid(plot_grid(sample_noise_p,seg_noise_p,seg_noise_point_p,seg_noise_bar_p,
+                                  nrow = 2,
+                                  labels = "AUTO"),
+                        plot_grid(seg_noise_leg),nrow = 2,rel_heights = c(1,0.1))
+
+noise_plot
+ggsave2(plot = noise_plot,filename = "plots/seg_sample_noise_filt_plot.png",width = 8,height = 9,units = "in",dpi = 300)
 ```
 
 ```{r noise_stats}
+table(segment_noise_sample$excluded)
+table(segment_noise_sample$excluded)/ nrow(segment_noise_sample) * 100
+table(segment_noise_segs$excluded)
 table(segment_noise_segs$excluded) / nrow(segment_noise_segs) * 100
 segment_stats <- segment_noise_segs %>%
                   group_by(sample) %>%
@@ -372,8 +401,11 @@ excluded_paired_sample <- as.character(meta.data$SAMPLE_ID[meta.data$SAMPLE_ID %
 cat("Excluded samples: ",paste0(excluded_samples,collapse = ",")," (n=",length(excluded_samples),")",sep = "")
 abs_data_filt <- abs_data[,which(!colnames(abs_data) %in% excluded_samples)]
 ```
+
 ```{r noise_stats_post_filt}
 segment_noise_segs_filt <- segment_noise_segs[which(!segment_noise_segs$sample %in% excluded_samples),]
+
+table(segment_noise_segs_filt$excluded)
 table(segment_noise_segs_filt$excluded) / nrow(segment_noise_segs_filt) * 100
 segment_stats_filt <- segment_noise_segs_filt %>%
                   group_by(sample) %>%
@@ -446,12 +478,13 @@ cor.test(clonality_table$purity,clonality_table$ith,method = "kendal")
 ```
 
 ```{r clonality_by_type}
-ggplot(clonality_table) +
+clonality_plot <- ggplot(clonality_table) +
   geom_point(aes(group,ith,fill=group),position="jitter",color="grey50") +
   geom_violin(aes(group,ith,fill=group),alpha=0.5) +
   geom_signif(aes(group,ith),comparisons = list(c("diagnosis","relapse")),test = "wilcox.test") +
   scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
-  theme_bw()
+  theme_bw() + theme(legend.position = "none")
+clonality_plot
 
 excluded_pats <- as.character(meta.data$PATIENT_ID[meta.data$SAMPLE_ID %in% excluded_samples & meta.data$paired == TRUE])
 
@@ -468,10 +501,20 @@ clonality_plot_paired <- ggplot(clonality_table_paired) +
   geom_violin(aes(group,ith,fill=group),alpha=0.5) +
   geom_signif(aes(group,ith),comparisons = list(c("diagnosis","relapse")),test = "wilcox.test",test.args = list(paired=TRUE)) +
   scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
-  theme_bw()
+  theme_bw() + theme(legend.position = "none")
 
-ggsave(filename = "plots/paired_clonality_plot.png",plot = clonality_plot_paired,width = 9,height = 7,units = "in",dpi = 300)
 clonality_plot_paired
+
+clonality_leg <- get_legend(
+  clonality_plot_paired + 
+    guides(color = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+
+comp_clonality_plot <- plot_grid(plot_grid(clonality_plot_paired,clonality_plot,labels = "AUTO",ncol = 2),
+                                 plot_grid(clonality_leg),nrow = 2,rel_heights = c(1,0.1))
+ggsave(filename = "plots/paired_clonality_plot.png",plot = comp_clonality_plot,width = 9,height = 7,units = "in",dpi = 300)
+comp_clonality_plot
 ```
 
 #### Intra-sampe clonality
@@ -509,36 +552,36 @@ ggplot(patient_clonality_diffs) +
 patient_ploidy <- meta.data %>%
   group_by(PATIENT_ID) %>%
   summarise(ploidy=mean(ploidy))
-
-patient_purity <- meta.data %>%
-  group_by(PATIENT_ID) %>%
-  summarise(purity=mean(purity))
 ```
 
 ```{r clonality_diff_cors}
 patient_clonality_diffs <- patient_clonality_diffs %>%
   inner_join(.,patient_data,by = c("patient"="PATIENT_ID")) %>%
-  mutate(.data = .,diagnosis_distance = as.numeric(difftime(diagnosis_date,as.Date(format(Sys.time(), '%Y-%m-%d')))))
+  mutate(diagnosis_distance = as.numeric(difftime(diagnosis_date,as.Date(format(Sys.time(), '%Y-%m-%d')))))
 
 patient_clonality_diffs$ploidy <- patient_ploidy$ploidy[match(patient_clonality_diffs$patient,patient_ploidy$PATIENT_ID)]
 patient_clonality_diffs$purity <- patient_purity$purity[match(patient_clonality_diffs$patient,patient_purity$PATIENT_ID)]
 ```
 
 ```{r clonality_diff_age}
-ggplot(patient_clonality_diffs) +
+diff_age_plot <- ggplot(patient_clonality_diffs) +
   geom_point(aes(age,ith_change)) +
   geom_smooth(aes(age,ith_change),method = "lm") +
+  ylab(label = paste0("\u0394","ITH")) +
   theme_bw()
 
+diff_age_plot
 cor.test(patient_clonality_diffs$age,patient_clonality_diffs$ith_change,method = "kendal")
 ```
 
 ```{r clonality_diff_sample_age}
-ggplot(patient_clonality_diffs) +
+sample_age_plot <- ggplot(patient_clonality_diffs) +
   geom_point(aes(diagnosis_distance,ith_change)) +
   geom_smooth(aes(diagnosis_distance,ith_change),method = "lm") +
+  ylab(label = paste0("\u0394","ITH")) +
   theme_bw()
 
+sample_age_plot
 cor.test(patient_clonality_diffs$diagnosis_distance,patient_clonality_diffs$ith_change,method = "kendal")
 ```
 
@@ -550,45 +593,53 @@ delta_itg_pt_sens <- ggplot(patient_clonality_diffs) +
   ylab(label = paste0("\u0394","ITH")) +
   xlab("") +
   scale_fill_discrete(name = "platinum status") +
-  theme_bw()
+  theme_bw() + theme(legend.position = "none")
 delta_itg_pt_sens
-ggsave(filename = "plots/delta_itg_pt_sens.png",plot = delta_itg_pt_sens,width = 8,height = 6,units = "in",dpi = 300)
+#ggsave(filename = "plots/delta_itg_pt_sens.png",plot = delta_itg_pt_sens,width = 8,height = 6,units = "in",dpi = 300)
 ```
 
 ```{r clonality_diff_priorlines}
-
-# delta_itg_priorlines <- 
 patient_clonality_diffs$pre_reg_chemo <- as.factor(patient_clonality_diffs$pre_reg_chemo)
-  
-  ggplot(patient_clonality_diffs) +
+table(patient_clonality_diffs$pre_reg_chemo)
+
+patient_clonality_diffs <- droplevels.data.frame(patient_clonality_diffs[patient_clonality_diffs$pre_reg_chemo %in% c(1:2),])
+
+delta_itg_priorlines <- ggplot(patient_clonality_diffs) +
   geom_point(aes(pre_reg_chemo,ith_change,fill=pre_reg_chemo),position="jitter") +
   geom_violin(aes(pre_reg_chemo,ith_change,fill=pre_reg_chemo),alpha=0.6) +
   geom_signif(aes(as.factor(pre_reg_chemo),ith_change),comparisons = list(c("1","2")),test = "wilcox.test") +
   ylab(label = paste0("\u0394","ITH")) +
   xlab("") +
-  scale_fill_discrete(name = "prior lines") +
-  theme_bw()
-delta_itg_pt_sens
-ggsave(filename = "plots/delta_itg_pt_sens.png",plot = delta_itg_pt_sens,width = 8,height = 6,units = "in",dpi = 300)
+  scale_fill_manual(values=c("#E69F00","#CC79A7"),name = "prior lines") +
+  theme_bw() + theme(legend.position = "none")
+delta_itg_priorlines
+#ggsave(filename = "plots/delta_itg_priorlines",plot = delta_itg_priorlines,width = 8,height = 6,units = "in",dpi = 300)
 ```
 
-##### Clonality patient-level analysis
+```{r mixed_pat_delta_ith_plot}
+pat_seg_leg1 <- get_legend(
+  delta_itg_pt_sens + 
+    guides(color = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+pat_seg_leg2 <- get_legend(
+  delta_itg_priorlines + 
+    guides(color = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+delta_plot <- plot_grid(plot_grid(delta_itg_pt_sens,delta_itg_priorlines,diff_age_plot,sample_age_plot,
+                                  labels = "AUTO"),
+          plot_grid(pat_seg_leg1,pat_seg_leg2),
+          nrow = 2,
+          rel_heights = c(1,0.1))
 
-```{r arx_multi_sample_data}
-multisite_patients <- clonality_table %>%
-  group_by(patient) %>%
-  tally() %>%
-  filter(n > 1) %>%
-  dplyr::select(patient)
+delta_plot
+ggsave2(filename = "plots/delta_itg_pt_sens.png",plot = delta_plot,width = 8,height = 8,units = "in",dpi = 300)
+```
 
-multisite_data <- clonality_table %>%
-  filter(patient %in% multisite_patients$patient)
-
-plot(as.dendrogram(
-  hclust(
-    dist(x = as.data.frame(multisite_data[multisite_data$patient == "BRITROC-232",c("ith")],
-                           row.names = as.character(multisite_data[multisite_data$patient == "BRITROC-232",c("sample")]))))))
-                
+### session info
+```{r session}
+sessionInfo()
 ```
 
 

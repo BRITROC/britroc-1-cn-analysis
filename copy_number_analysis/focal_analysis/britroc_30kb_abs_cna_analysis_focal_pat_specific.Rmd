@@ -23,11 +23,11 @@ knitr::opts_chunk$set(echo = TRUE)
 suppressPackageStartupMessages(suppressWarnings(library(Biobase)))
 suppressPackageStartupMessages(suppressWarnings(library(QDNAseqmod)))
 suppressPackageStartupMessages(suppressWarnings(library(tidyverse)))
-#suppressPackageStartupMessages(suppressWarnings(library(maftools)))
+suppressPackageStartupMessages(suppressWarnings(library(umap)))
 suppressPackageStartupMessages(suppressWarnings(library(cowplot)))
 suppressPackageStartupMessages(suppressWarnings(library(kableExtra)))
 suppressPackageStartupMessages(suppressWarnings(library(biomaRt)))
-#suppressPackageStartupMessages(suppressWarnings(library(org.Hs.eg.db)))
+suppressPackageStartupMessages(suppressWarnings(library(ComplexHeatmap)))
 #suppressPackageStartupMessages(suppressWarnings(library(topGO)))
 suppressPackageStartupMessages(suppressWarnings(library(VennDiagram)))
 suppressPackageStartupMessages(suppressWarnings(library(ggsignif)))
@@ -57,6 +57,12 @@ cytoband$length <- cytoband$end - cytoband$start
 
 ploidy_change_samples <- read.table(file = "../broad_analysis/data/ploidy_change_pats.tsv",header = T,sep = "\t")
 ploidy_change_samples <- unique(ploidy_change_samples$PATIENT_ID)
+
+#signatures
+
+#ith
+
+# BRCA
 ```
 
 Frequently altered genes are as listed below:
@@ -139,7 +145,10 @@ norm_paired_changes <- paired_changes %>%
 ### Patient-specific changes
 
 ```{r pat_specific_justification}
-pat_ordering <- norm_paired_changes %>% group_by(PATIENT_ID) %>% summarise(across(change,sum)) %>% arrange(change)
+pat_ordering <- norm_paired_changes %>%
+                  group_by(PATIENT_ID) %>%
+                  summarise(across(change,sum)) %>%
+                  arrange(change)
 
 norm_paired_changes$PATIENT_ID <- factor(norm_paired_changes$PATIENT_ID,
                                          levels = as.character(rev(pat_ordering$PATIENT_ID)))
@@ -175,6 +184,7 @@ ggplot(norm_paired_change_summary) +
 
 ```{r change_cor_mat_select_genes}
 cor_data <- norm_paired_changes %>%
+  filter(!PATIENT_ID %in% ploidy_change_samples) %>%
   dplyr::select(-c(arx,rlps)) %>%
   pivot_wider(id_cols = PATIENT_ID,names_from = gene,values_from = change) %>%
   column_to_rownames(var = "PATIENT_ID")
@@ -195,6 +205,22 @@ corrplot::corrplot(cor_matrix$r,col = col(200),mar = c(1, 0, 1, 0),
                    insig = "blank",order = "hclust",
                    diag = FALSE)
 
+p1_formula <- ~{
+  corrplot::corrplot(cor_matrix$r,col = col(200),mar = c(1, 0, 1, 0),
+                   method = "color",
+                   p.mat = cor_matrix$P,
+                   addCoef.col = "black",
+                   number.cex = 0.7,
+                   tl.col = "black",
+                   tl.srt = 90,
+                   tl.cex = 0.7,
+                   type = "upper",
+                   sig.level = 0.01,
+                   insig = "blank",order = "hclust",
+                   diag = FALSE)
+}
+ggdraw(corp1)
+
 heatmap(cor_matrix$r)
 ```
 
@@ -208,7 +234,8 @@ norm_paired_changes_all <- paired_changes_all %>%
   group_by(PATIENT_ID,group,gene) %>%
   summarise(value=median(value)) %>%
   pivot_wider(values_from = value, names_from=group) %>%
-  mutate(change=rlps-arx)
+  mutate(change=rlps-arx) %>%
+  filter(!PATIENT_ID %in% ploidy_change_samples)
 ```
 
 ```{r normalised_changes_stats_all}
@@ -231,15 +258,43 @@ norm_paired_change_summary_all$PATIENT_ID <- factor(norm_paired_change_summary_a
 
 ggplot(norm_paired_change_summary_all) +
   geom_point(aes(change,PATIENT_ID,color=shift),alpha = 0.3) +
-  geom_boxplot(aes(change,PATIENT_ID),outlier.alpha = 0)
+  geom_boxplot(aes(change,PATIENT_ID),outlier.alpha = 0) +
+  theme_bw()
 ```
 
 ```{r norm_cor_all}
-cor_data_all <- norm_paired_changes_all%>%
+cor_data_all <- norm_paired_changes_all %>%
   dplyr::select(-c(arx,rlps)) %>%
   pivot_wider(id_cols = PATIENT_ID,names_from = gene,values_from = change) %>%
   column_to_rownames(var = "PATIENT_ID")
 
+chr_colors <- ifelse(protein_coding_genes$chromosome_name[protein_coding_genes$hgnc_symbol %in% colnames(cor_data_all)] %% 2 == 0,"grey75","grey25")
+gene_change_ordering <- match(protein_coding_genes$hgnc_symbol[protein_coding_genes$hgnc_symbol %in% colnames(cor_data_all)],colnames(cor_data_all))
+
+ann_age <- patient_data$age[match(rownames(cor_data_all),
+                                             paste0("BRITROC-",patient_data$britroc_number))]
+ann_prior <- patient_data$pre_reg_chemo[match(rownames(cor_data_all),
+                                             paste0("BRITROC-",patient_data$britroc_number))]
+ann_pt <- patient_data$pt_sensitivity_at_reg[match(rownames(cor_data_all),
+                                             paste0("BRITROC-",patient_data$britroc_number))]
+ann_stage <- patient_data$tumour_stage_at_diagnosis[match(rownames(cor_data_all),
+                                             paste0("BRITROC-",patient_data$britroc_number))]
+  
+col_ann <- HeatmapAnnotation(age=ann_age,
+                             prior_lines=as.factor(ann_prior),
+                             platinum_status=ann_pt,
+                             stage=as.factor(ann_stage))
+row_ann <- rowAnnotation(chromosome=chr_colors)
+
+ComplexHeatmap::Heatmap(t(cor_data_all),
+                        name = "copy number change",
+                        top_annotation = col_ann,
+                        #right_annotation = row_ann,
+                        #row_order = gene_change_ordering,
+                        row_order = c(1:dim(t(cor_data_all))[1]),
+                        show_row_dend = FALSE,
+                        show_row_names = FALSE,
+                        use_raster = TRUE)
 # if(file.exists("data/bclust.RDS")){
 #   bclust <- readRDS("data/bclust.RDS")
 # } else {
@@ -247,25 +302,27 @@ cor_data_all <- norm_paired_changes_all%>%
 #   saveRDS(bclust,file = "data/bclust.RDS") 
 # }
 
-ploidyChangeLabel <- ifelse(row.names(cor_data_all) %in% ploidy_change_samples,"red","black")
+#ploidyChangeLabel <- ifelse(row.names(cor_data_all) %in% ploidy_change_samples,"red","black")
 
-heatmap(as.matrix(t(cor_data_all)),
-        labRow = NA,
-        scale = "row",
-        col=rev(brewer.pal(11,"RdBu")),
-        ColSideColors = ploidyChangeLabel)
+#ComplexHeatmap::Heatmap(cor_data_all)
 
-chr_colors <- ifelse(protein_coding_genes$chromosome_name[protein_coding_genes$hgnc_symbol %in% colnames(cor_data_all)] %% 2 == 0,"grey75","grey25")
-gene_change_ordering <- match(protein_coding_genes$hgnc_symbol[protein_coding_genes$hgnc_symbol %in% colnames(cor_data_all)],colnames(cor_data_all))
-cor_data_all_ordered <- cor_data_all[,gene_change_ordering]
+# heatmap(as.matrix(t(cor_data_all)),
+#         labRow = NA,
+#         scale = "row",
+#         col=rev(brewer.pal(11,"RdBu")),
+#         ColSideColors = ploidyChangeLabel)
 
-heatmap(as.matrix(t(cor_data_all_ordered)),
-        labRow = NA,
-        scale = "row",
-        col=rev(brewer.pal(11,"RdBu")),
-        ColSideColors = ploidyChangeLabel,
-        RowSideColors = chr_colors,
-        Rowv = NA)
+# chr_colors <- ifelse(protein_coding_genes$chromosome_name[protein_coding_genes$hgnc_symbol %in% colnames(cor_data_all)] %% 2 == 0,"grey75","grey25")
+# gene_change_ordering <- match(protein_coding_genes$hgnc_symbol[protein_coding_genes$hgnc_symbol %in% colnames(cor_data_all)],colnames(cor_data_all))
+# cor_data_all_ordered <- cor_data_all[,gene_change_ordering]
+# 
+# heatmap(as.matrix(t(cor_data_all_ordered)),
+#         labRow = NA,
+#         scale = "row",
+#         col=rev(brewer.pal(11,"RdBu")),
+#         ColSideColors = ploidyChangeLabel,
+#         RowSideColors = chr_colors,
+#         Rowv = NA)
 ```
 
 ```{r change_cor_mat_all_genes_sub}
@@ -282,239 +339,68 @@ cor_data_all_sub <- cor_data_all[names(cor_data_all) %in% cor_data_all_vars_top]
 # }
 ```
 
+```{r change_cor_heatmap_all_genes_sub}
+#ploidyChangeLabelSub <- ifelse(row.names(cor_data_all_sub) %in% ploidy_change_samples,"changed","stable")
+
+chr_colors_sub <- ifelse(protein_coding_genes$chromosome_name[protein_coding_genes$hgnc_symbol %in% colnames(cor_data_all_sub)] %% 2 == 0,"grey75","grey25")
+gene_change_ordering_sub <- match(protein_coding_genes$hgnc_symbol[protein_coding_genes$hgnc_symbol %in% colnames(cor_data_all_sub)],colnames(cor_data_all_sub))
+
+ann_age <- patient_data$age[match(rownames(cor_data_all_sub),
+                                             paste0("BRITROC-",patient_data$britroc_number))]
+ann_prior <- patient_data$pre_reg_chemo[match(rownames(cor_data_all_sub),
+                                             paste0("BRITROC-",patient_data$britroc_number))]
+ann_pt <- patient_data$pt_sensitivity_at_reg[match(rownames(cor_data_all_sub),
+                                             paste0("BRITROC-",patient_data$britroc_number))]
+ann_stage <- patient_data$tumour_stage_at_diagnosis[match(rownames(cor_data_all_sub),
+                                             paste0("BRITROC-",patient_data$britroc_number))]
+  
+col_ann <- HeatmapAnnotation(age=ann_age,
+                             prior_lines=as.factor(ann_prior),
+                             platinum_status=ann_pt,
+                             stage=as.factor(ann_stage))
+#row_ann <- rowAnnotation(chromosome=chr_colors_sub)
+ComplexHeatmap::Heatmap(t(cor_data_all_sub),
+                        name = "Copy number change",
+                        top_annotation = col_ann,
+                        #right_annotation = row_ann,
+                        row_order = gene_change_ordering_sub, 
+                        show_row_dend = FALSE,
+                        show_row_names = FALSE,
+                        use_raster = TRUE)
+
+```
+
+```{r umap}
+umap.data <- umap(cor_data_all_sub)
+ggplot(as.data.frame(umap.data$layout)) +
+  geom_point(aes(umap.data$layout[,1],umap.data$layout[,2])) +
+  xlab("dim 1") +
+  ylab("dim 2") +
+  labs(title = "Gene change UMAP") +
+  theme_bw()
+
+```
+
+```{r change_cor_heatmap_all_genes_sub_noPloidyChange}
+# png("plots/gene_change_noPloidyChange_heatmap.png",width = 8,height = 8,units = "in",res = 300)
+# heatmap(as.matrix(t(cor_data_all_sub_ordered[!rownames(cor_data_all_sub_ordered) %in% ploidy_change_samples,])),
+#         labRow = NA,
+#         scale = "row",
+#         col=rev(brewer.pal(11,"RdBu")),
+#         ColSideColors = rep("black",times=nrow(cor_data_all_sub_ordered)-9),
+#         RowSideColors = chr_colors_sub,
+#         Rowv = NA)
+# dev.off()
+```
+
 ```{r change_cor_pca_all_genes_sub}
 pcasub <- prcomp(cor_data_all_sub,scale. =T)
 plot(pcasub$x[,1],pcasub$x[,2])
 ```
 
-```{r change_cor_heatmap_all_genes_sub}
-ploidy_change_table <- meta.data %>%
-                        group_by(PATIENT_ID,group) %>%
-                        filter(paired == TRUE) %>%
-                        summarise_at(.vars = "ploidy",.funs = c("mean")) %>%
-                        ungroup() %>%
-                        group_by(PATIENT_ID) %>%
-                        pivot_wider(id_cols = PATIENT_ID,names_from = group,values_from = ploidy) %>%
-                        mutate(ploidy_change = rlps - arx) %>%
-                        arrange(ploidy_change)
-ploidy_change_table$PATIENT_ID <- factor(ploidy_change_table$PATIENT_ID,
-                                         levels = ploidy_change_table$PATIENT_ID[order(ploidy_change_table$ploidy_change)])
-ggplot(ploidy_change_table) +
-  geom_col(aes(PATIENT_ID,ploidy_change)) +
-  theme_bw() +
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank())
-
-ploidyChangeLabelSub <- ifelse(row.names(cor_data_all_sub) %in% ploidy_change_samples,"red","black")
-
-#png("temp_heatmap.png",width = 8,height = 8,units = "in",res = 300)
-heatmap(as.matrix(t(cor_data_all_sub)),
-        labRow = NA,
-        scale = "row",
-        col=rev(brewer.pal(11,"RdBu")),
-        ColSideColors = ploidyChangeLabelSub)
-#dev.off()
-
-chr_colors_sub <- ifelse(protein_coding_genes$chromosome_name[protein_coding_genes$hgnc_symbol %in% colnames(cor_data_all_sub)] %% 2 == 0,"grey75","grey25")
-gene_change_ordering_sub <- match(protein_coding_genes$hgnc_symbol[protein_coding_genes$hgnc_symbol %in% colnames(cor_data_all_sub)],colnames(cor_data_all_sub))
-cor_data_all_sub_ordered <- cor_data_all_sub[,gene_change_ordering_sub]
-
-png("plots/gene_change_heatmap.png",width = 8,height = 8,units = "in",res = 300)
-heatmap(as.matrix(t(cor_data_all_sub_ordered)),
-        labRow = NA,
-        scale = "row",
-        col=rev(brewer.pal(11,"RdBu")),
-        ColSideColors = ploidyChangeLabelSub,
-        RowSideColors = chr_colors_sub,
-        Rowv = NA)
-dev.off()
-
-```
-
-```{r change_cor_heatmap_all_genes_sub_noPloidyChange}
-png("plots/gene_change_noPloidyChange_heatmap.png",width = 8,height = 8,units = "in",res = 300)
-heatmap(as.matrix(t(cor_data_all_sub_ordered[!rownames(cor_data_all_sub_ordered) %in% ploidy_change_samples,])),
-        labRow = NA,
-        scale = "row",
-        col=rev(brewer.pal(11,"RdBu")),
-        ColSideColors = rep("black",times=nrow(cor_data_all_sub_ordered)-9),
-        RowSideColors = chr_colors_sub,
-        Rowv = NA)
-dev.off()
-```
-
 - Plot gene per chromosome from most variable subset and GOterm analysis
 - Pattern of patient-level alterations 
 - Correlation / co-occurrence with SNV data
-
-#### Patient-specific fitting
-
-##### BRITROC-248
-
-```{r patient_specific_248}
-# BRITROC-248
-samples_248 <- getSamples(abs_data = abs_data,PATIENT_ID = "BRITROC-248")
-data_248 <- abs_data[,colnames(abs_data) %in% samples_248]
-
-plot(data_248,
-     doCalls=FALSE,
-     showSD=TRUE,
-     logTransform=FALSE,
-     ylim=c(0,15),
-     ylab="Absolute tumour CN")
-fitting_table <- read.table("../../absolute_PRE_down_sampling/fit_QC_predownsample_withsmooth.tsv",header = T,sep = "\t")
-fitting_table_248 <- fitting_table[fitting_table$SAMPLE_ID %in% samples_248,]
-fitting_table_248
-```
-![JBLAB-19302 fitting plots](../../absolute_PRE_down_sampling/plots/JBLAB-19302.png)
-![JBLAB-19303 fitting plots](../../absolute_PRE_down_sampling/plots/JBLAB-19303.png)
-![IM_403 fitting plots](../../absolute_PRE_down_sampling/plots/IM_403.png)
-
-##### BRITROC-241
-
-```{r patient_specific_241}
-# BRITROC-241
-samples_241 <- getSamples(abs_data = abs_data,PATIENT_ID = "BRITROC-241")
-data_241 <- abs_data[,colnames(abs_data) %in% samples_241]
-
-plot(data_241,
-     doCalls=FALSE,
-     showSD=TRUE,
-     logTransform=FALSE,
-     ylim=c(0,15),
-     ylab="Absolute tumour CN")
-fitting_table <- read.table("../../absolute_PRE_down_sampling/fit_QC_predownsample_withsmooth.tsv",header = T,sep = "\t")
-fitting_table_241 <- fitting_table[fitting_table$SAMPLE_ID %in% samples_241,]
-fitting_table_241
-```
-![JBLAB-4996 fitting plots](../../absolute_PRE_down_sampling/plots/JBLAB-4996.png)
-![IM_423 fitting plots](../../absolute_PRE_down_sampling/plots/IM_423.png)
-
-##### BRITROC-23
-
-```{r patient_specific_23}
-# BRITROC-23
-samples_23 <- getSamples(abs_data = abs_data,PATIENT_ID = "BRITROC-23")
-data_23 <- abs_data[,colnames(abs_data) %in% samples_23]
-
-plot(data_23,
-     doCalls=FALSE,
-     showSD=TRUE,
-     logTransform=FALSE,
-     ylim=c(0,15),
-     ylab="Absolute tumour CN")
-fitting_table <- read.table("../../absolute_PRE_down_sampling/fit_QC_predownsample_withsmooth.tsv",header = T,sep = "\t")
-fitting_table_23 <- fitting_table[fitting_table$SAMPLE_ID %in% samples_23,]
-fitting_table_23
-```
-![IM_56 fitting plots](../../absolute_PRE_down_sampling/plots/IM_56.png)
-![JBLAB-4128 fitting plots](../../absolute_PRE_down_sampling/plots/JBLAB-4128.png)
-
-##### BRITROC-267
-
-```{r patient_specific_267}
-# BRITROC-267
-samples_267 <- getSamples(abs_data = abs_data,PATIENT_ID = "BRITROC-267")
-data_267 <- abs_data[,colnames(abs_data) %in% samples_267]
-
-plot(data_267,
-     doCalls=FALSE,
-     showSD=TRUE,
-     logTransform=FALSE,
-     ylim=c(0,15),
-     ylab="Absolute tumour CN")
-fitting_table <- read.table("../../absolute_PRE_down_sampling/fit_QC_predownsample_withsmooth.tsv",header = T,sep = "\t")
-fitting_table_267 <- fitting_table[fitting_table$SAMPLE_ID %in% samples_267,]
-fitting_table_267
-```
-![JBLAB-19330 fitting plots](../../absolute_PRE_down_sampling/plots/JBLAB-19330.png)
-![IM_383 fitting plots](../../absolute_PRE_down_sampling/plots/IM_383.png)
-
-##### BRITROC-216
-
-```{r patient_specific_216}
-# BRITROC-216
-samples_216 <- getSamples(abs_data = abs_data,PATIENT_ID = "BRITROC-216")
-data_216 <- abs_data[,colnames(abs_data) %in% samples_216]
-
-plot(data_216,
-     doCalls=FALSE,
-     showSD=TRUE,
-     logTransform=FALSE,
-     ylim=c(0,15),
-     ylab="Absolute tumour CN")
-fitting_table <- read.table("../../absolute_PRE_down_sampling/fit_QC_predownsample_withsmooth.tsv",header = T,sep = "\t")
-fitting_table_216 <- fitting_table[fitting_table$SAMPLE_ID %in% samples_216,]
-fitting_table_216
-```
-![JBLAB-4965 fitting plots](../../absolute_PRE_down_sampling/plots/JBLAB-4965.png)
-![IM_340 fitting plots](../../absolute_PRE_down_sampling/plots/IM_340.png)
-![IM_341 fitting plots](../../absolute_PRE_down_sampling/plots/IM_341.png)
-
-##### BRITROC-74
-
-```{r patient_specific_74}
-# BRITROC-74
-samples_74 <- getSamples(abs_data = abs_data,PATIENT_ID = "BRITROC-74")
-data_74 <- abs_data[,colnames(abs_data) %in% samples_74]
-
-plot(data_74,
-     doCalls=FALSE,
-     showSD=TRUE,
-     logTransform=FALSE,
-     ylim=c(0,15),
-     ylab="Absolute tumour CN")
-fitting_table <- read.table("../../absolute_PRE_down_sampling/fit_QC_predownsample_withsmooth.tsv",header = T,sep = "\t")
-fitting_table_74 <- fitting_table[fitting_table$SAMPLE_ID %in% samples_74,]
-fitting_table_74
-```
-![IM_124 fitting plots](../../absolute_PRE_down_sampling/plots/IM_124.png)
-![JBLAB-4189 fitting plots](../../absolute_PRE_down_sampling/plots/JBLAB-4189.png)
-![JBLAB-4186 fitting plots](../../absolute_PRE_down_sampling/plots/JBLAB-4186.png)
-![JBLAB-4187 fitting plots](../../absolute_PRE_down_sampling/plots/JBLAB-4187.png)
-![JBLAB-4188 fitting plots](../../absolute_PRE_down_sampling/plots/JBLAB-4188.png)
-
-##### BRITROC-274
-
-```{r patient_specific_274}
-# BRITROC-274
-samples_274 <- getSamples(abs_data = abs_data,PATIENT_ID = "BRITROC-274")
-data_274 <- abs_data[,colnames(abs_data) %in% samples_274]
-
-plot(data_274,
-     doCalls=FALSE,
-     showSD=TRUE,
-     logTransform=FALSE,
-     ylim=c(0,15),
-     ylab="Absolute tumour CN")
-fitting_table <- read.table("../../absolute_PRE_down_sampling/fit_QC_predownsample_withsmooth.tsv",header = T,sep = "\t")
-fitting_table_274 <- fitting_table[fitting_table$SAMPLE_ID %in% samples_274,]
-fitting_table_274
-```
-![IM_395 fitting plots](../../absolute_PRE_down_sampling/plots/IM_395.png)
-![IM_396 fitting plots](../../absolute_PRE_down_sampling/plots/IM_396.png)
-![JBLAB-19337 fitting plots](../../absolute_PRE_down_sampling/plots/JBLAB-19337.png)
-![JBLAB-19338 fitting plots](../../absolute_PRE_down_sampling/plots/JBLAB-19338.png)
-
-##### BRITROC-209
-
-```{r patient_specific_209}
-# BRITROC-209
-samples_209 <- getSamples(abs_data = abs_data,PATIENT_ID = "BRITROC-209")
-data_209 <- abs_data[,colnames(abs_data) %in% samples_209]
-
-plot(data_209,
-     doCalls=FALSE,
-     showSD=TRUE,
-     logTransform=FALSE,
-     ylim=c(0,15),
-     ylab="Absolute tumour CN")
-fitting_table <- read.table("../../absolute_PRE_down_sampling/fit_QC_predownsample_withsmooth.tsv",header = T,sep = "\t")
-fitting_table_209 <- fitting_table[fitting_table$SAMPLE_ID %in% samples_209,]
-fitting_table_209
-```
-![IM_295 fitting plots](../../absolute_PRE_down_sampling/plots/IM_295.png)
-![JBLAB-4960 fitting plots](../../absolute_PRE_down_sampling/plots/JBLAB-4960.png)
 
 ### Session info
 
