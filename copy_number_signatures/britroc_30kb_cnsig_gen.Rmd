@@ -157,8 +157,8 @@ plot_rel_expo(sig_quants = sig_quants)
 ## Export signature data
 
 ```{r export data}
-# Save objects as rds data
-save(file = "britroc_30kb_signature_data.rds",list = c("patient.meta","sig_quants","sample_by_component"))
+# Save objects as Rdata
+save(file = "britroc_30kb_signature_data.Rdata",list = c("patient.meta","sig_quants","sample_by_component"))
 # Save patient meta data as csv
 write.table(x = patient.meta,
           file = "britroc_30kb_signature_data_meta.tsv",
@@ -166,14 +166,14 @@ write.table(x = patient.meta,
           sep = "\t",
           col.names = TRUE,
           row.names = FALSE)
-# Save sample_by_component matrix as csv
+# Save sample_by_component matrix as tsv
 write.table(x = rownames_to_column(as.data.frame(sample_by_component)),
           file = "britroc_30kb_signature_data_sample_by_comp.tsv",
           quote = FALSE,
           sep = "\t",
           col.names = TRUE,
           row.names = FALSE)
-# Save signature exposure matrix as csv
+# Save signature exposure matrix as tsv
 write.table(x = rownames_to_column(as.data.frame(sig_quants)),
           file = "britroc_30kb_signature_data_sig_exposures.tsv",
           quote = FALSE,
