@@ -370,6 +370,24 @@ saveRDS(object = sig_box_paired_wilcox,file = "plots/sig_box_paired_wilcox.RDS")
 ggsave(sig_bar_plot,filename = "plots/sig_box_paired_wilcox.png",width = 8,height = 6,units = "in",dpi = 300)
 ```
 
+```{r sig_paired_line_plot}
+paired_line <- sig_box_paired_wilcox$data
+paired_line_plot <- ggplot(paired_line) +
+  geom_line(aes(group,value,group=PATIENT_ID),alpha=0.3) +
+  geom_point(aes(group,value,color=group)) +
+  facet_wrap(. ~ Signature,nrow = 1) +
+  scale_y_continuous(limits = c(0,1)) +
+  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+  xlab("signature") +
+  ylab("exposure") +
+  theme_bw() +
+  theme(legend.position = "bottom",axis.text.x = element_blank(),axis.ticks.x = element_blank())
+
+saveRDS(object = paired_line_plot,file = "plots/paired_line_plot.RDS")
+ggsave(paired_line_plot,filename = "plots/paired_line_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+paired_line_plot
+```
+
 ### Comparison to TCGA/PCAWG
 
 ```{r sig_box_plot_compare}

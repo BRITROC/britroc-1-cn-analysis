@@ -508,7 +508,7 @@ min_test_z <- d2
 min_test_z
 ```
 
-```{r test_minimal_ps_check}
+```{r test_minimal_zc_check}
 identical(minimal_out,min_test_z)
 ```
 
