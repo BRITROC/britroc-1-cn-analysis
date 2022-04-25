@@ -516,7 +516,7 @@ min_test_z
 identical(minimal_out,min_test_z)
 ```
 
-### Gene bin selection
+## Gene bin selection
 
 ```{r bin_selection_ps}
 extract_abs_segs <- function(abs_data = x,genes = NULL){
@@ -876,6 +876,10 @@ orig_late_rates <- get_cna_rates(early_late_comb_calling[,colnames(early_late_co
 old_combined_rates <- rbind(orig_early_rates,orig_late_rates) %>%
                         mutate(method = rep("old",times=nrow(.)))
 ```
+
+## Result
+
+Two issues have been identified; 1) calling of copy number alterations appears to be incorrect when using the availabe code (this will need to be validated by Zhao). 2) Incorrect genome build was used for the gene list used in the early-to-late stage paper resulting in inaccurate gene loci being used.
 
 ```{r plot_diff}
 combined_rates <- rbind(old_combined_rates,new_combined_rates,combind_earlylate_oldnew)

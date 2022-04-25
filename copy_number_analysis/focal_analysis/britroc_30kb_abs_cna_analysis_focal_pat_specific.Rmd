@@ -40,6 +40,7 @@ suppressPackageStartupMessages(suppressWarnings(library(RColorBrewer)))
 ```{r functions}
 source("data/focal_cna_analysis_funcs.R")
 source("data/nbclustfixed.R")
+source("../../colour_palettes.R")
 ```
 
 ## Load data
@@ -353,13 +354,22 @@ ann_pt <- patient_data$pt_sensitivity_at_reg[match(rownames(cor_data_all_sub),
                                              paste0("BRITROC-",patient_data$britroc_number))]
 ann_stage <- patient_data$tumour_stage_at_diagnosis[match(rownames(cor_data_all_sub),
                                              paste0("BRITROC-",patient_data$britroc_number))]
-  
+
+
+age_col <- 
+
 col_ann <- HeatmapAnnotation(age=ann_age,
                              prior_lines=as.factor(ann_prior),
                              platinum_status=ann_pt,
-                             stage=as.factor(ann_stage))
+                             stage=as.factor(ann_stage),
+                             col = list(age = circlize::colorRamp2(c(1,100),colors = c("white","purple")),
+                                        prior_lines = c("1"="#e5f5f9","2"="#99d8c9","4"="#2ca25f"),
+                                        platinum_status = colour_palettes$resist_sensitive,
+                                        stage = c("1"="#fef0d9","2"="#fdcc8a","3"="#fc8d59","4"="#d7301f")),
+                             gp = gpar(col = "black"))
 #row_ann <- rowAnnotation(chromosome=chr_colors_sub)
-ComplexHeatmap::Heatmap(t(cor_data_all_sub),
+pdf(file = "plots/gene_change_heatmap.pdf",width = 10,height = 8)
+hmPlot <- ComplexHeatmap::Heatmap(t(cor_data_all_sub),
                         name = "Copy number change",
                         top_annotation = col_ann,
                         #right_annotation = row_ann,
@@ -368,6 +378,8 @@ ComplexHeatmap::Heatmap(t(cor_data_all_sub),
                         show_row_names = FALSE,
                         use_raster = TRUE)
 
+draw(hmPlot)
+dev.off()
 ```
 
 ```{r umap}

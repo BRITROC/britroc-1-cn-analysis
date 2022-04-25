@@ -441,6 +441,9 @@ legend_b <- get_legend(
 
 ploidy_plots <- plot_grid(prow, legend_b, ncol = 1, rel_heights = c(1, .1))
 ggsave2(filename = "plots/ploidy_plots.png",plot = ploidy_plots,width = 8,height = 8,units = "in",dpi = 300)
+pdf(file = "plots/ploidy_plots.pdf",width = 9,height = 8)
+ploidy_plots
+dev.off()
 ploidy_plots
 ```
 

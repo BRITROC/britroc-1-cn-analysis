@@ -68,7 +68,10 @@ cna_tissue_ith <- cna_tissue_ith + theme(legend.position = "none")
 
 ## Figure 3
 fig3 <- plot_grid(substraction_plot,focal_rates_clinic,labels = c("A","B"),nrow = 2)
-ggsave2(filename = "plots/figure_3_render.png",plot = fig3,width = 11,height = 8,units = "in",dpi = 300)  
+ggsave2(filename = "plots/figure_3_render.png",plot = fig3,width = 11,height = 8,units = "in",dpi = 300)
+pdf(file = "plots/figure_3_pdf_render.pdf",width = 11,height = 8)
+fig3
+dev.off()
 
 ## Figure 4
 

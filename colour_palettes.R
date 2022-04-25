@@ -6,6 +6,8 @@ gain_colour_setting <- "firebrick1"
 amp_colour_setting <- "firebrick3"
 loss_colour_setting <- "dodgerblue1"
 del_colour_setting <- "dodgerblue4"
+resistant_colour_setting <- "#F8766D"
+sensitive_colour_setting <- "#00BFC4"
 
 colour_palettes <- list(arx_rlps=c(arx=primary_colour_setting,
                                    rlps=relapse_colour_setting),
@@ -24,6 +26,8 @@ colour_palettes <- list(arx_rlps=c(arx=primary_colour_setting,
                         AMP_DEL=c(GAIN=gain_colour_setting,
                                    AMP=amp_colour_setting,
                                    LOSS=loss_colour_setting,
-                                   DEL=del_colour_setting))
+                                   DEL=del_colour_setting),
+                        resist_sensitive=c(resistant=resistant_colour_setting,
+                                           sensitive=sensitive_colour_setting))
 
 rm(list = ls()[grep("*_colour_setting",ls())])

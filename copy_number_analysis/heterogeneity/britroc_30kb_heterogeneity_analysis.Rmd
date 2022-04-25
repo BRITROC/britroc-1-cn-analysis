@@ -610,7 +610,7 @@ delta_itg_priorlines <- ggplot(patient_clonality_diffs) +
   geom_signif(aes(as.factor(pre_reg_chemo),ith_change),comparisons = list(c("1","2")),test = "wilcox.test") +
   ylab(label = paste0("\u0394","ITH")) +
   xlab("") +
-  scale_fill_manual(values=c("#E69F00","#CC79A7"),name = "prior lines") +
+  scale_fill_manual(values=c("#e5f5f9","#99d8c9"),name = "prior lines") +
   theme_bw() + theme(legend.position = "none")
 delta_itg_priorlines
 #ggsave(filename = "plots/delta_itg_priorlines",plot = delta_itg_priorlines,width = 8,height = 6,units = "in",dpi = 300)
