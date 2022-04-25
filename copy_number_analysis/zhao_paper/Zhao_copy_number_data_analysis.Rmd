@@ -218,6 +218,7 @@ phil_recalled_cna_calls <- do.call(rbind,apply(phil_cna_calls_sub[rownames(phil_
 
 identical(zhao_recalled_cna_calls,phil_recalled_cna_calls)
 ```
+
 ## Compare method outcomes
 Load the pre-computed copy number counts by gene in the early paper
 
@@ -232,6 +233,7 @@ zhao_data <- zhao_data[,colnames(zhao_data) %in% c("name","group",inter_ploidy)]
 zhao_data <- zhao_data[,colnames(zhao_data) %in% c("name","group",inter_ploidy)]
 head(zhao_data)
 ```
+
 Subset copy number data in both sets to overlapping samples
 
 ```{r compare_cn_reformat}
@@ -297,11 +299,11 @@ locations <- fData(late) %>%
   dplyr::select(id, chromosome, start, end) %>%
   mutate_at(vars(start, end), as.integer) %>%
   mutate(chromosome = factor(chromosome, levels = unique(chromosome)))
-locations
+#locations
 
 samples <- sort(sampleNames(late))
 number_of_samples <- length(samples)
-number_of_samples
+#number_of_samples
 
 for (sample_index in 1:number_of_samples) {
   sample <- samples[sample_index]
@@ -378,7 +380,7 @@ test_z <- as.data.frame(test_z) %>%
             mutate(name = rownames(.)) %>%
             relocate(name)
 rownames(test_z) <- test_z$name
-test_z
+head(test_z)
 #write.table(test_z,"late_sample_segemented_copy_number.txt",sep = "\t")
 ```
 
@@ -417,7 +419,7 @@ e4<-cbind(d2,c1)
 e4[is.na(e4)] = ""
 #head(e4)
 e4= as.matrix(e4)
-e4
+#e4
 
 d2_reformat <- do.call(rbind,apply(d2,MARGIN = 1,FUN = function(x) data.frame(N=sum(x ==  ""),
                                                                                                AMP=sum(x == "Amp"),
@@ -431,6 +433,8 @@ zhao_recalled_cna_calls
 ```
 
 ## calling method (Min Repro)
+
+Error was identified in the calling of copy number alterations.
 
 ```{r minimal_repo}
 sample_ploidys <- c(sample1=2.4,sample2=1.5,sample3=3.6,sample4=3.2)
@@ -488,7 +492,7 @@ identical(minimal_out,min_test_ps)
 ```
 
 ```{r zhao_code_test}
-ploidy_z<-minimal_input
+ploidy_z<-data.frame(rbind(sample_ploidys,sample_ploidys,sample_ploidys,sample_ploidys))
 late2<-minimal_input
 #late2<-as.data.frame(late2)
 #rownames(late2)<-late2[,1]
@@ -838,6 +842,23 @@ new_combined_rates <- rbind(zc_early_rates,zc_late_rates) %>%
                         mutate(method = rep("new",times=nrow(.)))
 ```
 
+```{r old_genes_new_calls}
+late_g <- late2[,-1]
+early_g <- final_early
+
+combind_oldnew <- cbind(early_g,late_g)
+colnames(combind_oldnew) <- gsub(x = colnames(combind_oldnew),pattern = "\\.",replacement = "-")
+combind_oldnew <- get_cna_calls(data = combind_oldnew)
+
+zc_early_rates_oldnw <- get_cna_rates(combind_oldnew[,colnames(combind_oldnew) %in% colnames(early)]) %>%
+                    mutate(cohort = rep("early",times=nrow(.)))
+zc_late_rates_oldnw <- get_cna_rates(combind_oldnew[,colnames(combind_oldnew) %in% colnames(late)]) %>%
+                    mutate(cohort = rep("late",times=nrow(.)))
+
+combind_earlylate_oldnew <- rbind(zc_early_rates_oldnw,zc_late_rates_oldnw) %>%
+                              mutate(method = rep("old_newcalling",times=nrow(.)))
+```
+
 ```{r old_method_collate}
 ## Added PS
 early_late_comb_calling <- cbind(d,e4)
@@ -857,7 +878,7 @@ old_combined_rates <- rbind(orig_early_rates,orig_late_rates) %>%
 ```
 
 ```{r plot_diff}
-combined_rates <- rbind(old_combined_rates,new_combined_rates)
+combined_rates <- rbind(old_combined_rates,new_combined_rates,combind_earlylate_oldnew)
 
 ggplot(combined_rates) +
   geom_col(aes(gene,rate,fill=method),position="dodge") +

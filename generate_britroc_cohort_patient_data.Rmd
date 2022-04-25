@@ -243,6 +243,6 @@ sum_plot <- ggplot() +
                     panel.grid = element_blank())
 
 sum_plot
-saveRDS(object = sum_plot,file = "cohort_plot.RDS")
-ggsave(filename = "cohort_summary_plot.png",plot = sum_plot,device = "png",width = 12,height = 9,dpi = "retina",units = "in")
+saveRDS(object = sum_plot,file = "plots/cohort_plot.RDS")
+ggsave(filename = "plots/cohort_summary_plot.png",plot = sum_plot,device = "png",width = 12,height = 9,dpi = "retina",units = "in")
 ```
