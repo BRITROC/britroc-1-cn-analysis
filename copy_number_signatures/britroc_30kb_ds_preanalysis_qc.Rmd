@@ -34,6 +34,7 @@ suppressMessages(library(plotly))
 ```{r source_scripts}
 # Load main functions
 source("data/britroc_30kb_functions.R")
+source("../colour_palettes.R")
 ```
 
 ### Load meta data and filter
@@ -229,8 +230,8 @@ Comparisons between archival and relapse tumour groups were identically affected
 sddf.arx <- cn_stddev(cn_object = arx_cn_data)
 sddf.rlps <- cn_stddev(cn_object = rlps_cn_data)
 
-sddf.arx$group <- rep("ARX",nrow(sddf.arx))
-sddf.rlps$group <- rep("RLPS",nrow(sddf.rlps))
+sddf.arx$group <- rep("diagnosis",nrow(sddf.arx))
+sddf.rlps$group <- rep("relapse",nrow(sddf.rlps))
 
 sddf.merge <- melt(rbind(sddf.arx,sddf.rlps),measure.vars = 4)
 
@@ -245,6 +246,8 @@ vline_data <- vline_data %>% pivot_longer(-cn_state,names_to = "stat")
 
 ggplot(sddf.merge) + geom_point(aes(group,value,color=group),position = "jitter",alpha=0.3) +  
   geom_violin(aes(group,value,fill=group),alpha=0.5) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
   labs(title = "CN state standard deviation by tumour group (all)") +
   ylab(label = "Standard deviation") +
   xlab(label = "") +
@@ -253,6 +256,7 @@ ggplot(sddf.merge) + geom_point(aes(group,value,color=group),position = "jitter"
   theme(strip.background = element_blank())
 
 ggplot(sddf.merge)+geom_point(aes(value,rd,color=group),alpha=0.5) + 
+  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
   facet_wrap(.~cn_state) +
   labs(title = "CN state standard deviation against used reads by tumour group (all)") +
   ylab(label = "Read depth") +
@@ -262,9 +266,10 @@ ggplot(sddf.merge)+geom_point(aes(value,rd,color=group),alpha=0.5) +
   theme(strip.background = element_blank())
 
 ggplot() + 
-  geom_density(data = sddf.merge[sddf.merge$group == "ARX",],aes(value,color=group)) + 
-  geom_density(data = sddf.merge[sddf.merge$group == "RLPS",],aes(value,color=group)) +
+  geom_density(data = sddf.merge[sddf.merge$group == "diagnosis",],aes(value,color=group)) + 
+  geom_density(data = sddf.merge[sddf.merge$group == "relapse",],aes(value,color=group)) +
   geom_vline(data = vline_data,aes(xintercept = value,linetype = stat)) +
+  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
   labs(title = "CN state standard deviation density by tumour group (all)") +
   ylab(label = "Density") +
   xlab(label = "Standard deviation") +
@@ -333,8 +338,8 @@ ggplot() +
 sddf.arx <- cn_stddev(cn_object = paired_arx_cn_data)
 sddf.rlps <- cn_stddev(cn_object = paired_rlps_cn_data)
 
-sddf.arx$group <- rep("ARX",nrow(sddf.arx))
-sddf.rlps$group <- rep("RLPS",nrow(sddf.rlps))
+sddf.arx$group <- rep("diagnosis",nrow(sddf.arx))
+sddf.rlps$group <- rep("relapse",nrow(sddf.rlps))
 
 sddf.merge <- melt(rbind(sddf.arx,sddf.rlps),measure.vars = 4)
 
@@ -347,8 +352,10 @@ vline_data <- as.data.frame(cbind(c(1:4),
 colnames(vline_data) <- c("cn_state","mean","Stdev2","Stdev3")
 vline_data <- vline_data %>% pivot_longer(-cn_state,names_to = "stat")
 
-ggplot(sddf.merge) + geom_point(aes(group,value,color=group),position = "jitter",alpha=0.3) +  
+ggplot(sddf.merge) + geom_point(aes(group,value,color=group),position = "jitter",alpha=0.3) +
   geom_violin(aes(group,value,fill=group),alpha=0.5) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
   labs(title = "CN state standard deviation by tumour group (paired)") +
   ylab(label = "Standard deviation") +
   xlab(label = "") +
@@ -358,6 +365,7 @@ ggplot(sddf.merge) + geom_point(aes(group,value,color=group),position = "jitter"
 
 ggplot(sddf.merge)+geom_point(aes(value,rd,color=group),alpha=0.5) + 
   facet_wrap(.~cn_state) +
+  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
   labs(title = "CN state standard deviation against used reads by tumour group (paired)") +
   ylab(label = "Read depth") +
   xlab(label = "Standard deviation") +
@@ -366,9 +374,10 @@ ggplot(sddf.merge)+geom_point(aes(value,rd,color=group),alpha=0.5) +
   theme(strip.background = element_blank())
 
 ggplot() + 
-  geom_density(data = sddf.merge[sddf.merge$group == "ARX",],aes(value,color=group)) + 
-  geom_density(data = sddf.merge[sddf.merge$group == "RLPS",],aes(value,color=group)) +
+  geom_density(data = sddf.merge[sddf.merge$group == "diagnosis",],aes(value,color=group)) + 
+  geom_density(data = sddf.merge[sddf.merge$group == "relapse",],aes(value,color=group)) +
   geom_vline(data = vline_data,aes(xintercept = value,linetype = stat)) +
+  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
   labs(title = "CN state standard deviation density by tumour group (paired)") +
   ylab(label = "Density") +
   xlab(label = "Standard deviation") +
@@ -517,7 +526,7 @@ ggplot() +
 
 ### Excluded samples (Std dev * 3)
 
-For CN state independent standard deviation, 4 samples exceeded 3 times standard deviation
+For CN state independent standard deviation, 3 samples exceeded 3 times standard deviation
 
 ```{r std_tables_sd3}
 qc_samples <- c()
@@ -528,7 +537,7 @@ qc_samples <- sort(unique(qc_samples))
 qc_samples
 ```
 
-Standard deviation distribution ceollectively across each CN state (1-4)
+Standard deviation distribution collectively across each CN state (1-4)
 
 ```{r collective_state_sd}
 sd.temp <- sddf.merge[sddf.merge$norm == TRUE,c(2,6)] %>% group_by(name) %>% summarise_all(.funs = sd)
