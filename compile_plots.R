@@ -51,14 +51,20 @@ sig_legend_b <- get_legend(
 cna_tissue_rates <- readRDS("copy_number_analysis/sites_of_relapse/plots/cna_rates_tissue.RDS")
 cna_tissue_rates <- cna_tissue_rates + theme(legend.position = "none")
 cna_tissue_counts <- readRDS("copy_number_analysis/sites_of_relapse/plots/cna_count_tissue.RDS")
-cna_tissue_counts <- cna_tissue_counts + theme(legend.position = "none",axis.text.x = element_blank(),axis.ticks.x = element_blank())
+cna_tissue_counts <- cna_tissue_counts + theme(legend.position = "none",axis.text = element_text(angle = 90))
 cna_tissue_ith <- readRDS("copy_number_analysis/sites_of_relapse/plots/ith_tissue.RDS")
-tissue_legend_b <- get_legend(
-  cna_tissue_ith + 
+cna_tissue_ith <- cna_tissue_ith + theme(legend.position = "none")
+
+tissue_legend_a <- get_legend(
+  cna_tissue_counts + 
     guides(color = guide_legend(nrow = 1)) +
     theme(legend.position = "bottom")
 )
-cna_tissue_ith <- cna_tissue_ith + theme(legend.position = "none")
+tissue_legend_b <- get_legend(
+  cna_tissue_rates + 
+    guides(color = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
 
 ## Figure 1
 # Thomas
@@ -91,12 +97,13 @@ fig5 <- plot_grid(plot_grid(signature_paired_line,
 ggsave2(filename = "plots/figure_5_render.png",plot = fig5,width = 10,height = 9,units = "in",dpi = 300)  
 
 ## Figure 6
-fig6 <- plot_grid(cna_tissue_rates,
-          cna_tissue_counts,
-          plot_grid(cna_tissue_ith,tissue_legend_b,labels = c("C","")),
-          nrow = 3,
-          labels = c("A","B",""),rel_heights = c(1,1.2,0.7))
-ggsave2(filename = "plots/figure_6_render.png",plot = fig5,width = 10,height = 10,units = "in",dpi = 300)
+fig6 <- plot_grid(
+          plot_grid(cna_tissue_rates,
+                    cna_tissue_counts,align = "hv",
+                    labels = c("A","B")),
+          plot_grid(tissue_legend_b,tissue_legend_a),
+          nrow = 2,rel_heights = c(1,0.1))
+ggsave2(filename = "plots/figure_6_render.png",plot = fig6,width = 10,height = 10,units = "in",dpi = 300)
 
 ## Supplemental - TCGA-Britroc focal rate comparison 
 britroc_tcga_comp_raw <- readRDS("copy_number_analysis/focal_analysis/plots/britroc_tcga_comp_raw.RDS")

@@ -68,6 +68,16 @@ get_cna_changes <- function(data=NULL,genes=NULL,patients=NULL){
 
 ```
 
+```{r read_meta}
+meta.data <- read.table("../../copy_number_signatures/britroc_30kb_signature_data_meta.tsv",header = TRUE,sep = "\t")
+patient_data <- read.table("../../britroc_cohort_patient_data.tsv",header = T,sep = "\t")
+focal_genes_table <- read.table("../focal_analysis/data/focal_CNA_pseudo_bed.txt",header = T,sep = "\t")
+ith_table <- read.table("../heterogeneity/data/ith_results_table.tsv",header = T,sep = "\t")
+signatures <- read.table("../../copy_number_signatures/britroc_30kb_signature_data_sig_exposures.tsv",
+                         header = TRUE,sep = "\t",row.names = 1)
+colnames(signatures) <- gsub(colnames(signatures),pattern = "\\.",replacement = "-")
+```
+
 ```{r db_open}
 ## Retrieve clinical database login details
 clin_config <- config::get("clinDB")
@@ -79,58 +89,85 @@ britroc_con <- dbConnect(RPostgres::Postgres(),
                          user = clin_config$user,
                          password = clin_config$password
 )
-
-## Still lack of adequate mapping between tissue block id, tissue location, and sample id. 
 ```
 
-```{r read_meta}
-meta.data <- read.table("../../copy_number_signatures/britroc_30kb_signature_data_meta.tsv",header = TRUE,sep = "\t")
+```{r get_db_tables}
+sample_table <- RPostgres::dbReadTable(britroc_con,name = "sample")
 
-patient_data <- read.table("../../britroc_cohort_patient_data.tsv",header = T,sep = "\t")
+diag_tissue_blocks <- RPostgres::dbReadTable(britroc_con,name = "tissue_blocks")
+diag_pre_op <- RPostgres::dbReadTable(britroc_con,name = "pre_relapse_operations")
 
-tissue_data_diag <- read.table("data/Archival_samples_curated.txt",
-                               header = T,
-                               sep = "\t",
-                               quote = "",
-                               na.strings = "",
-                               comment.char = "",fill = T)
+diag_tissue_table <- left_join(diag_tissue_blocks,diag_pre_op,"histological_id") %>%
+                      select(histological_id,tissue_site) %>%
+                      rename("fk_histological_id"="histological_id")
 
-tissue_data_relapse <- read.table("data/Biopsies_relapse_curated.csv",
-                                  header = T,
-                                  sep = ",",
-                                  na.strings = "")
+relapse_tissue_blocks <- RPostgres::dbReadTable(britroc_con,name = "relapse_tissue_samples")
+relapse_post_op <- RPostgres::dbReadTable(britroc_con,name = "post_relapse_biopsies")
 
-focal_genes_table <- read.table("../focal_analysis/data/focal_CNA_pseudo_bed.txt",header = T,sep = "\t")
+relapse_tissue_table <- left_join(relapse_tissue_blocks,relapse_post_op,by = c("fk_histological_id"="histological_id")) %>%
+                          select("fk_histological_id","anatomical_site") %>%
+                          rename("tissue_site"="anatomical_site")
 
-ith_table <- read.table("../heterogeneity/data/ith_results_table.tsv",header = T,sep = "\t")
+site_table <- left_join(sample_table,diag_tissue_table,"fk_histological_id") %>%
+                left_join(.,relapse_tissue_table,"fk_histological_id") %>%
+                distinct() %>%
+                select("fk_britroc_number","type","name","tissue_site.x","tissue_site.y") %>%
+                unite("tissue_site",c("tissue_site.x","tissue_site.y"),sep = ",",remove = TRUE,na.rm = TRUE) %>%
+                rename("PATIENT_ID"="fk_britroc_number","SAMPLE_ID"="name") %>%
+                filter(type %in% c("archival","relapse")) %>%
+                filter(SAMPLE_ID %in% meta.data$SAMPLE_ID)
+```
+
+```{r normalise_tissue}
+tissue_mapping <- read.table("data/tissue_mapping.txt",header = TRUE,sep = "\t")
+
+site_table$location_curated <- tissue_mapping$location_curated[match(site_table$tissue_site,tissue_mapping$Location.of.Tumour.biopsied)]
+site_table$tissue_grouped <- tissue_mapping$tissue_group_curated[match(site_table$tissue_site,tissue_mapping$Location.of.Tumour.biopsied)]
+
+## Some samples have more than one tissue entry for one sample
+dup_samples <- site_table$SAMPLE_ID[which(duplicated(site_table$SAMPLE_ID))]
+site_table <- site_table[which(!site_table$SAMPLE_ID %in% dup_samples),] %>%
+                select(SAMPLE_ID,tissue_site,location_curated,tissue_grouped)
+tissue_data <- site_table
 ```
 
 ```{r format_tissue_table}
-tissue_data_diag <- tissue_data_diag %>%
-                dplyr::select(BritRoc.No,IM_ID,archival_location_curated,archival_tissue_grouped) %>%
-                rename(PATIENT_ID = "BritRoc.No",
-                       SAMPLE_ID = "IM_ID",
-                       location_curated = "archival_location_curated",
-                       tissue_grouped = "archival_tissue_grouped") %>%
-                mutate(PATIENT_ID = paste0("BRITROC-",PATIENT_ID))
-
-tissue_data_relapse <- tissue_data_relapse %>%
-                dplyr::select(BritRoc.No,JBLAB_ID,relapse_location_curated,relapse_tissue_grouped) %>%
-                rename(PATIENT_ID = "BritRoc.No",
-                       SAMPLE_ID = "JBLAB_ID",
-                       location_curated = "relapse_location_curated",
-                       tissue_grouped = "relapse_tissue_grouped") %>%
-                mutate(PATIENT_ID = paste0("BRITROC-",PATIENT_ID))
-
-tissue_data <- rbind(tissue_data_diag,tissue_data_relapse)
-head(tissue_data)
+# tissue_data_diag <- read.table("data/Archival_samples_curated.txt",
+#                                header = T,
+#                                sep = "\t",
+#                                quote = "",
+#                                na.strings = "",
+#                                comment.char = "",fill = T)
+# 
+# tissue_data_relapse <- read.table("data/Biopsies_relapse_curated.csv",
+#                                   header = T,
+#                                   sep = ",",
+#                                   na.strings = "")
+# 
+# tissue_data_diag <- tissue_data_diag %>%
+#                 dplyr::select(BritRoc.No,IM_ID,archival_location_curated,archival_tissue_grouped) %>%
+#                 rename(PATIENT_ID = "BritRoc.No",
+#                        SAMPLE_ID = "IM_ID",
+#                        location_curated = "archival_location_curated",
+#                        tissue_grouped = "archival_tissue_grouped") %>%
+#                 mutate(PATIENT_ID = paste0("BRITROC-",PATIENT_ID))
+# 
+# tissue_data_relapse <- tissue_data_relapse %>%
+#                 dplyr::select(BritRoc.No,JBLAB_ID,relapse_location_curated,relapse_tissue_grouped) %>%
+#                 rename(PATIENT_ID = "BritRoc.No",
+#                        SAMPLE_ID = "JBLAB_ID",
+#                        location_curated = "relapse_location_curated",
+#                        tissue_grouped = "relapse_tissue_grouped") %>%
+#                 mutate(PATIENT_ID = paste0("BRITROC-",PATIENT_ID))
+# 
+# tissue_data <- rbind(tissue_data_diag,tissue_data_relapse)
+# head(tissue_data)
 ```
 
 ```{r add_tissue_metadata}
 meta.data <- left_join(x = meta.data,
                        y = tissue_data,
-                       by = c("PATIENT_ID","SAMPLE_ID"))
-
+                       by = "SAMPLE_ID")
 head(meta.data)
 ```
 
@@ -145,25 +182,21 @@ annotation_summary_group <- as.data.frame(table(meta.data$tissue_grouped,meta.da
                         mutate(group = case_when(group == "arx" ~ "diagnosis",
                                                  group == "rlps" ~ "relapse"))
 
-ggplot(annotation_summary) +
+annotation_summary_plot <- ggplot(annotation_summary) +
   geom_col(aes(tissue,count,fill=group),position="dodge") +
   scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
   xlab("") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90,vjust = 0.5))
 
-ggplot(annotation_summary_group) +
-  geom_col(aes(tissue,count,fill=group),position="dodge") +
-  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
-  xlab("") +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 90,vjust = 0.5))
-
-ggplot(annotation_summary_group) + 
+annotation_summary_group_plot <- ggplot(annotation_summary_group) + 
   geom_col(aes(group,count,fill=tissue)) +
   xlab("") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 0,vjust = 0.5))
+
+plot_grid(annotation_summary_plot,
+          annotation_summary_group_plot,ncol = 1)
 ```
 
 ### Read copy number data
@@ -200,7 +233,7 @@ cna_rates_tissue <- do.call(rbind,lapply(X = names(tissue_samples),FUN = functio
 }))
 
 focal_rate_plot <- ggplot(cna_rates_tissue) +
-  geom_col(aes(x = gene,y = rate,fill = group),
+  geom_col(aes(x = tissue,y = rate,fill = group),
            position="dodge",color="grey20") +
   #scale_fill_manual(values = colour_palettes$amplification_deletion) +
   labs(title = "") +
@@ -210,10 +243,10 @@ focal_rate_plot <- ggplot(cna_rates_tissue) +
   theme(axis.title.x = element_blank(),
           axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90),
         legend.position = "bottom") +
-  facet_wrap(. ~ tissue,nrow = 5)
+  facet_wrap(. ~ gene,ncol = 3)
 
 saveRDS(focal_rate_plot,file = "plots/cna_rates_tissue.RDS")
-ggsave(plot = focal_rate_plot,filename = "plots/cna_rates_tissue.png",width = 12,height = 8,units = "in",dpi = 300)
+ggsave(plot = focal_rate_plot,filename = "plots/cna_rates_tissue.png",width = 8,height = 8,units = "in",dpi = 300)
 focal_rate_plot
 ```
 
@@ -259,6 +292,7 @@ pairwise.fishers.results <- lapply(sig_tissue_genes,FUN = function(x){
   rownames(pair.wise$p.value) <- names(n)[as.numeric(rownames(pair.wise$p.value))]
   return(pair.wise)
 })
+fisher.test.tissues[order(fisher.test.tissues$p.value),]
 names(pairwise.fishers.results) <- sig_tissue_genes
 pairwise.fishers.results
 ```
@@ -281,35 +315,51 @@ cna_count_plot <- ggplot(cna_copies) +
   geom_boxplot(aes(x = tissue,y=value,fill=tissue),outlier.shape = NA) +
   ylab("copy number") +
   xlab("") +
-  facet_wrap(. ~ gene,scales = "free") +
+  facet_wrap(. ~ gene,scales = "free_y",ncol = 3) +
   theme_bw() +
   theme(legend.position = "bottom")
 
-
-anova
 saveRDS(cna_count_plot,file = "plots/cna_count_tissue.RDS")
 ggsave(plot = cna_count_plot,filename = "plots/cna_count_tissue.png",width = 12,height = 8,units = "in",dpi = 300)
 cna_count_plot
 ```
 
 ```{r cna_count_test}
-cna_count_test <- do.call(rbind,lapply(X = names(tissue_samples),FUN = function(x){
-  cna_count_table <- cna_median_copies(data = cna_data,min_obs = 3,genes = focal_genes_table$Gene.name,
-                         sub_a = meta.data$SAMPLE_ID[meta.data$group == "arx"],
-                         sub_b = relapse_tissue_samples[[x]],p.adj = "fdr")
-  cna_count_table$tissue <- rep(x,times = nrow(cna_count_table))
-  return(cna_count_table)
-  }))
-cna_count_test[order(cna_count_test$pVal),c(1,4,5,7,8,10)]
+cna_count_anova <- do.call(rbind,lapply(unique(cna_copies$gene),FUN = function(x){
+  gene <- x
+  anova.results <- aov(value ~ tissue, data = cna_copies[cna_copies$gene == gene,])
+  anova.summary <- summary(anova.results)
+  anova.pval <- anova.summary[[1]]$`Pr(>F)`[1]
+  anova.post <- TukeyHSD(anova.results)
+  
+  anova.post.table <- as.data.frame(anova.post$tissue)
+  anova.post.table <- anova.post.table[order(anova.post.table$`p adj`),]
+  anova.post.table <- anova.post.table[anova.post.table$`p adj` < 0.05,] %>%
+                        rownames_to_column(var = "combination") %>%
+                        select(combination,`p adj`)
+  if(nrow(anova.post.table) > 0){
+    out <- data.frame(gene=rep(gene,times=nrow(anova.post.table)),
+                      anova_pval=rep(anova.pval,times=nrow(anova.post.table)),
+                      posthoc_group=anova.post.table$combination,
+                      posthoc_pval=anova.post.table$`p adj`)
+  } else {
+    out <- data.frame(gene=gene,
+                      anova_pval=anova.pval,
+                      posthoc_group=NA,
+                      posthoc_pval=NA)
+  }
+  return(out)
+}))
+cna_count_anova$q.val <- p.adjust(cna_count_anova$posthoc_pval,method = "bonferroni")
+cna_count_anova[order(cna_count_anova$anova_pval),]
 ```
 
 ### ITH 
 
 ```{r ith_data}
 ith_table_tissue <- ith_table %>%
-                      mutate(tissue = meta.data$relapse_tissue_grouped[match(sample,meta.data$SAMPLE_ID)]) %>%
-                      filter(!is.na(tissue) | grepl("IM",sample)) %>%
-                      mutate(tissue = ifelse(is.na(tissue),"diagnosis",as.character(tissue)))
+                      mutate(tissue = meta.data$tissue_grouped[match(sample,meta.data$SAMPLE_ID)]) %>%
+                      filter(!is.na(tissue))
 ```
 
 ```{r ith_plot}
@@ -326,8 +376,66 @@ ith_plot
 ```
 
 ```{r test_ith}
-res.aov <- aov(ith ~ tissue,data = ith_table_tissue)
-summary(res.aov)
-TukeyHSD(res.aov)
+res.aov.ith <- aov(ith ~ tissue,data = ith_table_tissue)
+summary(res.aov.ith)
+TukeyHSD(res.aov.ith)
 ```
 
+```{r test_signatures}
+signatures_table <- signatures %>%
+                     rownames_to_column(var = "signature") %>%
+                     pivot_longer(cols = 2:ncol(.),names_to = "SAMPLE_ID",values_to = "exposure") %>%
+                     mutate(tissue = meta.data$tissue_grouped[match(SAMPLE_ID,meta.data$SAMPLE_ID)]) %>%
+                     filter(!is.na(tissue))
+signatures_table
+```
+
+```{r sig_plot}
+signature_plot <- ggplot(signatures_table) +
+  geom_point(aes(tissue,exposure,fill=tissue),position="jitter",color="grey50") +
+  geom_violin(aes(tissue,exposure,fill=tissue),alpha=0.5) +
+  #geom_signif(aes(tissue,ith),comparisons = list(c("diagnosis","relapse")),test = "wilcox.test") +
+  scale_y_continuous(limits = c(0,1)) +
+  facet_wrap(. ~ signature) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+saveRDS(signature_plot,file = "plots/signature_tissue.RDS")
+ggsave(plot = signature_plot,filename = "plots/signatures_tissue.png",width = 10,height = 8,units = "in",dpi = 300)
+signature_plot
+```
+
+```{r signature_aov}
+signature_tissue_anova <- do.call(rbind,lapply(unique(signatures_table$signature),FUN = function(x){
+  sig <- x
+  anova.results <- aov(exposure ~ tissue, data = signatures_table[signatures_table$signature == sig,])
+  anova.summary <- summary(anova.results)
+  anova.pval <- anova.summary[[1]]$`Pr(>F)`[1]
+  anova.post <- TukeyHSD(anova.results)
+  
+  anova.post.table <- as.data.frame(anova.post$tissue)
+  anova.post.table <- anova.post.table[order(anova.post.table$`p adj`),]
+  anova.post.table <- anova.post.table[anova.post.table$`p adj` < 0.05,] %>%
+                        rownames_to_column(var = "combination") %>%
+                        select(combination,`p adj`)
+  if(nrow(anova.post.table) > 0){
+    out <- data.frame(signature=rep(sig,times=nrow(anova.post.table)),
+                      anova_pval=rep(anova.pval,times=nrow(anova.post.table)),
+                      posthoc_group=anova.post.table$combination,
+                      posthoc_pval=anova.post.table$`p adj`)
+  } else {
+    out <- data.frame(signature=sig,
+                      anova_pval=anova.pval,
+                      posthoc_group=NA,
+                      posthoc_pval=NA)
+  }
+  return(out)
+}))
+signature_tissue_anova$q.val <- p.adjust(signature_tissue_anova$posthoc_pval,method = "bonferroni")
+signature_tissue_anova[order(signature_tissue_anova$anova_pval),]
+signature_tissue_anova
+```
+
+```{r session_info}
+sessionInfo()
+```

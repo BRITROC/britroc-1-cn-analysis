@@ -30,7 +30,6 @@ Load functions used in the focal analysis document and additional functions used
 
 ```{r functions}
 source("../focal_analysis/data/focal_cna_analysis_funcs.R")
-source("../focal_analysis/data/nbclustfixed.R")
 
 getSampNames<-function(abs_profiles)
 {
@@ -437,8 +436,8 @@ zhao_recalled_cna_calls
 Error was identified in the calling of copy number alterations.
 
 ```{r minimal_repo}
-sample_ploidys <- c(sample1=2.4,sample2=1.5,sample3=3.6,sample4=3.2)
-minimal_input <- data.frame(sample1 = c(6.2,3.1,0,2.5),
+sample_ploidys <- c(sample1=4.2,sample2=2.8,sample3=3.6,sample4=3.2)
+minimal_input <- data.frame(sample1 = c(6.2,3.1,0.6,2.5),
            sample2 = c(2.1,0,2.8,2.3),
            sample3 = c(5.2,9.2,2.4,0.8),
            sample4 = c(2.3,12.1,2.9,3.3),
@@ -450,7 +449,7 @@ minimal_input
 sample_ploidys
 minimal_input
 
-minimal_out <- data.frame(sample1 = c("AMP","N","DEL","N"),
+minimal_out <- data.frame(sample1 = c("N","N","DEL","N"),
            sample2 = c("N","DEL","N","N"),
            sample3 = c("N","AMP","N","DEL"),
            sample4 = c("N","AMP","N","N"),
