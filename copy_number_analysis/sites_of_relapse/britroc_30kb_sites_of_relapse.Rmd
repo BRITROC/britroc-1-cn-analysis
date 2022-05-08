@@ -243,6 +243,7 @@ focal_rate_plot <- ggplot(cna_rates_tissue) +
   theme(axis.title.x = element_blank(),
           axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90),
         legend.position = "bottom") +
+  scale_fill_manual(values = colour_palettes$amplification_deletion) +
   facet_wrap(. ~ gene,ncol = 3)
 
 saveRDS(focal_rate_plot,file = "plots/cna_rates_tissue.RDS")
@@ -310,12 +311,12 @@ cna_copies <- get_cna_changes(data = cna_data,genes = focal_genes_table$Gene.nam
 ```{r plot_cna_count}
 cna_count_plot <- ggplot(cna_copies) +
   geom_point(aes(x = tissue,y=value,color=tissue),
-             position=position_jitterdodge(jitter.width = 0.2),
+             position=position_jitterdodge(jitter.width = 0.3),
              alpha=0.2) +
-  geom_boxplot(aes(x = tissue,y=value,fill=tissue),outlier.shape = NA) +
+  geom_violin(aes(x = tissue,y=value,color=tissue),fill=NA) +
   ylab("copy number") +
   xlab("") +
-  facet_wrap(. ~ gene,scales = "free_y",ncol = 3) +
+  facet_wrap(. ~ gene,scales = "free_y",ncol = 2) +
   theme_bw() +
   theme(legend.position = "bottom")
 
@@ -396,9 +397,9 @@ signature_plot <- ggplot(signatures_table) +
   geom_violin(aes(tissue,exposure,fill=tissue),alpha=0.5) +
   #geom_signif(aes(tissue,ith),comparisons = list(c("diagnosis","relapse")),test = "wilcox.test") +
   scale_y_continuous(limits = c(0,1)) +
-  facet_wrap(. ~ signature) +
+  facet_wrap(. ~ signature,nrow = 1) +
   theme_bw() +
-  theme(legend.position = "bottom")
+  theme(legend.position = "bottom",axis.text.x = element_text(angle = 90))
 
 saveRDS(signature_plot,file = "plots/signature_tissue.RDS")
 ggsave(plot = signature_plot,filename = "plots/signatures_tissue.png",width = 10,height = 8,units = "in",dpi = 300)
@@ -433,7 +434,108 @@ signature_tissue_anova <- do.call(rbind,lapply(unique(signatures_table$signature
 }))
 signature_tissue_anova$q.val <- p.adjust(signature_tissue_anova$posthoc_pval,method = "bonferroni")
 signature_tissue_anova[order(signature_tissue_anova$anova_pval),]
-signature_tissue_anova
+```
+
+```{r cn_by_diag_relapse}
+obs_table <- as.matrix(table(cna_copies$group[cna_copies$gene == "BRCA1"],
+      cna_copies$tissue[cna_copies$gene == "BRCA1"]))
+
+obs_table
+
+tissue_obs_sufficient <- colnames(obs_table)[which(apply(obs_table,MARGIN = 2,FUN = function(x) all(x > 2)))]
+
+cna_copies_stratified <- cna_copies[cna_copies$tissue %in% tissue_obs_sufficient,]
+```
+
+```{r cn_by_diag_relapse_plot}
+cn_count_tissue_plot <- ggplot(cna_copies_stratified) +
+  geom_point(aes(group,value,color=group)) +
+  geom_boxplot(aes(group,value,color=group)) +
+  geom_signif(aes(group,value),
+              comparisons = list(c("diagnosis","relapse")),
+              test = "wilcox.test",vjust = 1.5) +
+  facet_grid(cols = vars(tissue),rows = vars(gene),scales = "free") +
+  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90,vjust = 0.5))
+
+saveRDS(cn_count_tissue_plot,file = "plots/cn_count_tissue.RDS")
+ggsave(plot = cn_count_tissue_plot,filename = "plots/cn_count_tissue.png",width = 10,height = 8,units = "in",dpi = 300)
+cn_count_tissue_plot
+```
+
+```{r cn_sigs_group_by_tissue}
+signatures_table_group <- signatures_table %>%
+                            mutate(group = meta.data$group[match(SAMPLE_ID,meta.data$SAMPLE_ID)]) %>%
+                            mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse")) %>%
+                            filter(tissue %in% tissue_obs_sufficient)
+signatures_table_group
+```
+
+```{r cn_sigs_group_by_tissue_plot}
+cn_sigs_tissueplot1 <- ggplot(signatures_table_group) +
+  geom_point(aes(group,exposure,color=group),
+             position = position_jitterdodge(jitter.width = 0.3),
+             alpha=0.3) +
+  geom_violin(aes(group,exposure,color=group),fill=NA) +
+  geom_signif(aes(group,exposure),
+              comparisons = list(c("diagnosis","relapse")),
+              test = "wilcox.test",vjust = 1.5) +
+  facet_grid(rows = vars(tissue),cols = vars(signature),scales = "free") +
+  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90,vjust = 0.5))
+
+cn_sigs_tissueplot2 <- ggplot(signatures_table_group) +
+  geom_point(aes(tissue,exposure,color=tissue),alpha=0.4) +
+  geom_violin(aes(tissue,exposure,color=tissue),fill=NA) +
+  # geom_signif(aes(tissue,exposure),
+  #             comparisons = list(c("diagnosis","relapse")),
+  #             test = "wilcox.test",vjust = 1.5) +
+  facet_grid(rows = vars(group),cols = vars(signature),scales = "free") +
+  #scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90,vjust = 0.5))
+
+saveRDS(cn_sigs_tissueplot1,file = "plots/cn_sigs_tissue.RDS")
+ggsave(plot = cn_count_tissue_plot,filename = "plots/cn_sigs_tissue.png",width = 10,height = 8,units = "in",dpi = 300)
+cn_sigs_tissueplot1
+```
+
+```{r ith_group_by_tissue}
+ith_table_tissue_group <- ith_table_tissue %>%
+                            filter(tissue %in% tissue_obs_sufficient)
+ith_table_tissue_group
+```
+
+```{r cith_group_by_tissue_plot}
+ith_tissueplot1 <- ggplot(ith_table_tissue_group) +
+  geom_point(aes(group,ith,color=group),
+             position = position_jitterdodge(jitter.width = 0.3),
+             alpha=0.3) +
+  geom_violin(aes(group,ith,color=group),fill=NA) +
+  geom_signif(aes(group,ith),
+              comparisons = list(c("diagnosis","relapse")),
+              test = "wilcox.test",vjust = 1.5) +
+  facet_grid(cols = vars(tissue),scales = "free") +
+  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90,vjust = 0.5))
+
+ith_tissueplot2 <- ggplot(ith_table_tissue_group) +
+  geom_point(aes(tissue,ith,color=tissue),alpha=0.4) +
+  geom_violin(aes(tissue,ith,color=tissue),fill=NA) +
+  # geom_signif(aes(tissue,ith),
+  #             comparisons = list(c("diagnosis","relapse")),
+  #             test = "wilcox.test",vjust = 1.5) +
+  facet_grid(cols = vars(group),scales = "free") +
+  #scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90,vjust = 0.5))
+
+saveRDS(ith_tissueplot1,file = "plots/ith_tissue_strat.RDS")
+ggsave(plot = ith_tissueplot1,filename = "plots/ith_tissue_strat.png",width = 10,height = 8,units = "in",dpi = 300)
+ith_tissueplot1
 ```
 
 ```{r session_info}
