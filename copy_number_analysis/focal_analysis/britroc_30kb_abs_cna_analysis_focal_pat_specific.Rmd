@@ -41,6 +41,142 @@ suppressPackageStartupMessages(suppressWarnings(library(RColorBrewer)))
 source("data/focal_cna_analysis_funcs.R")
 source("data/nbclustfixed.R")
 source("../../colour_palettes.R")
+
+get_paired_genome_diffs <- function(data,method="mean",arx_samples=NULL,rlps_samples=NULL){
+    samples <- colnames(data)
+    sub_meta <- meta.data[meta.data$SAMPLE_ID %in% samples,]
+    sample_by_pat_list <- split(sub_meta$SAMPLE_ID,f=as.factor(sub_meta$PATIENT_ID),drop = T)
+    
+    arxdiffs <- do.call(cbind,lapply(names(sample_by_pat_list),FUN = function(x){
+        pat_name <- x
+        abs_samples <- sub_meta$SAMPLE_ID[sub_meta$PATIENT_ID %in% x]
+        abs_subset <- data[,colnames(data) %in% abs_samples]
+        arx_samps <- colnames(abs_subset)[colnames(abs_subset) %in% arx_samples]
+        abs_arx <- abs_subset[,colnames(abs_subset) %in% arx_samps]
+        abs_arx_bins <- assayDataElement(abs_arx,elt = "segmented")
+        if(method == "mean"){
+            arx_bin <- rowMeans(abs_arx_bins,na.rm = T)
+        } else if(method == "median"){
+            arx_bin <- rowMedians(abs_arx_bins,na.rm = T)
+        } else {
+            stop("unknown method")
+        }
+        return(arx_bin)
+    }))
+    
+    rlpsdiffs <- do.call(cbind,lapply(names(sample_by_pat_list),FUN = function(x){
+        pat_name <- x
+        abs_samples <- sub_meta$SAMPLE_ID[sub_meta$PATIENT_ID %in% x]
+        abs_subset <- data[,colnames(data) %in% abs_samples]
+        rlps_samps <- colnames(abs_subset)[colnames(abs_subset) %in% rlps_samples]
+        abs_rlps <- abs_subset[,colnames(abs_subset) %in% rlps_samps]
+        abs_rlps_bins <- assayDataElement(abs_rlps,elt = "segmented")
+        
+        if(method == "mean"){
+            rlps_bin <- rowMeans(abs_rlps_bins,na.rm = T)
+        } else if(method == "median"){
+            rlps_bin <- rowMedians(abs_rlps_bins,na.rm = T)
+        } else {
+            stop("unknown method")
+        }
+        return(rlps_bin)
+    }))
+    arxdiffs <- data.frame(arxdiffs)
+    colnames(arxdiffs) <- paste0(names(sample_by_pat_list),"_arx")
+    
+    rlpsdiffs <- data.frame(rlpsdiffs) 
+    colnames(rlpsdiffs) <- paste0(names(sample_by_pat_list),"_rlps")
+    
+    diffs <- cbind(arxdiffs,rlpsdiffs)
+    rownames(diffs) <- rownames(data)
+    return(diffs)
+}
+
+getcoordinates <- function(chr, pos, chrom.len) {
+    posflat <- pos
+    offset <- 0
+    for (contig_ix in 1:nrow(chrom.len)) {
+        on_contig <- chr == chrom.len$Group.1[contig_ix]
+        posflat[on_contig] <- pos[on_contig] + offset
+        offset <- offset + chrom.len$x.max[contig_ix]
+    }
+    posflat
+}
+
+plotSegments <- function(object=NULL,pat.name=NULL,cn.max=15){
+    diff_matrix_s <- object[,pat.name]
+    fdfiltfull <- as.data.frame(str_split(string = names(diff_matrix_s),pattern = ":|-",simplify = TRUE))
+    colnames(fdfiltfull) <- c("chromosome","start","end")
+    
+    segTable<-c()
+    for(c in unique(fdfiltfull$chromosome)){
+        snfilt<-diff_matrix_s[fdfiltfull$chromosome==c]
+        fdfilt<-fdfiltfull[fdfiltfull$chromosome==c,]
+        sn.rle<-rle(snfilt)
+        starts <- cumsum(c(1, sn.rle$lengths[-length(sn.rle$lengths)]))
+        ends <- cumsum(sn.rle$lengths)
+        lapply(1:length(sn.rle$lengths), function(s) {
+          from <- fdfilt$start[starts[s]]
+          to <- fdfilt$end[ends[s]]
+          segValue <- sn.rle$value[s]
+          c(fdfilt$chromosome[starts[s]], from, to, segValue)
+        }) -> segtmp
+        segTableRaw <- data.frame(matrix(unlist(segtmp), ncol=4, byrow=T),stringsAsFactors=F)
+        segTable<-rbind(segTable,segTableRaw)
+    }
+    colnames(segTable) <- c("chromosome", "start", "end", "segVal")
+    segTable$chromosome <- factor(segTable$chromosome,levels = stringr::str_sort(unique(segTable$chromosome),numeric = T))
+    segTable <- segTable[order(segTable$chromosome,segTable$start),]
+
+    segTab <- segTable
+    
+    if(max(segTab$segVal) > cn.max){
+        segTab$segVal[segTab$segVal > cn.max] <- cn.max
+        ylim <- c(-cn.max,cn.max)
+    } else {
+        ylim <- c(-round(max(segTab$segVal))-1,round(max(segTab$segVal))+1)
+    }
+    
+    seg.n <- nrow(segTab)
+    chrom.len <- data.frame(Group.1=unique(segTab$chromosome))
+    chrom.len$x.max <- stats::aggregate(segTab$end,by = list(segTab$chromosome),FUN = max)$x
+    chrom.len$x.min <- stats::aggregate(segTab$start,by = list(segTab$chromosome),FUN = min)$x
+    chrom.len$Group.1 <- factor(chrom.len$Group.1,levels = stringr::str_sort(unique(chrom.len$Group.1),numeric = T))
+    chrom.len <- chrom.len[order(chrom.len$Group.1),]
+
+    segTab$startf <- getcoordinates(chr = segTab$chromosome,pos = segTab$start,chrom.len = chrom.len)
+    segTab$endf <- getcoordinates(chr = segTab$chromosome,pos = segTab$end,chrom.len = chrom.len)
+    chrom.len$flatm <- getcoordinates(chr = chrom.len$Group.1,pos = chrom.len$x.min,chrom.len = chrom.len)
+    chrom.len$flats <- getcoordinates(chr = chrom.len$Group.1,pos = chrom.len$x.max/2,chrom.len = chrom.len)
+    chrom.len$flate <- getcoordinates(chr = chrom.len$Group.1,pos = chrom.len$x.max,chrom.len = chrom.len)
+
+    title <- pat.name
+    sub.title <- paste0("segments: ",seg.n)
+    rect.col <- ifelse(seq_along(chrom.len$Group.1) %% 2 == 0,"white","grey95")
+
+    graphics::par(mar=c(5, 4, 4, 4) + 0.2)
+    graphics::plot(NA,
+         xlab="chromosome",
+         ylab="copy number change",
+         las=1,
+         xlim=c(min(chrom.len$flatm), max(chrom.len$flate)),
+         ylim=ylim,
+         xaxs="i",
+         xaxt="n",
+         yaxp=c(ylim[1], ylim[2], ylim[2]-ylim[1]),
+         yaxs="i")
+    graphics::rect(xleft = chrom.len$flatm,
+         xright = chrom.len$flate,
+         ybottom = -100,ytop = 100,
+         col=rect.col,
+         border = NA)
+    graphics::axis(1, at=chrom.len$flats, labels=chrom.len$Group.1)
+    graphics::box()
+    graphics::mtext(side=3, line=2, at=-0.07, adj=0, cex=1.2, title)
+    graphics::mtext(side=3, line=1, at=-0.07, adj=0, cex=1, sub.title)
+    graphics::abline(h = seq.int(round(min(segTab$segVal))-1,cn.max,1),lty="dashed",col="gray50")
+    graphics::segments(x0 = segTab$startf,y0 = segTab$segVal,x1 = segTab$endf,y1 = segTab$segVal,lwd=3,col="blue")
+}
 ```
 
 ## Load data
@@ -61,7 +197,14 @@ ploidy_change_samples <- unique(ploidy_change_samples$PATIENT_ID)
 
 #signatures
 sig.exposures <- read.table("../../copy_number_signatures/britroc_30kb_signature_data_sig_exposures.tsv",header = TRUE,sep = "\t")
-
+colnames(sig.exposures) <- gsub(colnames(sig.exposures),pattern = "\\.",replacement = "-")
+signature.table <- sig.exposures %>%
+                     #rownames_to_column(var = "signature") %>%
+                     pivot_longer(cols = 2:ncol(.),names_to = "SAMPLE_ID",values_to = "exposure") %>%
+                     mutate(PATIENT_ID = meta.data$PATIENT_ID[match(SAMPLE_ID,meta.data$SAMPLE_ID)]) %>%
+                     mutate(group = meta.data$group[match(SAMPLE_ID,meta.data$SAMPLE_ID)]) %>%
+                     mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse")) %>%
+                     rename("signature"="rowname")
 #ith
 ith <- read.table("../heterogeneity/data/ith_results_table.tsv",header = TRUE,sep = "\t")
 
@@ -266,6 +409,7 @@ saveRDS(pairs_plot,file = "plots/gene_pairs_plot.RDS")
 png(filename = "plots/gene_pairs_plot.png",width = 10,height = 8,units = "in",res = 300)
 pairs(cor_data,upper.panel = panel.lm,lower.panel = panel.cor,cex.labels = 0.75)
 dev.off()
+pairs(cor_data,upper.panel = panel.lm,lower.panel = panel.cor,cex.labels = 0.75)
 ```
 
 ```{r change_cor_mat_all_genes}
@@ -357,18 +501,17 @@ draw(hmPlot)
 dev.off()
 ```
 
-```{r umap}
+```{r gene_change_umap_and_kclusts}
+
 umap.data <- umap(cor_data_all_sub)
 
-ggplot(as.data.frame(umap.data$layout)) +
+u1 <- ggplot(as.data.frame(umap.data$layout)) +
   geom_point(aes(umap.data$layout[,1],umap.data$layout[,2])) +
   xlab("dim 1") +
   ylab("dim 2") +
-  labs(title = "Gene change UMAP") +
+  labs(title = "UMAP") +
   theme_bw()
-```
 
-```{r heatmap_all_genes_sub_noPloidyChange}
 kclust.est <- data.frame("clusters"=as.numeric(),"tot.withinss"=as.numeric())
 for(i in 1:10){
   n <- c()
@@ -376,23 +519,92 @@ for(i in 1:10){
   kclust.est <- rbind(kclust.est,data.frame("clusters"=i,"tot.withinss"=n))
 }
 
-ggplot(kclust.est) +
+u2 <- ggplot(kclust.est) +
   geom_point(aes(clusters,tot.withinss)) +
   geom_line(aes(clusters,tot.withinss)) +
+  xlab("cluster") +
+  ylab("total within sum of squares") +
+  labs(title = "K optimisation") +
   theme_bw()
 
 kmean.clust <- kmeans(cor_data_all_sub,centers = 6)
 
-ggplot(as.data.frame(umap.data$layout)) +
+u3 <- ggplot(as.data.frame(umap.data$layout)) +
   geom_point(aes(umap.data$layout[,1],umap.data$layout[,2],color = as.factor(kmean.clust$cluster))) +
   xlab("dim 1") +
   ylab("dim 2") +
-  labs(title = "Gene change UMAP") +
-  theme_bw()
+  labs(title = "clusterd UMAP") +
+  scale_color_discrete(name = "cluster") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+umap_legend <- get_legend(
+  u3 + 
+    guides(color = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+umap_plot <- plot_grid(u1,plot_grid(u2,u3,ncol = 2,labels = c("B","C")),umap_legend,nrow = 3,labels = c("A","",""),rel_heights = c(0.45,0.45,0.1))
+
+saveRDS(umap_plot,file = "plots/umap_plot.RDS")
+ggsave(plot = umap_plot,filename = "plots/umap_plot.png",width = 6,height = 6,units = "in",dpi = 300)
+umap_plot
+```
+
+```{r recalc_paired_diffs}
+paired_diffs <- get_paired_genome_diffs(data = abs_data[,colnames(abs_data) %in% meta.data$SAMPLE_ID[meta.data$paired == "TRUE"]],
+                                        method = "median",
+                                        arx_samples = meta.data$SAMPLE_ID[meta.data$paired == T & meta.data$group == "arx"],
+                                        rlps_samples = meta.data$SAMPLE_ID[meta.data$paired == T & meta.data$group == "rlps"]
+                                        )
+paired_diffs[paired_diffs <= 0] <- 0.0005
+diff_matrix <- as.matrix(paired_diffs[,c(((ncol(paired_diffs)/2)+1):ncol(paired_diffs))]) - as.matrix(paired_diffs[,1:(ncol(paired_diffs)/2)])
+colnames(diff_matrix) <- gsub(colnames(diff_matrix),pattern = "_rlps",replacement = "")
 ```
 
 ```{r patient_vignettes}
+norm_paired_changes_all <- norm_paired_changes_all %>%
+                            mutate(ploidy_changed = ifelse(PATIENT_ID %in% ploidy_change_samples,"changed","unchanged")) %>%
+                            arrange(change) %>%
+                            filter(ploidy_changed == "unchanged") %>%
+                            mutate(chr = protein_coding_genes$chromosome_name[match(gene,protein_coding_genes$hgnc_symbol)])
+norm_paired_changes_all
+```
 
+```{r patient_vignettes_2}
+get_patient_vig <- function(diff_matrix = NULL,pat.name = NULL){
+  pat.name <<- pat.name
+  seg_formula <- ~{
+  plotSegments(object = diff_matrix,pat.name = pat.name)
+  }
+  seg_plot <- ggdraw(seg_formula)
+  
+  gene_p1 <- ggplot(norm_paired_changes[norm_paired_changes$PATIENT_ID == pat.name,]) +
+    geom_col(aes(gene,change)) +
+    theme_bw() + theme(axis.text.x = element_text(angle = 90))
+  
+  ith_p2 <- ggplot() +
+              geom_jitter(data = ith[ith$patient != pat.name,],aes(group,ith,colour=group),
+                          alpha=0.4,
+                          position = position_dodge2(width = 0.4)) +
+              scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+              geom_point(data = ith[ith$patient == pat.name,],aes(group,ith),colour="red") +
+              theme_bw()
+  
+  sig_p3 <- ggplot() +
+              geom_jitter(data = signature.table[signature.table$PATIENT_ID != pat.name,],aes(group,exposure,colour=group),
+                          alpha=0.4,
+                          position = position_dodge2(width = 0.4)) +
+              scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+              geom_point(data = signature.table[signature.table$PATIENT_ID == pat.name,],aes(group,exposure),colour="red") +
+              facet_wrap(. ~ signature,nrow = 1) +
+              theme_bw() + theme(legend.position = "none",axis.text.x = element_text(angle = 90))
+  
+  pat_vig <- plot_grid(seg_plot,gene_p1,sig_p3,nrow=3,rel_heights = c(0.5,0.25,0.25),axis = "r",align = "h")
+  return(pat_vig)
+}
+
+pat_vig_36 <- get_patient_vig(diff_matrix = diff_matrix,pat.name = "BRITROC-36")
+ggsave(plot = pat_vig_36,filename = "plots/pat_vig_36.png",height = 10,width = 8,dpi = 300,units = "in")
 ```
 
 - Plot gene per chromosome from most variable subset and GOterm analysis
