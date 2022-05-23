@@ -299,7 +299,7 @@ pat_ordering <- norm_paired_changes %>%
 norm_paired_changes$PATIENT_ID <- factor(norm_paired_changes$PATIENT_ID,
                                          levels = as.character(rev(pat_ordering$PATIENT_ID)))
 
-ggplot(norm_paired_changes) +
+norm_paired_changes_plot <- ggplot(norm_paired_changes) +
   geom_hline(yintercept = 0) +
   geom_col(aes(x = PATIENT_ID,y = change,group = gene,fill=ifelse(PATIENT_ID %in% ploidy_change_samples,"changed","unchanged"))) +
   facet_wrap(. ~ gene,scales = "free_y",ncol = 3) +
@@ -308,6 +308,10 @@ ggplot(norm_paired_changes) +
   scale_fill_manual(name = "ploidy change",values = c("firebrick2","grey50")) +
   theme_bw() +
   theme(axis.text.x = element_blank(),axis.ticks = element_blank())
+
+ggsave(plot = norm_paired_changes_plot,filename = "plots/norm_paired_changes_plot.png",width = 8,height = 8,units = "in",dpi = 300)
+ggsave(plot = norm_paired_changes_plot,filename = "plots/norm_paired_changes_plot.pdf",width = 8,height = 8,units = "in",dpi = 300)
+norm_paired_changes_plot
 ```
 
 ```{r normalised_changes_stats_genelist}
@@ -370,6 +374,7 @@ p1_formula <- ~{
 corr_plot <- ggdraw(p1_formula)
 saveRDS(corr_plot,file = "plots/gene_corr_plot.RDS")
 ggsave(plot = corr_plot,filename = "plots/gene_corr_plot.png",width = 8,height = 8,units = "in",dpi = 300)
+ggsave(plot = corr_plot,filename = "plots/gene_corr_plot.pdf",width = 8,height = 8,units = "in",dpi = 300)
 corr_plot
 ```
 
@@ -409,6 +414,11 @@ saveRDS(pairs_plot,file = "plots/gene_pairs_plot.RDS")
 png(filename = "plots/gene_pairs_plot.png",width = 10,height = 8,units = "in",res = 300)
 pairs(cor_data,upper.panel = panel.lm,lower.panel = panel.cor,cex.labels = 0.75)
 dev.off()
+
+pdf(file = "plots/gene_pairs_plot.pdf",width = 10,height = 8)
+pairs(cor_data,upper.panel = panel.lm,lower.panel = panel.cor,cex.labels = 0.75)
+dev.off()
+
 pairs(cor_data,upper.panel = panel.lm,lower.panel = panel.cor,cex.labels = 0.75)
 ```
 
@@ -547,6 +557,7 @@ umap_plot <- plot_grid(u1,plot_grid(u2,u3,ncol = 2,labels = c("B","C")),umap_leg
 
 saveRDS(umap_plot,file = "plots/umap_plot.RDS")
 ggsave(plot = umap_plot,filename = "plots/umap_plot.png",width = 6,height = 6,units = "in",dpi = 300)
+ggsave(plot = umap_plot,filename = "plots/umap_plot.pdf",width = 6,height = 6,units = "in",dpi = 300)
 umap_plot
 ```
 
@@ -604,7 +615,6 @@ get_patient_vig <- function(diff_matrix = NULL,pat.name = NULL){
 }
 
 pat_vig_36 <- get_patient_vig(diff_matrix = diff_matrix,pat.name = "BRITROC-36")
-ggsave(plot = pat_vig_36,filename = "plots/pat_vig_36.png",height = 10,width = 8,dpi = 300,units = "in")
 ```
 
 - Plot gene per chromosome from most variable subset and GOterm analysis

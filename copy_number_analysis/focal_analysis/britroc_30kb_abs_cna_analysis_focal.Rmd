@@ -171,6 +171,7 @@ save_plot(filename = "plots/CNA_rates_primary_clinrelgenes.png",plot = p2)
 save_plot(filename = "plots/CNA_rates_relapse_clinrelgenes.png",plot = p3)
 all_rates <- plot_grid(p1 + labs(title = ""),p2 + labs(title = ""),p3 + labs(title = ""),labels = c("A","B","C"))
 ggsave2(filename = "plots/CNA_all_rates.png",plot = all_rates,width = 8,height = 6,units = "in",dpi = 300)
+ggsave2(filename = "plots/CNA_all_rates.pdf",plot = all_rates,width = 8,height = 6,units = "in",dpi = 300)
 all_rates
 ```
 
@@ -202,7 +203,7 @@ cp <- ggplot(combined_rates) +
 
 saveRDS(object = cp,file = "plots/combined_rate_plot_CNA.RDS")
 ggsave(filename = "plots/combined_rate_plot_CNA.png",plot = cp,width = 8,height = 6,units = "in",dpi = 300)
-
+ggsave(filename = "plots/combined_rate_plot_CNA.pdf",plot = cp,width = 8,height = 6,units = "in",dpi = 300)
 cp
 ```
 
@@ -239,6 +240,7 @@ fishers_gene_CNA(data = cna_calls,
 
 saveRDS(object = cp,file = "plots/rlps_pt_rate_plot_CNA.png",)
 ggsave(plot = cp,filename = "plots/rlps_pt_rate_plot_CNA.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = cp,filename = "plots/rlps_pt_rate_plot_CNA.pdf",width = 8,height = 6,units = "in",dpi = 300)
 cp
 ```
 
@@ -266,6 +268,7 @@ amp_del_gene_plot <- ggplot(data = combined_rates) +
 
 saveRDS(object = amp_del_gene_plot,file = "plots/amp_del_gene_plot_CNA.RDS",)
 ggsave(plot = amp_del_gene_plot,filename = "plots/amp_del_gene_plot_CNA.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = amp_del_gene_plot,filename = "plots/amp_del_gene_plot_CNA.pdf",width = 8,height = 6,units = "in",dpi = 300)
 amp_del_gene_plot
 ```
 
@@ -306,6 +309,7 @@ britroc_tcga_comp_raw <- ggplot(tcga_total_comparison) +
 
 saveRDS(object = britroc_tcga_comp_raw,file = "plots/britroc_tcga_comp_raw.RDS",)
 ggsave(plot = britroc_tcga_comp_raw,filename = "plots/britroc_tcga_comp_raw.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = britroc_tcga_comp_raw,filename = "plots/britroc_tcga_comp_raw.pdf",width = 8,height = 6,units = "in",dpi = 300)
 britroc_tcga_comp_raw
 ```
 
@@ -334,6 +338,7 @@ britroc_tcga_comp_norm <- ggplot(tcga_total_comparison_norm) +
 
 saveRDS(object = britroc_tcga_comp_norm,file = "plots/britroc_tcga_comp_norm.RDS",)
 ggsave(plot = britroc_tcga_comp_norm,filename = "plots/britroc_tcga_comp_norm.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = britroc_tcga_comp_norm,filename = "plots/britroc_tcga_comp_norm.pdf",width = 8,height = 6,units = "in",dpi = 300)
 britroc_tcga_comp_norm
 ```
 
@@ -410,6 +415,7 @@ prior_line_plot2 <- ggplot(prior_lines_freq) +
 
 #prior_lines_cna_focal_plot <- plot_grid(prior_line_plot1,prior_line_plot2,nrow = 2)
 ggsave2(filename = "plots/prior_lines_cna_focal_plot.png",plot = prior_line_plot1,width = 8,height = 8,units = "in",dpi = 300)
+ggsave2(filename = "plots/prior_lines_cna_focal_plot.pdf",plot = prior_line_plot1,width = 8,height = 8,units = "in",dpi = 300)
 prior_line_plot1
 prior_line_plot2
 ```
@@ -460,6 +466,7 @@ prior_paired_line_plot2 <- ggplot(prior_paired_lines_freq) +
 
 #prior_paired_lines_cna_focal_plot <- plot_grid(prior_paired_line_plot1,prior_paired_line_plot2,nrow = 2)
 ggsave2(filename = "plots/prior_paired_lines_cna_focal_paired_plot.png",plot = prior_paired_line_plot1,width = 8,height = 8,units = "in",dpi = 300)
+ggsave2(filename = "plots/prior_paired_lines_cna_focal_paired_plot.pdf",plot = prior_paired_line_plot1,width = 8,height = 8,units = "in",dpi = 300)
 prior_paired_line_plot1
 prior_paired_line_plot2
 ```
@@ -469,6 +476,10 @@ prior_lines_cna_focal_plot <- plot_grid(prior_line_plot1,prior_paired_line_plot1
 ggsave2(plot = prior_lines_cna_focal_plot,
         filename = "plots/prior_paired_lines_combined_plot.png",
         height = 8,width = 10,units = "in",dpi = 300)
+ggsave2(plot = prior_lines_cna_focal_plot,
+        filename = "plots/prior_paired_lines_combined_plot.pdf",
+        height = 8,width = 10,units = "in",dpi = 300)
+
 prior_lines_cna_focal_plot
 ```
 
@@ -512,7 +523,7 @@ ggsave(plot = copy_state_groups,filename = "plots/copy_state_groups.png",width =
 copy_state_groups
 
 pats <- unique(meta.data$PATIENT_ID[meta.data$paired == TRUE])[12:16]
-ggplot(paired_amp_changes[paired_amp_changes$PATIENT_ID %in% pats,]) +
+paired_amp_changes_plot <- ggplot(paired_amp_changes[paired_amp_changes$PATIENT_ID %in% pats,]) +
   geom_point(aes(x=gene,y=value,color=group)) +
   scale_color_manual(values = colour_palettes$diagnosis_relapse) +
   coord_flip() +
@@ -521,6 +532,10 @@ ggplot(paired_amp_changes[paired_amp_changes$PATIENT_ID %in% pats,]) +
              ncol = ceiling(sqrt(length(unique(paired_amp_changes$PATIENT_ID)))),
              scales = "free") +
   theme_bw()
+
+ggsave(plot = paired_amp_changes_plot,filename = "plots/paired_amp_changes_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = paired_amp_changes_plot,filename = "plots/paired_amp_changes_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
+paired_amp_changes_plot
 ```
 
 #### Mann-Whitney amplification magnitude - paired
@@ -594,69 +609,23 @@ meta.data.prior <- meta.data %>%
                     filter(paired == "TRUE") %>%
                     mutate(prior_lines = patient_data$pre_reg_chemo[match(PATIENT_ID,paste0("BRITROC-",patient_data$britroc_number))])
 
-paired_amp_changes$prior_lines <- patient_data$pre_reg_chemo[match(paired_amp_changes$PATIENT_ID,paste0("BRITROC-",patient_data$britroc_number))]
+norm_amp_changes$prior_lines <- patient_data$pre_reg_chemo[match(norm_amp_changes$PATIENT_ID,paste0("BRITROC-",patient_data$britroc_number))]
 
+norm_amp_changes$prior_lines <- as.factor(norm_amp_changes$prior_lines)
 
-unique(paired_amp_changes$PATIENT_ID[which(is.na(patient_data$pre_reg_chemo[match(paired_amp_changes$PATIENT_ID,paste0("BRITROC-",patient_data$britroc_number))]))])
-unique(paired_amp_changes$PATIENT_ID[which(is.na(patient_data$pre_reg_chemo[match(paired_amp_changes$PATIENT_ID,paste0("BRITROC-",patient_data$britroc_number))]))])
-unique(paired_amp_changes$PATIENT_ID[which(is.na(patient_data$pre_reg_chemo[match(paired_amp_changes$PATIENT_ID,paste0("BRITROC-",patient_data$britroc_number))]))])
-unique(paired_amp_changes$PATIENT_ID[which(is.na(patient_data$pre_reg_chemo[match(paired_amp_changes$PATIENT_ID,paste0("BRITROC-",patient_data$britroc_number))]))])
-unique(paired_amp_changes$PATIENT_ID[which(is.na(patient_data$pre_reg_chemo[match(paired_amp_changes$PATIENT_ID,paste0("BRITROC-",patient_data$britroc_number))]))])
-
-ggplot(paired_amp_changes[paired_amp_changes$group == "relapse",]) +
-  geom_boxplot(aes(x = gene,y = value,fill=as.factor(prior_lines)),position = "dodge") +
+gene_change_prior_lines <- ggplot(norm_amp_changes) +
+  geom_point(aes(x = prior_lines,y = change,color=prior_lines),position = position_dodge2(width = 0.4)) +
+  geom_boxplot(aes(x = prior_lines,y = change,fill=prior_lines),alpha=0.3,position = "dodge") +
   facet_wrap(. ~ gene,scales = "free")
 
+ggsave(plot = gene_change_prior_lines,filename = "plots/gene_change_prior_lines_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = gene_change_prior_lines,filename = "plots/gene_change_prior_lines_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
+gene_change_prior_lines
 ```
 
 ### Sub amplification changes
 
 - Investigation of CNA amplification numbers between "diploid" and "amplified"
-
-#### GO analysis - Amp change
-
-- Explore whole gene set changes and enrichment analysis
-
-```{r go_setup_paired}
-## GO analysis
-# GO.ids <- mapIds(x = org.Hs.eg.db,keys = as.character(cna_copies_results_paired$Gene[!is.na(cna_copies_results_paired$pVal)]),keytype = "SYMBOL",column = "GO",multiVals = "list")
-# geneL <- cna_copies_results_paired$pVal[!is.na(cna_copies_results_paired$pVal)]
-# names(geneL) <- as.character(cna_copies_results_paired$Gene[!is.na(cna_copies_results_paired$pVal)])
-# GOdata <- new("topGOdata",
-#               ontology = "BP",
-#               allGenes = geneL,
-#               geneSel = geneSelection,
-#               annot = annFUN.gene2GO,
-#               gene2GO = GO.ids,
-#               nodeSize = 5)
-```
-
-```{r go_output_paired}
-# resultFisher <- runTest(GOdata, algorithm = "classic", statistic = "fisher")
-# allRes <- GenTable(GOdata,Fisher = resultFisher,topNodes = 500,numChar = 500)
-# kable(allRes) %>% kable_styling() %>% scroll_box(height = "200px")
-```
-
-```{r go_setup}
-## GO analysis
-# GO.ids <- mapIds(x = org.Hs.eg.db,keys = as.character(cna_copies_results$Gene[!is.na(cna_copies_results$pVal)]),keytype = "SYMBOL",column = "GO",multiVals = "list")
-# geneL <- cna_copies_results$pVal[!is.na(cna_copies_results$pVal)]
-# names(geneL) <- as.character(cna_copies_results$Gene[!is.na(cna_copies_results$pVal)])
-# GOdata <- new("topGOdata",
-#               ontology = "BP",
-#               allGenes = geneL,
-#               geneSel = geneSelection,
-#               annot = annFUN.gene2GO,
-#               gene2GO = GO.ids,
-#               nodeSize = 5)
-```
-
-```{r go_output}
-# resultFisher <- runTest(GOdata, algorithm = "classic", statistic = "fisher")
-# allRes <- GenTable(GOdata,Fisher = resultFisher,topNodes = 500,numChar = 500)
-# kable(allRes) %>% kable_styling() %>% scroll_box(height = "200px")
-```
-
 
 ## Session info
 

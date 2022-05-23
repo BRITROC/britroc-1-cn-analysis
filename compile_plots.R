@@ -109,9 +109,7 @@ tissue_legend_strat <- get_legend(
 ## Figure 3
 fig3 <- plot_grid(substraction_plot,focal_rates_clinic,labels = c("A","B"),nrow = 2)
 ggsave2(filename = "plots/figure_3_render.png",plot = fig3,width = 11,height = 8,units = "in",dpi = 300)
-pdf(file = "plots/figure_3_pdf_render.pdf",width = 11,height = 8)
-fig3
-dev.off()
+ggsave2(filename = "plots/figure_3_render.pdf",plot = fig3,width = 11,height = 8,units = "in",dpi = 300)
 
 ## Figure 4
 
@@ -119,7 +117,8 @@ fig4 <- plot_grid(signature_stacked_all,sig_box_wilcox,plot_grid(sig_legend_a,si
                   nrow = 3,
                   rel_heights = c(1,1,0.1),
                   labels = c("A","B"))
-ggsave2(filename = "plots/figure_4_render.png",plot = fig4,width = 10,height = 11,units = "in",dpi = 300)  
+ggsave2(filename = "plots/figure_4_render.png",plot = fig4,width = 10,height = 11,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_4_render.pdf",plot = fig4,width = 10,height = 11,units = "in",dpi = 300)
 
 ## Figure 5
 fig5 <- plot_grid(plot_grid(signature_paired_line,
@@ -128,7 +127,8 @@ fig5 <- plot_grid(plot_grid(signature_paired_line,
                   rel_heights = c(0.4,0.6),
                   labels = c("A","")),nrow = 2,
                   plot_grid(sig_legend_a,sig_legend_b,ncol = 2,labels = c("","")),rel_heights = c(1,0.1))
-ggsave2(filename = "plots/figure_5_render.png",plot = fig5,width = 10,height = 9,units = "in",dpi = 300)  
+ggsave2(filename = "plots/figure_5_render.png",plot = fig5,width = 10,height = 9,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_5_render.pdf",plot = fig5,width = 10,height = 9,units = "in",dpi = 300)
 
 ## Supplemental - TCGA-Britroc focal rate comparison 
 britroc_tcga_comp_raw <- readRDS("copy_number_analysis/focal_analysis/plots/britroc_tcga_comp_raw.RDS")
@@ -138,7 +138,8 @@ britroc_tcga_comp_norm <- readRDS("copy_number_analysis/focal_analysis/plots/bri
 britroc_tcga_comp_norm <- britroc_tcga_comp_norm +
                            labs(title = "") + theme(legend.position = "bottom")
 sup_plot_britroc_tcga_rates <- plot_grid(britroc_tcga_comp_raw,britroc_tcga_comp_norm,nrow = 2,labels = c("A","B"))
-ggsave2(filename = "plots/supplemental_figure_tcga_britroc_rates.png",plot = sup_plot_britroc_tcga_rates,width = 8,height = 8,units = "in",dpi = 300)  
+ggsave2(filename = "plots/supplemental_figure_tcga_britroc_rates.png",plot = sup_plot_britroc_tcga_rates,width = 8,height = 8,units = "in",dpi = 300)
+ggsave2(filename = "plots/supplemental_figure_tcga_britroc_rates.pdf",plot = sup_plot_britroc_tcga_rates,width = 8,height = 8,units = "in",dpi = 300)
 
 ## Supplemental - tissue 1
 tissue_supplemental1 <- plot_grid(plot_grid(plot_grid(cna_tissue_counts,labels = c("A",""),
@@ -147,6 +148,7 @@ tissue_supplemental1 <- plot_grid(plot_grid(plot_grid(cna_tissue_counts,labels =
                               plot_grid(tissue_legend_b,tissue_legend_a),nrow = 2,rel_heights = c(1,0.1))
 
 ggsave2(filename = "plots/tissue_supplemental1.png",plot = tissue_supplemental1,width = 10,height = 12,units = "in",dpi = 300)
+ggsave2(filename = "plots/tissue_supplemental1.pdf",plot = tissue_supplemental1,width = 10,height = 12,units = "in",dpi = 300)
 
 ## Supplemental - tissue 2
 tissue_supplemental2 <- plot_grid(plot_grid(cn_tissue_counts_strat,
@@ -157,4 +159,5 @@ tissue_supplemental2 <- plot_grid(plot_grid(cn_tissue_counts_strat,
           nrow = 2,
           rel_heights = c(1,0.1))
 
-ggsave2(filename = "plots/tissue_supplemental2.png",plot = tissue_supplemental2,width = 10,height = 12,units = "in",dpi = 300)  
+ggsave2(filename = "plots/tissue_supplemental2.png",plot = tissue_supplemental2,width = 10,height = 12,units = "in",dpi = 300)
+ggsave2(filename = "plots/tissue_supplemental2.pdf",plot = tissue_supplemental2,width = 10,height = 12,units = "in",dpi = 300)

@@ -244,5 +244,10 @@ sum_plot <- ggplot() +
 
 sum_plot
 saveRDS(object = sum_plot,file = "plots/cohort_plot.RDS")
-ggsave(filename = "plots/cohort_summary_plot.png",plot = sum_plot,device = "png",width = 12,height = 9,dpi = "retina",units = "in")
+ggsave(filename = "plots/cohort_summary_plot.png",plot = sum_plot,device = "png",width = 12,height = 9,dpi = 300,units = "in")
+ggsave(filename = "plots/cohort_summary_plot.pdf",plot = sum_plot,device = "pdf",width = 12,height = 9,dpi = 300,units = "in")
+```
+
+```{r sessioninfo}
+sessionInfo()
 ```

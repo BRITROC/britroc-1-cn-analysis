@@ -138,6 +138,7 @@ genome_plot <- ggplot(bin_cna[bin_cna$cna != "neutral",]) +
         legend.position = "bottom")
 
 ggsave("plots/cna_freq_plot.png",plot = genome_plot,device = "png",width = 12,height = 6,units = "in",dpi = 300)
+ggsave("plots/cna_freq_plot.pdf",plot = genome_plot,device = "pdf",width = 12,height = 6,units = "in",dpi = 300)
 genome_plot
 ```
 
@@ -215,6 +216,12 @@ ggsave(filename = "plots/genome_paired_substractionPlot.png",
        height = 6,
        units = "in",
        dpi = 300)
+ggsave(filename = "plots/genome_paired_substractionPlot.pdf",
+       plot = p,
+       width = 12,
+       height = 6,
+       units = "in",
+       dpi = 300)
 ```
 
 ```{r substraction_stats}
@@ -278,6 +285,7 @@ segs_paired <- ggplot(seg_paired_long) +
   theme_bw()
 segs_paired
 ggsave(plot = segs_paired,filename = "plots/seg_counts_paired.png",width = 5,height = 7,units = "in",dpi = 300)
+ggsave(plot = segs_paired,filename = "plots/seg_counts_paired.pdf",width = 5,height = 7,units = "in",dpi = 300)
 ```
 
 ```{r plot_segs_pt}
@@ -296,6 +304,7 @@ segs_paired_pt <- ggplot(seg_paired_long) +
   theme(legend.position = "bottom")
 segs_paired_pt
 ggsave(plot = segs_paired_pt,filename = "plots/seg_counts_pt_paired.png",width = 5,height = 7,units = "in",dpi = 300)
+ggsave(plot = segs_paired_pt,filename = "plots/seg_counts_pt_paired.pdf",width = 5,height = 7,units = "in",dpi = 300)
 ```
 
 ```{r segs_corr}
@@ -318,6 +327,7 @@ seg_plot <- cowplot::plot_grid(plot_grid(segs_paired+theme(legend.position = "no
 seg_plot
 seg.kenall
 ggsave2(plot = seg_plot,filename = "plots/segments_combined_plot.png",width = 6,height = 7,units = "in",dpi = 300)
+ggsave2(plot = seg_plot,filename = "plots/segments_combined_plot.pdf",width = 6,height = 7,units = "in",dpi = 300)
 ```
 
 Re-testing the segment count distribution across all samples, without accounting for pairing, also confirmed that no coordinated change in segment counts occur between primary and relapse tumours.
@@ -384,7 +394,11 @@ ploidy_pt_plot <- ggplot(ploidy_summary[!is.na(ploidy_summary$platinum_status),]
   xlab("") +
   theme_bw() +
   theme(legend.position = "bottom")
-  
+
+ggsave(plot = ploidy_plot,filename = "plots/ploidy_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = ploidy_plot,filename = "plots/ploidy_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = ploidy_pt_plot,filename = "plots/ploidy_pt_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = ploidy_pt_plot,filename = "plots/ploidy_pt_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
 ploidy_plot
 ploidy_pt_plot
 ```
@@ -421,6 +435,11 @@ ploidy_paired_pt_plot <- ggplot(ploidy_summary_paired) +
   theme_bw() +
   theme(legend.position = "bottom")
 
+ggsave(plot = ploidy_paired_plot,filename = "plots/ploidy_paired_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = ploidy_paired_plot,filename = "plots/ploidy_paired_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = ploidy_paired_pt_plot,filename = "plots/ploidy_paired_pt_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = ploidy_paired_pt_plot,filename = "plots/ploidy_paired_pt_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
+
 ploidy_paired_plot
 ploidy_paired_pt_plot
 ```
@@ -441,9 +460,7 @@ legend_b <- get_legend(
 
 ploidy_plots <- plot_grid(prow, legend_b, ncol = 1, rel_heights = c(1, .1))
 ggsave2(filename = "plots/ploidy_plots.png",plot = ploidy_plots,width = 8,height = 8,units = "in",dpi = 300)
-pdf(file = "plots/ploidy_plots.pdf",width = 9,height = 8)
-ploidy_plots
-dev.off()
+ggsave2(filename = "plots/ploidy_plots.pdf",plot = ploidy_plots,width = 8,height = 8,units = "in",dpi = 300)
 ploidy_plots
 ```
 
@@ -528,6 +545,11 @@ purity_pt_plot <- ggplot(purity_summary[!is.na(purity_summary$platinum_status),]
   xlab("") +
   theme_bw() +
   theme(legend.position = "bottom")
+
+ggsave(plot = purity_plot,filename = "plots/purity_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = purity_plot,filename = "plots/purity_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = purity_pt_plot,filename = "plots/purity_pt_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = purity_pt_plot,filename = "plots/purity_pt_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
   
 purity_plot
 purity_pt_plot
@@ -563,6 +585,11 @@ purity_paired_pt_plot <- ggplot(purity_summary_paired) +
   theme_bw() +
   theme(legend.position = "bottom")
 
+ggsave(plot = purity_paired_plot,filename = "plots/purity_paired_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = purity_paired_plot,filename = "plots/purity_paired_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = purity_paired_pt_plot,filename = "plots/purity_paired_pt_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = purity_paired_pt_plot,filename = "plots/purity_paired_pt_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
+
 purity_paired_plot
 purity_paired_pt_plot
 ```
@@ -583,6 +610,7 @@ legend_b <- get_legend(
 
 purity_plots <- plot_grid(prow, legend_b, ncol = 1, rel_heights = c(1, .1))
 ggsave2(filename = "plots/purity_plots.png",plot = purity_plots,width = 8,height = 8,units = "in",dpi = 300)
+ggsave2(filename = "plots/purity_plots.pdf",plot = purity_plots,width = 8,height = 8,units = "in",dpi = 300)
 purity_plots
 ```
 
@@ -623,6 +651,7 @@ CNA_events_mean
 
 CNA_events <- CNA_events %>%
                 pivot_longer(cols = 3:5)
+
 CNA_events$platinum_treatment <- clinical.data$pt_sensitivity_at_reg[match(CNA_events$patient,paste0("BRITROC-",clinical.data$britroc_number))]
 
 cnv_event_means_broad(data = CNA_events) +
@@ -679,10 +708,22 @@ ggsave(filename = "plots/cnv_event_means_broad_paired.png",
        height = 6,
        units = "in",
        dpi = 300)
+ggsave(filename = "plots/cnv_event_means_broad_paired.pdf",
+       plot = cemb,
+       width = 6,
+       height = 6,
+       units = "in",
+       dpi = 300)
 
 cembp
 saveRDS(object = cembp,file = "plots/cnv_event_means_broad_ptsen_paired.RDS")
 ggsave(filename = "plots/cnv_event_means_broad__ptsen_paired.png",
+       plot = cembp,
+       width = 6,
+       height = 6,
+       units = "in",
+       dpi = 300)
+ggsave(filename = "plots/cnv_event_means_broad__ptsen_paired.pdf",
        plot = cembp,
        width = 6,
        height = 6,
@@ -771,6 +812,10 @@ cyto_plot_paired <- ggplot(broad_cyto_combined) +
         legend.position = "none",
         panel.grid.major.x = element_blank(),
         panel.grid.minor.x = element_blank())
+
+ggsave(plot = cyto_plot_paired,filename = "plots/cyto_plot_paired_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = cyto_plot_paired,filename = "plots/cyto_plot_paired_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
+cyto_plot_paired
 ```
 
 ### Broad-level alterations - Arm-level events
@@ -861,6 +906,10 @@ arm_plot_paired <- ggplot(broad_arm_combined) +
         legend.position = "none",
         panel.grid.major.x = element_blank(),
         panel.grid.minor.x = element_blank())
+
+ggsave(plot = arm_plot_paired,filename = "plots/arm_plot_paired_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = arm_plot_paired,filename = "plots/arm_plot_paired_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
+arm_plot_paired
 ```
 
 ```{r arm_cyto_plotting}
@@ -879,6 +928,7 @@ broad_plot <- plot_grid(cyto_plot_paired,
 
 saveRDS(object = broad_plot,file = "plots/cna_arm_cyto_plot.RDS")
 ggsave2(plot = broad_plot,filename = "plots/cna_arm_cyto_plot.png",width = 10,height = 8,units = "in",dpi = 300)
+ggsave2(plot = broad_plot,filename = "plots/cna_arm_cyto_plot.pdf",width = 10,height = 8,units = "in",dpi = 300)
 broad_plot
 ```
 

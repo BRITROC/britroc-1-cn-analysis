@@ -168,14 +168,14 @@ abcel_abs <- readRDS("../absolute_PRE_down_sampling/abcel_absoluteCN_30kbps_refi
 ### Load external data
 
 ```{r ext}
-# tcga_samp_comp <- generateSampleByComponentMatrix(readRDS("data/tcga_CN_features.rds"))
-# tcga_sigs <- quantifySignatures(tcga_samp_comp)
-# 
-# pcawg_samp_comp <- generateSampleByComponentMatrix(readRDS("data/pcawg_CN_features.rds"))
-# pcawg_sigs <- quantifySignatures(pcawg_samp_comp)
-# 
-# natgen_samp_comp <- generateSampleByComponentMatrix(readRDS("data/natgen_CN_features.rds"))
-# natgen_sigs <- quantifySignatures(natgen_samp_comp)
+tcga_samp_comp <- generateSampleByComponentMatrix(readRDS("data/tcga_CN_features.rds"))
+tcga_sigs <- quantifySignatures(tcga_samp_comp)
+
+pcawg_samp_comp <- generateSampleByComponentMatrix(readRDS("data/pcawg_CN_features.rds"))
+pcawg_sigs <- quantifySignatures(pcawg_samp_comp)
+
+natgen_samp_comp <- generateSampleByComponentMatrix(readRDS("data/natgen_CN_features.rds"))
+natgen_sigs <- quantifySignatures(natgen_samp_comp)
 ```
 
 ```{r feat_dists}
@@ -224,6 +224,7 @@ feat_plot <- ggplot(samp_comp_long) +
 
 saveRDS(object = feat_plot,file = "plots/feat_plot.RDS")
 ggsave(feat_plot,filename = "plots/feat_plot.png",width = 8,height = 8,units = "in",dpi = 300)
+ggsave(feat_plot,filename = "plots/feat_plot.pdf",width = 8,height = 8,units = "in",dpi = 300)
 feat_plot
 ```
 
@@ -265,6 +266,7 @@ sig_bar_plot <- ggplot(sig_bar) +
 
 saveRDS(object = sig_bar_plot,file = "plots/signatures_allSamples_stacked_bar.RDS")
 ggsave(sig_bar_plot,filename = "plots/signatures_allSamples_stacked_bar.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(sig_bar_plot,filename = "plots/signatures_allSamples_stacked_bar.pdf",width = 8,height = 6,units = "in",dpi = 300)
 sig_bar_plot
 ```
 
@@ -318,6 +320,7 @@ sig_bar_plot_paired <- ggplot(sig_bar_paired) +
 
 saveRDS(object = sig_bar_plot_paired,file = "plots/signatures_stacked_bar.RDS")
 ggsave(sig_bar_plot_paired,filename = "plots/signatures_stacked_bar.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(sig_bar_plot_paired,filename = "plots/signatures_stacked_bar.pdf",width = 8,height = 6,units = "in",dpi = 300)
 sig_bar_plot_paired
 
 sig_bar_paired_alt <- sig_bar_paired %>%
@@ -343,6 +346,7 @@ sig_bar_plot_paired_alt <- ggplot(sig_bar_paired_alt) +
 
 saveRDS(object = sig_bar_plot_paired_alt,file = "plots/signatures_stacked_bar_alt.RDS")
 ggsave(sig_bar_plot_paired_alt,filename = "plots/signatures_stacked_bar_alt.png",width = 6,height = 8,units = "in",dpi = 300)
+ggsave(sig_bar_plot_paired_alt,filename = "plots/signatures_stacked_bar_alt.pdf",width = 6,height = 8,units = "in",dpi = 300)
 sig_bar_plot_paired_alt
 ```
 
@@ -356,6 +360,7 @@ sig_box_wilcox
 
 saveRDS(object = sig_box_wilcox,file = "plots/sig_box_wilcox.RDS")
 ggsave(sig_bar_plot,filename = "plots/sig_box_wilcox.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(sig_bar_plot,filename = "plots/sig_box_wilcox.pdf",width = 8,height = 6,units = "in",dpi = 300)
 ```
 
 ### Paired samples
@@ -368,6 +373,7 @@ sig_box_paired_wilcox
 
 saveRDS(object = sig_box_paired_wilcox,file = "plots/sig_box_paired_wilcox.RDS")
 ggsave(sig_bar_plot,filename = "plots/sig_box_paired_wilcox.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(sig_bar_plot,filename = "plots/sig_box_paired_wilcox.pdf",width = 8,height = 6,units = "in",dpi = 300)
 ```
 
 ```{r sig_paired_line_plot}
@@ -385,6 +391,7 @@ paired_line_plot <- ggplot(paired_line) +
 
 saveRDS(object = paired_line_plot,file = "plots/paired_line_plot.RDS")
 ggsave(paired_line_plot,filename = "plots/paired_line_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(paired_line_plot,filename = "plots/paired_line_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
 paired_line_plot
 ```
 
@@ -405,11 +412,15 @@ pcawg_box_data$group <- rep("pcawg",times=nrow(pcawg_box_data))
 
 x <- pivot_longer(data = rbind(sig_box_data,natgen_box_data,tcga_box_data,pcawg_box_data),cols = c(2:8),names_to = "Signature")
 
-ggplot(data = x) +
+sig_box_plot_compare_plot <- ggplot(data = x) +
     geom_boxplot(aes(x = Signature,y = value,fill=group)) +
     labs(title = "Signature exposures by signature between cohorts") +
     scale_y_continuous(name = "Exposure",limits = c(0,1)) +
     theme_bw()
+
+ggsave(sig_box_plot_compare_plot,filename = "plots/sig_box_plot_compare_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(sig_box_plot_compare_plot,filename = "plots/sig_box_plot_compare_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
+sig_box_plot_compare_plot
 ```
 
 ### Signature corr.
@@ -441,11 +452,11 @@ rownames(corr.data) <- c("corr","p.value")
 kable(corr.data)
 ```
 
-```{r corr_plot}
+```{r external_corr_plot}
 corr.data.t <- as.data.frame(t(corr.data))
 corr.data.t <- rownames_to_column(corr.data.t,var = "name")
 
-ggplot(subset_sig_quants) + geom_point(aes(x = value,y = natgen_value)) +
+external_corr_plot <- ggplot(subset_sig_quants) + geom_point(aes(x = value,y = natgen_value)) +
   stat_smooth(aes(x = value,y = natgen_value),method = "lm") +
   scale_y_continuous(limits = c(0,1)) +
   scale_x_continuous(limits = c(0,1)) +
@@ -456,6 +467,10 @@ ggplot(subset_sig_quants) + geom_point(aes(x = value,y = natgen_value)) +
   geom_text(data = corr.data.t,aes(label=paste0("cor=",corr)),
             x = 0.9,y = 0.9,inherit.aes = FALSE) +
   theme_bw()
+
+ggsave(external_corr_plot,filename = "plots/external_corr_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(external_corr_plot,filename = "plots/external_corr_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
+external_corr_plot
 ```
 
 ```{r seg_counts_sig5}

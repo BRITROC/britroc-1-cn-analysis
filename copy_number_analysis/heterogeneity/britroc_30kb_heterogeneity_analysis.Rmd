@@ -376,6 +376,7 @@ noise_plot <- plot_grid(plot_grid(sample_noise_p,seg_noise_p,seg_noise_point_p,s
 
 noise_plot
 ggsave2(plot = noise_plot,filename = "plots/seg_sample_noise_filt_plot.png",width = 8,height = 9,units = "in",dpi = 300)
+ggsave2(plot = noise_plot,filename = "plots/seg_sample_noise_filt_plot.pdf",width = 8,height = 9,units = "in",dpi = 300)
 ```
 
 ```{r noise_stats}
@@ -514,6 +515,7 @@ clonality_leg <- get_legend(
 comp_clonality_plot <- plot_grid(plot_grid(clonality_plot_paired,clonality_plot,labels = "AUTO",ncol = 2),
                                  plot_grid(clonality_leg),nrow = 2,rel_heights = c(1,0.1))
 ggsave(filename = "plots/paired_clonality_plot.png",plot = comp_clonality_plot,width = 9,height = 7,units = "in",dpi = 300)
+ggsave(filename = "plots/paired_clonality_plot.pdf",plot = comp_clonality_plot,width = 9,height = 7,units = "in",dpi = 300)
 comp_clonality_plot
 ```
 
@@ -560,7 +562,6 @@ patient_clonality_diffs <- patient_clonality_diffs %>%
   mutate(diagnosis_distance = as.numeric(difftime(diagnosis_date,as.Date(format(Sys.time(), '%Y-%m-%d')))))
 
 patient_clonality_diffs$ploidy <- patient_ploidy$ploidy[match(patient_clonality_diffs$patient,patient_ploidy$PATIENT_ID)]
-patient_clonality_diffs$purity <- patient_purity$purity[match(patient_clonality_diffs$patient,patient_purity$PATIENT_ID)]
 ```
 
 ```{r clonality_diff_age}
@@ -594,8 +595,10 @@ delta_itg_pt_sens <- ggplot(patient_clonality_diffs) +
   xlab("") +
   scale_fill_discrete(name = "platinum status") +
   theme_bw() + theme(legend.position = "none")
+
+ggsave(filename = "plots/delta_itg_pt_sens.png",plot = delta_itg_pt_sens,width = 8,height = 6,units = "in",dpi = 300)
+ggsave(filename = "plots/delta_itg_pt_sens.pdf",plot = delta_itg_pt_sens,width = 8,height = 6,units = "in",dpi = 300)
 delta_itg_pt_sens
-#ggsave(filename = "plots/delta_itg_pt_sens.png",plot = delta_itg_pt_sens,width = 8,height = 6,units = "in",dpi = 300)
 ```
 
 ```{r clonality_diff_priorlines}
@@ -612,8 +615,10 @@ delta_itg_priorlines <- ggplot(patient_clonality_diffs) +
   xlab("") +
   scale_fill_manual(values=c("#e5f5f9","#99d8c9"),name = "prior lines") +
   theme_bw() + theme(legend.position = "none")
+
+ggsave(filename = "plots/delta_itg_priorlines.png",plot = delta_itg_priorlines,width = 8,height = 6,units = "in",dpi = 300)
+ggsave(filename = "plots/delta_itg_priorlines.pdf",plot = delta_itg_priorlines,width = 8,height = 6,units = "in",dpi = 300)
 delta_itg_priorlines
-#ggsave(filename = "plots/delta_itg_priorlines",plot = delta_itg_priorlines,width = 8,height = 6,units = "in",dpi = 300)
 ```
 
 ```{r mixed_pat_delta_ith_plot}
@@ -633,13 +638,12 @@ delta_plot <- plot_grid(plot_grid(delta_itg_pt_sens,delta_itg_priorlines,diff_ag
           nrow = 2,
           rel_heights = c(1,0.1))
 
-delta_plot
 ggsave2(filename = "plots/delta_itg_pt_sens.png",plot = delta_plot,width = 8,height = 8,units = "in",dpi = 300)
+ggsave2(filename = "plots/delta_itg_pt_sens.pdf",plot = delta_plot,width = 8,height = 8,units = "in",dpi = 300)
+delta_plot
 ```
 
 ### session info
 ```{r session}
 sessionInfo()
 ```
-
-
