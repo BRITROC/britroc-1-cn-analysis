@@ -26,6 +26,8 @@ suppressPackageStartupMessages(suppressWarnings(library(Biobase)))
 suppressPackageStartupMessages(suppressWarnings(library(QDNAseqmod)))
 ```
 
+### Set functions
+
 ```{r funcs}
 depthtocn<-function(x,purity,seqdepth) #converts readdepth to copy number given purity and single copy depth
 {
@@ -63,7 +65,10 @@ plotProfile <- function(data = NULL,sample = NULL,ploidy = NULL,purity = NULL){
                     sep=""),cex.main=0.8)
   abline(h=1:9,col = "blue")
 }
+
 ```
+
+### load data
 
 ```{r metadata}
 meta.fitting <- read.table("../../absolute_PRE_down_sampling/fit_QC_predownsample_withsmooth.tsv",header = T,sep = "\t")
@@ -75,35 +80,557 @@ ploidy_change_patients <- as.character(unique(ploidy_change_patients$PATIENT_ID)
 cnData <- readRDS("../../absolute_PRE_down_sampling/britroc_smoothed_copyNumbersSegmented.rds")
 ```
 
-```{r ploidy_change_1}
-#ploidy_change_patients[1]
-meta.fitting[meta.fitting$PATIENT_ID == ploidy_change_patients[1],]
-#meta.fitting[meta.fitting$PATIENT_ID == ploidy_change_patients[1] & meta.fitting$use == "TRUE",]
-meta.fitting$notes[meta.fitting$PATIENT_ID == ploidy_change_patients[1]]
+```{r cat_vectors}
+pats <- c()
+cat1 <- c()
+cat2 <- c()
+cat3 <- c()
+notes <- c()
+star_rating <- c()
 ```
 
-```{r selected_fits}
-plotProfile(data = cnData,sample = "IM_56",ploidy = 1.9,purity = 0.56)
-plotProfile(data = cnData,sample = "JBLAB-4128",ploidy = 3.6,purity = 0.82)
+### Rating criteria
+
+- Category 1: Selected fits have the highest scoring quantitative quality metrics compared to other sufficiently powered copy number fits (clonality error, TP53 estimate).
+- Category 2: No underpowered fits with otherwise acceptable or better quality metrics are available which would contradict the selected copy number fit.
+- Category 3: Additional samples, attributed to either diagnosis or relapse groups, support the ploidy change by also conforming to criteria 1 and/or criteria 2.
+
+#### Patient 1 - BRITROC-209
+
+```{r pat1_cat1}
+pat <- ploidy_change_patients[1]
+pats <- append(pats,pat)
+meta.fitting[meta.fitting$PATIENT_ID == pat,-c(2,6,11:15)]
+meta.fitting[meta.fitting$PATIENT_ID == pat & meta.fitting$use == "TRUE",-c(2,6,11:15)]
+notes <- append(notes,unique(paste0(meta.fitting$notes[meta.fitting$PATIENT_ID == pat],collapse = "")))
+
+cat1 <- append(cat1,"TRUE")
 ```
 
-```{r unselected_fits}
-plotProfile(data = cnData,sample = "JBLAB-4128",ploidy = 1.9,purity = 0.84)
-plotProfile(data = cnData,sample = "JBLAB-4967",ploidy = 3.7,purity = 0.77)
+```{r pat1_plots}
+for(i in 1:nrow(meta.fitting[meta.fitting$PATIENT_ID == pat,-c(2,6,11:15)])){
+  plotProfile(data = cnData,
+              sample = as.character(meta.fitting$SAMPLE_ID[meta.fitting$PATIENT_ID == pat][i]),
+              ploidy = as.numeric(meta.fitting$ploidy[meta.fitting$PATIENT_ID == pat][i]),
+              purity = as.numeric(meta.fitting$purity[meta.fitting$PATIENT_ID == pat][i]))
+  
+}
+
+plotProfile(data = cnData,sample = "IM_295",ploidy = 1.7,purity = 0.56) # Selected
+plotProfile(data = cnData,sample = "JBLAB-4960",ploidy = 3.6,purity = 0.82) # Selected
 ```
 
-```{r load_ploidy_change_1_all}
-read.table("../../absolute_PRE_down_sampling/clonality_results/IM_56_clonality.csv",sep = ",",header = T)
+```{r pat1_cat2}
+IM_295_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/IM_295_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "IM_295"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+IM_295_clonality[IM_295_clonality$ploidy > 3.2 & IM_295_clonality$ploidy < 4,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "IM_295",ploidy = 3.8,purity = 0.31)
+
+IM_295_clonality[IM_295_clonality$ploidy > 5 & IM_295_clonality$ploidy < 6,] %>%
+  arrange(TPdiff,clonality)
+
+plotProfile(data = cnData,sample = "IM_295",ploidy = 5.3,purity = 0.28)
+paste0("Potential underpowered fit")
+
+JBLAB_4960_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/JBLAB-4960_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "JBLAB-4960"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+JBLAB_4960_clonality[JBLAB_4960_clonality$ploidy > 1.5 & JBLAB_4960_clonality$ploidy < 2,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "JBLAB-4960",ploidy = 1.9,purity = 0.44)
+
+cat2 <- append(cat2,"FALSE")
+cat3 <- append(cat3,"TRUE")
+star_rating <- append(star_rating,c("**"))
 ```
+
+#### Patient 2 - BRITROC-216
+
+```{r pat2_cat1}
+pat <- ploidy_change_patients[2]
+pats <- append(pats,pat)
+meta.fitting[meta.fitting$PATIENT_ID == pat,-c(2,6,11:15)]
+meta.fitting[meta.fitting$PATIENT_ID == pat & meta.fitting$use == "TRUE",-c(2,6,11:15)]
+notes <- append(notes,unique(paste0(meta.fitting$notes[meta.fitting$PATIENT_ID == pat],collapse = "")))
+
+cat1 <- append(cat1,"TRUE")
+```
+
+```{r pat2_plots}
+for(i in 1:nrow(meta.fitting[meta.fitting$PATIENT_ID == pat,-c(2,6,11:15)])){
+  plotProfile(data = cnData,
+              sample = as.character(meta.fitting$SAMPLE_ID[meta.fitting$PATIENT_ID == pat][i]),
+              ploidy = as.numeric(meta.fitting$ploidy[meta.fitting$PATIENT_ID == pat][i]),
+              purity = as.numeric(meta.fitting$purity[meta.fitting$PATIENT_ID == pat][i]))
+  
+}
+
+plotProfile(data = cnData,sample = "IM_340",ploidy = 1.9,purity = 0.83) # Selected
+plotProfile(data = cnData,sample = "IM_341",ploidy = 1.8,purity = 0.84) # Selected
+plotProfile(data = cnData,sample = "JBLAB-4965",ploidy = 3.5,purity = 0.78) # Selected
+```
+
+```{r pat2_cat2}
+JBLAB_4965_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/JBLAB-4965_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "JBLAB-4965"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+JBLAB_4965_clonality[JBLAB_4965_clonality$ploidy > 1.5 & JBLAB_4965_clonality$ploidy < 2.4,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "JBLAB-4965",ploidy = 2.3,purity = 0.44)
+
+IM_340_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/IM_340_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "IM_340"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+IM_340_clonality[IM_340_clonality$ploidy > 3 & IM_340_clonality$ploidy < 3.8,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "IM_340",ploidy = 3.7,purity = 0.66)
+paste0("Potential underpowered fit")
+
+IM_341_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/IM_341_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "IM_341"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+IM_341_clonality[IM_341_clonality$ploidy > 3 & IM_341_clonality$ploidy < 3.8,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "IM_341",ploidy = 3.3,purity = 0.84)
+
+cat2 <- append(cat2,"FALSE")
+cat3 <- append(cat3,"FALSE")
+
+star_rating <- append(star_rating,c("*"))
+```
+
+#### Patient 3 - BRITROC-23
+
+```{r pat3_cat1}
+pat <- ploidy_change_patients[3]
+pats <- append(pats,pat)
+meta.fitting[meta.fitting$PATIENT_ID == pat,-c(2,6,11:15)]
+meta.fitting[meta.fitting$PATIENT_ID == pat & meta.fitting$use == "TRUE",-c(2,6,11:15)]
+notes <- append(notes,unique(paste0(meta.fitting$notes[meta.fitting$PATIENT_ID == pat],collapse = "")))
+
+cat1 <- append(cat1,"TRUE")
+```
+
+```{r pat3_plots}
+for(i in 1:nrow(meta.fitting[meta.fitting$PATIENT_ID == pat,-c(2,6,11:15)])){
+  plotProfile(data = cnData,
+              sample = as.character(meta.fitting$SAMPLE_ID[meta.fitting$PATIENT_ID == pat][i]),
+              ploidy = as.numeric(meta.fitting$ploidy[meta.fitting$PATIENT_ID == pat][i]),
+              purity = as.numeric(meta.fitting$purity[meta.fitting$PATIENT_ID == pat][i]))
+  
+}
+
+plotProfile(data = cnData,sample = "IM_56",ploidy = 1.9,purity = 0.56) # Selected
+plotProfile(data = cnData,sample = "JBLAB-4128",ploidy = 3.6,purity = 0.82) # Selected
+```
+
+```{r pat3_cat2}
+IM_56_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/IM_56_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "IM_56"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+IM_56_clonality[IM_56_clonality$ploidy > 3.2 & IM_56_clonality$ploidy < 4,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "IM_56",ploidy = 3.5,purity = 0.44)
+paste0("Potential underpowered fit")
+
+JBLAB_4128_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/JBLAB-4128_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "JBLAB-4128"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+JBLAB_4128_clonality[JBLAB_4128_clonality$ploidy > 1.5 & JBLAB_4128_clonality$ploidy < 2.4,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "JBLAB-4128",ploidy = 2.3,purity = 0.59)
+
+
+cat2 <- append(cat2,"FALSE")
+cat3 <- append(cat3,"TRUE")
+
+star_rating <- append(star_rating,c("**"))
+```
+
+#### Patient 4 - BRITROC-241
+
+```{r pat4_cat1}
+pat <- ploidy_change_patients[4]
+pats <- append(pats,pat)
+meta.fitting[meta.fitting$PATIENT_ID == pat,-c(2,6,11:15)]
+meta.fitting[meta.fitting$PATIENT_ID == pat & meta.fitting$use == "TRUE",-c(2,6,11:15)]
+notes <- append(notes,unique(paste0(meta.fitting$notes[meta.fitting$PATIENT_ID == pat],collapse = "")))
+
+cat1 <- append(cat1,"TRUE")
+```
+
+```{r pat4_plots}
+for(i in 1:nrow(meta.fitting[meta.fitting$PATIENT_ID == pat,-c(2,6,11:15)])){
+  plotProfile(data = cnData,
+              sample = as.character(meta.fitting$SAMPLE_ID[meta.fitting$PATIENT_ID == pat][i]),
+              ploidy = as.numeric(meta.fitting$ploidy[meta.fitting$PATIENT_ID == pat][i]),
+              purity = as.numeric(meta.fitting$purity[meta.fitting$PATIENT_ID == pat][i]))
+  
+}
+
+plotProfile(data = cnData,sample = "IM_423",ploidy = 1.8,purity = 0.70) # Selected
+plotProfile(data = cnData,sample = "JBLAB-4996",ploidy = 3.0,purity = 0.76) # Selected
+```
+
+```{r pat4_cat2}
+JBLAB_4996_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/JBLAB-4996_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "JBLAB-4996"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+JBLAB_4996_clonality[JBLAB_4996_clonality$ploidy > 1.6 & JBLAB_4996_clonality$ploidy < 2.2,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "JBLAB-4996",ploidy = 2.0,purity = 0.48)
+
+IM_423_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/IM_423_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "IM_423"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+IM_423_clonality[IM_423_clonality$ploidy > 2.7 & IM_423_clonality$ploidy < 3.4,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "IM_423",ploidy = 3.3,purity = 0.54)
+
+
+cat2 <- append(cat2,"TRUE")
+cat3 <- append(cat3,"FALSE")
+
+star_rating <- append(star_rating,c("**"))
+```
+
+#### Patient 5 - BRITROC-248
+
+```{r pat5_cat1}
+pat <- ploidy_change_patients[5]
+pats <- append(pats,pat)
+meta.fitting[meta.fitting$PATIENT_ID == pat,-c(2,6,11:15)]
+meta.fitting[meta.fitting$PATIENT_ID == pat & meta.fitting$use == "TRUE",-c(2,6,11:15)]
+notes <- append(notes,unique(paste0(meta.fitting$notes[meta.fitting$PATIENT_ID == pat],collapse = "")))
+
+cat1 <- append(cat1,"TRUE")
+```
+
+```{r pat5_plots}
+for(i in 1:nrow(meta.fitting[meta.fitting$PATIENT_ID == pat,-c(2,6,11:15)])){
+  plotProfile(data = cnData,
+              sample = as.character(meta.fitting$SAMPLE_ID[meta.fitting$PATIENT_ID == pat][i]),
+              ploidy = as.numeric(meta.fitting$ploidy[meta.fitting$PATIENT_ID == pat][i]),
+              purity = as.numeric(meta.fitting$purity[meta.fitting$PATIENT_ID == pat][i]))
+  
+}
+
+plotProfile(data = cnData,sample = "IM_403",ploidy = 5.3,purity = 0.48) # Selected
+plotProfile(data = cnData,sample = "JBLAB-19302",ploidy = 2.7,purity = 0.44) # Selected
+plotProfile(data = cnData,sample = "JBLAB-19303",ploidy = 2.6,purity = 0.47) # Selected
+```
+
+```{r pat5_cat2}
+JBLAB_19302_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/JBLAB-19302_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "JBLAB-19302"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+JBLAB_19302_clonality[JBLAB_19302_clonality$ploidy > 4.8 & JBLAB_19302_clonality$ploidy < 5.5,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "JBLAB-19302",ploidy = 5.3,purity = 0.29)
+paste0("Potential underpowered fit")
+
+JBLAB_19303_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/JBLAB-19303_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "JBLAB-19303"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+JBLAB_19303_clonality[JBLAB_19303_clonality$ploidy > 4.7 & JBLAB_19303_clonality$ploidy < 5.4,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "JBLAB-19303",ploidy = 5.0,purity = 0.28)
+
+IM_403_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/IM_403_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "IM_403"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+IM_403_clonality[IM_403_clonality$ploidy > 2.4 & IM_403_clonality$ploidy < 3.3,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "IM_403",ploidy = 3.1,purity = 0.41)
+
+cat2 <- append(cat2,"FALSE")
+cat3 <- append(cat3,"TRUE")
+
+star_rating <- append(star_rating,c("**"))
+```
+
+#### Patient 6 - BRITROC-267
+
+```{r pat6_cat1}
+pat <- ploidy_change_patients[6]
+pats <- append(pats,pat)
+meta.fitting[meta.fitting$PATIENT_ID == pat,-c(2,6,11:15)]
+meta.fitting[meta.fitting$PATIENT_ID == pat & meta.fitting$use == "TRUE",-c(2,6,11:15)]
+notes <- append(notes,unique(paste0(meta.fitting$notes[meta.fitting$PATIENT_ID == pat],collapse = "")))
+
+cat1 <- append(cat1,"TRUE")
+```
+
+```{r pat6_plots}
+for(i in 1:nrow(meta.fitting[meta.fitting$PATIENT_ID == pat,-c(2,6,11:15)])){
+  plotProfile(data = cnData,
+              sample = as.character(meta.fitting$SAMPLE_ID[meta.fitting$PATIENT_ID == pat][i]),
+              ploidy = as.numeric(meta.fitting$ploidy[meta.fitting$PATIENT_ID == pat][i]),
+              purity = as.numeric(meta.fitting$purity[meta.fitting$PATIENT_ID == pat][i]))
+  
+}
+
+plotProfile(data = cnData,sample = "IM_383",ploidy = 1.8,purity = 0.63) # Selected
+plotProfile(data = cnData,sample = "JBLAB-19330",ploidy = 3.4,purity = 0.65) # Selected
+```
+
+```{r pat6_cat2}
+IM_383_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/IM_383_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "IM_383"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+IM_383_clonality[IM_383_clonality$ploidy > 3.0 & IM_383_clonality$ploidy < 3.8,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "IM_383",ploidy = 3.7,purity = 0.41)
+
+JBLAB_19330_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/JBLAB-19330_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "JBLAB-19330"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+JBLAB_19330_clonality[JBLAB_19330_clonality$ploidy > 1.5 & JBLAB_19330_clonality$ploidy < 2.3,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "JBLAB-19330",ploidy = 2.2,purity = 0.58)
+
+cat2 <- append(cat2,"TRUE")
+cat3 <- append(cat3,"FALSE")
+
+star_rating <- append(star_rating,c("**"))
+```
+
+#### Patient 7 - BRITROC-274
+
+```{r pat7_cat1}
+pat <- ploidy_change_patients[7]
+pats <- append(pats,pat)
+meta.fitting[meta.fitting$PATIENT_ID == pat,-c(2,6,11:15)]
+meta.fitting[meta.fitting$PATIENT_ID == pat & meta.fitting$use == "TRUE",-c(2,6,11:15)]
+notes <- append(notes,unique(paste0(meta.fitting$notes[meta.fitting$PATIENT_ID == pat],collapse = "")))
+
+cat1 <- append(cat1,"TRUE")
+```
+
+```{r pat7_plots}
+for(i in 1:nrow(meta.fitting[meta.fitting$PATIENT_ID == pat,-c(2,6,11:15)])){
+  if(as.character(meta.fitting$SAMPLE_ID[meta.fitting$PATIENT_ID == pat][i]) == "IM_397"){
+    next() # IM_397 is a non-HGSOC sample
+  }
+  plotProfile(data = cnData,
+              sample = as.character(meta.fitting$SAMPLE_ID[meta.fitting$PATIENT_ID == pat][i]),
+              ploidy = as.numeric(meta.fitting$ploidy[meta.fitting$PATIENT_ID == pat][i]),
+              purity = as.numeric(meta.fitting$purity[meta.fitting$PATIENT_ID == pat][i]))
+  
+}
+
+plotProfile(data = cnData,sample = "IM_395",ploidy = 1.8,purity = 0.63) # Selected
+plotProfile(data = cnData,sample = "IM_396",ploidy = 1.8,purity = 0.70) # Selected
+plotProfile(data = cnData,sample = "JBLAB-19337",ploidy = 1.9,purity = 0.67) # Selected
+plotProfile(data = cnData,sample = "JBLAB-19338",ploidy = 3.9,purity = 1.00) # Selected
+```
+
+```{r pat7_cat2}
+JBLAB_19338_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/JBLAB-19338_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "JBLAB-19338"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+JBLAB_19338_clonality[JBLAB_19338_clonality$ploidy > 1.5 & JBLAB_19338_clonality$ploidy < 2.4,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "JBLAB-19338",ploidy = 3.7,purity = 0.41)
+
+JBLAB_19337_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/JBLAB-19337_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "JBLAB-19337"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+JBLAB_19337_clonality[JBLAB_19337_clonality$ploidy > 3.5 & JBLAB_19337_clonality$ploidy < 4.4,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "JBLAB-19337",ploidy = 3.8,purity = 0.48)
+paste0("Potential underpowered fit")
+
+IM_395_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/IM_395_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "IM_395"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+IM_395_clonality[IM_395_clonality$ploidy > 3.5 & IM_395_clonality$ploidy < 4.4,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "IM_395",ploidy = 3.6,purity = 0.57)
+paste0("Potential underpowered fit")
+
+IM_396_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/IM_396_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "IM_396"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+IM_396_clonality[IM_396_clonality$ploidy > 3.3 & IM_396_clonality$ploidy < 4.4,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "IM_396",ploidy = 4.3,purity = 0.40)
+
+cat2 <- append(cat2,"FALSE")
+cat3 <- append(cat3,"FALSE")
+
+star_rating <- append(star_rating,c("*"))
+```
+
+#### Patient 8 - BRITROC-67
+
+```{r pat8_cat1}
+pat <- ploidy_change_patients[8]
+pats <- append(pats,pat)
+meta.fitting[meta.fitting$PATIENT_ID == pat,-c(2,6,11:15)]
+meta.fitting[meta.fitting$PATIENT_ID == pat & meta.fitting$use == "TRUE",-c(2,6,11:15)]
+notes <- append(notes,unique(paste0(meta.fitting$notes[meta.fitting$PATIENT_ID == pat],collapse = "")))
+
+cat1 <- append(cat1,"TRUE")
+```
+
+```{r pat8_plots}
+for(i in 1:nrow(meta.fitting[meta.fitting$PATIENT_ID == pat,-c(2,6,11:15)])){
+  plotProfile(data = cnData,
+              sample = as.character(meta.fitting$SAMPLE_ID[meta.fitting$PATIENT_ID == pat][i]),
+              ploidy = as.numeric(meta.fitting$ploidy[meta.fitting$PATIENT_ID == pat][i]),
+              purity = as.numeric(meta.fitting$purity[meta.fitting$PATIENT_ID == pat][i]))
+  
+}
+
+plotProfile(data = cnData,sample = "IM_115",ploidy = 2.9,purity = 1.0) # Selected
+plotProfile(data = cnData,sample = "JBLAB-4179",ploidy = 1.9,purity = 0.88) # Selected
+```
+
+```{r pat8_cat2}
+IM_115_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/IM_115_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "IM_115"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+IM_115_clonality[IM_115_clonality$ploidy > 1.5 & IM_115_clonality$ploidy < 2.4,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "IM_115",ploidy = 3.7,purity = 0.41)
+
+JBLAB_4179_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/JBLAB-4179_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "JBLAB-4179"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+JBLAB_4179_clonality[JBLAB_4179_clonality$ploidy > 2.6 & JBLAB_4179_clonality$ploidy < 3.4,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "JBLAB-4179",ploidy = 3.7,purity = 0.41)
+
+cat2 <- append(cat2,"TRUE")
+cat3 <- append(cat3,"FALSE")
+
+star_rating <- append(star_rating,c("**"))
+```
+
+#### Patient 9 - BRITROC-74
+
+```{r pat9_cat1}
+pat <- ploidy_change_patients[9]
+pats <- append(pats,pat)
+meta.fitting[meta.fitting$PATIENT_ID == pat,-c(2,6,11:15)]
+meta.fitting[meta.fitting$PATIENT_ID == pat & meta.fitting$use == "TRUE",-c(2,6,11:15)]
+notes <- append(notes,unique(paste0(meta.fitting$notes[meta.fitting$PATIENT_ID == pat],collapse = "")))
+
+cat1 <- append(cat1,"TRUE")
+```
+
+```{r pat9_plots}
+for(i in 1:nrow(meta.fitting[meta.fitting$PATIENT_ID == pat,-c(2,6,11:15)])){
+  plotProfile(data = cnData,
+              sample = as.character(meta.fitting$SAMPLE_ID[meta.fitting$PATIENT_ID == pat][i]),
+              ploidy = as.numeric(meta.fitting$ploidy[meta.fitting$PATIENT_ID == pat][i]),
+              purity = as.numeric(meta.fitting$purity[meta.fitting$PATIENT_ID == pat][i]))
+  
+}
+
+plotProfile(data = cnData,sample = "IM_124",ploidy = 2.9,purity = 0.9) # Selected
+plotProfile(data = cnData,sample = "JBLAB-4186",ploidy = 3.2,purity = 0.57) # Selected
+plotProfile(data = cnData,sample = "JBLAB-4187",ploidy = 3.2,purity = 0.64) # Selected
+plotProfile(data = cnData,sample = "JBLAB-4188",ploidy = 3.1,purity = 0.75) # Selected
+plotProfile(data = cnData,sample = "JBLAB-4189",ploidy = 3.1,purity = 0.64) # Selected
+```
+
+```{r pat9_cat2}
+IM_124_clonality <- read.table("../../absolute_PRE_down_sampling/clonality_results/IM_124_clonality.csv",sep = ",",header = T) %>%
+                      mutate(TP53freq = unique(meta.fitting$TP53freq[meta.fitting$SAMPLE_ID == "IM_124"])) %>%
+                      filter(powered == 0) %>%
+                      filter(TP53cn > 0) %>%
+                      mutate(TPdiff = abs(TP53freq - expected_TP53_AF))
+
+IM_124_clonality[IM_124_clonality$ploidy > 2.8 & IM_124_clonality$ploidy < 3.8,] %>%
+  arrange(TPdiff,clonality)
+plotProfile(data = cnData,sample = "IM_115",ploidy = 3.7,purity = 0.62)
+
+cat2 <- append(cat2,"TRUE")
+cat3 <- append(cat3,"TRUE")
+
+star_rating <- append(star_rating,c("***"))
+```
+
+### Final table
 
 ```{r ploidy_table_final}
-data.frame(patient=c(NA),
-           samples=c(NA),
-           `category 1`=c(NA),
-           `category 2`=c(NA),
-           `category 3`=c(NA),
-           `fit note`=c(NA),
-           `star rating`=c(NA))
+ploidy_change_scoring_table <- data.frame(patient=pats,
+           samples=c(unlist(lapply(pats,FUN = function(x){
+            samples <- unique(meta.fitting$SAMPLE_ID[meta.fitting$PATIENT_ID == x])
+            colsamples <- paste0(samples,collapse = ",")
+            return(colsamples)
+            }))),
+           `category 1` = cat1,
+           `category 2` = cat2,
+           `category 3` = cat3,
+           `star rating` = star_rating,
+           `fit note` = notes,check.names = F)
+write.table(ploidy_change_scoring_table,file = "data/ploidy_change_scoring_table.tsv",quote = F,row.names = F,col.names = T,sep = "\t")
+ploidy_change_scoring_table
 ```
 
 ```{r sessioninfo}
