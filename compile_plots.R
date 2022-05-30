@@ -100,6 +100,9 @@ tissue_legend_strat <- get_legend(
     theme(legend.position = "bottom")
 )
 
+focal_pairs_plot <- readRDS("copy_number_analysis/focal_analysis/plots/gene_pairs_plot.RDS")
+focal_heatmap_plot <- readRDS("copy_number_analysis/focal_analysis/plots/gene_change_heatmap.RDS")
+
 ## Figure 1
 # Thomas
 
@@ -129,6 +132,11 @@ fig5 <- plot_grid(plot_grid(signature_paired_line,
                   plot_grid(sig_legend_a,sig_legend_b,ncol = 2,labels = c("","")),rel_heights = c(1,0.1))
 ggsave2(filename = "plots/figure_5_render.png",plot = fig5,width = 10,height = 9,units = "in",dpi = 300)
 ggsave2(filename = "plots/figure_5_render.pdf",plot = fig5,width = 10,height = 9,units = "in",dpi = 300)
+
+## Figure 6
+fig6 <- plot_grid(focal_heatmap_plot,focal_pairs_plot,nrow = 2,labels = c("A","B"))
+ggsave2(filename = "plots/figure_6_render.png",plot = fig6,width = 8,height = 10,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_6_render.pdf",plot = fig6,width = 8,height = 10,units = "in",dpi = 300)
 
 ## Supplemental - TCGA-Britroc focal rate comparison 
 britroc_tcga_comp_raw <- readRDS("copy_number_analysis/focal_analysis/plots/britroc_tcga_comp_raw.RDS")

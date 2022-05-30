@@ -459,6 +459,35 @@ ggplot(norm_paired_change_summary_all) +
   theme_bw()
 ```
 
+```{r ploidy_norm_change}
+norm_paired_changes_ploidy <- norm_paired_changes_all %>%
+  mutate(ploidy = meta.data$ploidy[match(PATIENT_ID,meta.data$PATIENT_ID)]) %>%
+  filter(gene %in% focal_genes_table$Gene.name) %>%
+  mutate(arx_norm = arx - ploidy) %>%
+  mutate(rlps_norm = rlps - ploidy) %>%
+  mutate(gene = factor(gene,levels = unique(focal_genes_table$Gene.name))) %>%
+  mutate(class = focal_genes_table$expected[match(gene,focal_genes_table$Gene.name)]) %>%
+  dplyr::select(-arx,-rlps) %>%
+  pivot_longer(cols = 5:6,names_to = "group",values_to = "copy number") %>%
+  mutate(group = case_when(group == "arx_norm" ~ "diagnosis",group == "rlps_norm" ~ "relapse"))
+
+ploidy_norm_gene_cn_plot <- ggplot(norm_paired_changes_ploidy) +
+  geom_hline(yintercept = 0) +
+  geom_line(aes(group,`copy number`,group=PATIENT_ID),alpha = 0.3) +
+  geom_jitter(aes(group,`copy number`,color=group),alpha = 0.3,
+              position = position_dodge(width = 0.6)) +
+  geom_violin(aes(group,`copy number`,color=group),fill=NA) +
+  ylab("copy number (ploidy normalised)") +
+  facet_wrap(. ~ gene,scales = "free") +
+  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+  theme_bw()
+
+saveRDS(ploidy_norm_gene_cn_plot,file = "plots/ploidy_norm_gene_cn_plot.RDS")
+ggsave(plot = ploidy_norm_gene_cn_plot,filename = "plots/ploidy_norm_gene_cn_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = ploidy_norm_gene_cn_plot,filename = "plots/ploidy_norm_gene_cn_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
+ploidy_norm_gene_cn_plot
+```
+
 ```{r norm_cor_all}
 cor_data_all <- norm_paired_changes_all %>%
   dplyr::select(-c(arx,rlps)) %>%
@@ -509,6 +538,22 @@ hmPlot <- ComplexHeatmap::Heatmap(t(cor_data_all_sub),
 
 draw(hmPlot)
 dev.off()
+png(file = "plots/gene_change_heatmap.png",width = 10,height = 8,units = "in",res = 300)
+hmPlot <- ComplexHeatmap::Heatmap(t(cor_data_all_sub),
+                        name = "Copy number change",
+                        top_annotation = col_ann,
+                        #right_annotation = row_ann,
+                        row_order = gene_change_ordering_sub, 
+                        show_row_dend = FALSE,
+                        show_row_names = FALSE,
+                        use_raster = TRUE)
+
+draw(hmPlot)
+dev.off()
+
+heatmapGG <- ggdraw(grid.grabExpr(draw(hmPlot)))
+saveRDS(heatmapGG,file = "plots/gene_change_heatmap.RDS")
+hmPlot
 ```
 
 ```{r gene_change_umap_and_kclusts}
@@ -572,13 +617,15 @@ diff_matrix <- as.matrix(paired_diffs[,c(((ncol(paired_diffs)/2)+1):ncol(paired_
 colnames(diff_matrix) <- gsub(colnames(diff_matrix),pattern = "_rlps",replacement = "")
 ```
 
-```{r patient_vignettes}
+```{r norm_paired_changes_all}
 norm_paired_changes_all <- norm_paired_changes_all %>%
                             mutate(ploidy_changed = ifelse(PATIENT_ID %in% ploidy_change_samples,"changed","unchanged")) %>%
                             arrange(change) %>%
                             filter(ploidy_changed == "unchanged") %>%
                             mutate(chr = protein_coding_genes$chromosome_name[match(gene,protein_coding_genes$hgnc_symbol)])
 norm_paired_changes_all
+norm_paired_changes_sub <- norm_paired_changes_all[norm_paired_changes_all$gene %in% focal_genes_table$Gene.name,]
+norm_paired_changes_sub[order(norm_paired_changes_sub$change),]
 ```
 
 ```{r patient_vignettes_2}
@@ -614,7 +661,82 @@ get_patient_vig <- function(diff_matrix = NULL,pat.name = NULL){
   return(pat_vig)
 }
 
-pat_vig_36 <- get_patient_vig(diff_matrix = diff_matrix,pat.name = "BRITROC-36")
+plotSegments <- function(object=NULL,pat.name=NULL,cn.max=15){
+    diff_matrix_s <- object[,pat.name]
+    fdfiltfull <- as.data.frame(str_split(string = names(diff_matrix_s),pattern = ":|-",simplify = TRUE))
+    colnames(fdfiltfull) <- c("chromosome","start","end")
+    
+    segTable<-c()
+    for(c in unique(fdfiltfull$chromosome)){
+        snfilt<-diff_matrix_s[fdfiltfull$chromosome==c]
+        fdfilt<-fdfiltfull[fdfiltfull$chromosome==c,]
+        sn.rle<-rle(snfilt)
+        starts <- cumsum(c(1, sn.rle$lengths[-length(sn.rle$lengths)]))
+        ends <- cumsum(sn.rle$lengths)
+        lapply(1:length(sn.rle$lengths), function(s) {
+          from <- fdfilt$start[starts[s]]
+          to <- fdfilt$end[ends[s]]
+          segValue <- sn.rle$value[s]
+          c(fdfilt$chromosome[starts[s]], from, to, segValue)
+        }) -> segtmp
+        segTableRaw <- data.frame(matrix(unlist(segtmp), ncol=4, byrow=T),stringsAsFactors=F)
+        segTable<-rbind(segTable,segTableRaw)
+    }
+    colnames(segTable) <- c("chromosome", "start", "end", "segVal")
+    segTable$chromosome <- factor(segTable$chromosome,levels = stringr::str_sort(unique(segTable$chromosome),numeric = T))
+    segTable <- segTable[order(segTable$chromosome,segTable$start),]
+
+    segTab <- segTable
+    
+    if(max(segTab$segVal) > cn.max){
+        segTab$segVal[segTab$segVal > cn.max] <- cn.max
+        ylim <- c(-cn.max,cn.max)
+    } else {
+        ylim <- c(-round(max(segTab$segVal))-1,round(max(segTab$segVal))+1)
+    }
+    
+    seg.n <- nrow(segTab)
+    chrom.len <- data.frame(Group.1=unique(segTab$chromosome))
+    chrom.len$x.max <- stats::aggregate(segTab$end,by = list(segTab$chromosome),FUN = max)$x
+    chrom.len$x.min <- stats::aggregate(segTab$start,by = list(segTab$chromosome),FUN = min)$x
+    chrom.len$Group.1 <- factor(chrom.len$Group.1,levels = stringr::str_sort(unique(chrom.len$Group.1),numeric = T))
+    chrom.len <- chrom.len[order(chrom.len$Group.1),]
+
+    segTab$startf <- getcoordinates(chr = segTab$chromosome,pos = segTab$start,chrom.len = chrom.len)
+    segTab$endf <- getcoordinates(chr = segTab$chromosome,pos = segTab$end,chrom.len = chrom.len)
+    chrom.len$flatm <- getcoordinates(chr = chrom.len$Group.1,pos = chrom.len$x.min,chrom.len = chrom.len)
+    chrom.len$flats <- getcoordinates(chr = chrom.len$Group.1,pos = chrom.len$x.max/2,chrom.len = chrom.len)
+    chrom.len$flate <- getcoordinates(chr = chrom.len$Group.1,pos = chrom.len$x.max,chrom.len = chrom.len)
+
+    title <- pat.name
+    sub.title <- paste0("segments: ",seg.n)
+    rect.col <- ifelse(seq_along(chrom.len$Group.1) %% 2 == 0,"white","grey95")
+
+    graphics::par(mar=c(5, 4, 4, 4) + 0.2)
+    graphics::plot(NA,
+         xlab="chromosome",
+         ylab="copy number change",
+         las=1,
+         xlim=c(min(chrom.len$flatm), max(chrom.len$flate)),
+         ylim=ylim,
+         xaxs="i",
+         xaxt="n",
+         yaxp=c(ylim[1], ylim[2], ylim[2]-ylim[1]),
+         yaxs="i")
+    graphics::rect(xleft = chrom.len$flatm,
+         xright = chrom.len$flate,
+         ybottom = -100,ytop = 100,
+         col=rect.col,
+         border = NA)
+    graphics::axis(1, at=chrom.len$flats, labels=chrom.len$Group.1)
+    graphics::box()
+    graphics::mtext(side=3, line=2, at=-0.07, adj=0, cex=1.2, title)
+    graphics::mtext(side=3, line=1, at=-0.07, adj=0, cex=1, sub.title)
+    graphics::abline(h = seq.int(round(min(segTab$segVal))-1,cn.max,1),lty="dashed",col="gray50")
+    graphics::segments(x0 = segTab$startf,y0 = segTab$segVal,x1 = segTab$endf,y1 = segTab$segVal,lwd=3,col="blue")
+}
+pat_vig_246 <- get_patient_vig(diff_matrix = diff_matrix,pat.name = "BRITROC-246")
+ggsave2(pat_vig_246,filename = "plots/pat_vig_246.pdf")
 ```
 
 - Plot gene per chromosome from most variable subset and GOterm analysis
