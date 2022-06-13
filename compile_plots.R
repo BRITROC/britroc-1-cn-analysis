@@ -100,6 +100,7 @@ tissue_legend_strat <- get_legend(
     theme(legend.position = "bottom")
 )
 
+## Load patient-specific figures
 focal_pairs_plot <- readRDS("copy_number_analysis/focal_analysis/plots/gene_pairs_plot.RDS")
 focal_heatmap_plot <- readRDS("copy_number_analysis/focal_analysis/plots/gene_change_heatmap.RDS")
 

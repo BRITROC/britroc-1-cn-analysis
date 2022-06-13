@@ -98,7 +98,7 @@ diag_tissue_blocks <- RPostgres::dbReadTable(britroc_con,name = "tissue_blocks")
 diag_pre_op <- RPostgres::dbReadTable(britroc_con,name = "pre_relapse_operations")
 
 diag_tissue_table <- left_join(diag_tissue_blocks,diag_pre_op,"histological_id") %>%
-                      select(histological_id,tissue_site) %>%
+                      dplyr::select(histological_id,tissue_site) %>%
                       rename("fk_histological_id"="histological_id")
 
 relapse_tissue_blocks <- RPostgres::dbReadTable(britroc_con,name = "relapse_tissue_samples")
@@ -119,49 +119,19 @@ site_table <- left_join(sample_table,diag_tissue_table,"fk_histological_id") %>%
 ```
 
 ```{r normalise_tissue}
-tissue_mapping <- read.table("data/tissue_mapping.txt",header = TRUE,sep = "\t")
+tissue_mapping <- read.table("data/tissue_mapping_V2.txt",header = TRUE,sep = "\t")
 
 site_table$location_curated <- tissue_mapping$location_curated[match(site_table$tissue_site,tissue_mapping$Location.of.Tumour.biopsied)]
 site_table$tissue_grouped <- tissue_mapping$tissue_group_curated[match(site_table$tissue_site,tissue_mapping$Location.of.Tumour.biopsied)]
 
-## Some samples have more than one tissue entry for one sample
+## Some samples have more than one tissue entry for one sample and are dropped
 dup_samples <- site_table$SAMPLE_ID[which(duplicated(site_table$SAMPLE_ID))]
+length(dup_samples)
 site_table <- site_table[which(!site_table$SAMPLE_ID %in% dup_samples),] %>%
                 select(SAMPLE_ID,tissue_site,location_curated,tissue_grouped)
+table(site_table$location_curated)
+table(site_table$tissue_grouped)
 tissue_data <- site_table
-```
-
-```{r format_tissue_table}
-# tissue_data_diag <- read.table("data/Archival_samples_curated.txt",
-#                                header = T,
-#                                sep = "\t",
-#                                quote = "",
-#                                na.strings = "",
-#                                comment.char = "",fill = T)
-# 
-# tissue_data_relapse <- read.table("data/Biopsies_relapse_curated.csv",
-#                                   header = T,
-#                                   sep = ",",
-#                                   na.strings = "")
-# 
-# tissue_data_diag <- tissue_data_diag %>%
-#                 dplyr::select(BritRoc.No,IM_ID,archival_location_curated,archival_tissue_grouped) %>%
-#                 rename(PATIENT_ID = "BritRoc.No",
-#                        SAMPLE_ID = "IM_ID",
-#                        location_curated = "archival_location_curated",
-#                        tissue_grouped = "archival_tissue_grouped") %>%
-#                 mutate(PATIENT_ID = paste0("BRITROC-",PATIENT_ID))
-# 
-# tissue_data_relapse <- tissue_data_relapse %>%
-#                 dplyr::select(BritRoc.No,JBLAB_ID,relapse_location_curated,relapse_tissue_grouped) %>%
-#                 rename(PATIENT_ID = "BritRoc.No",
-#                        SAMPLE_ID = "JBLAB_ID",
-#                        location_curated = "relapse_location_curated",
-#                        tissue_grouped = "relapse_tissue_grouped") %>%
-#                 mutate(PATIENT_ID = paste0("BRITROC-",PATIENT_ID))
-# 
-# tissue_data <- rbind(tissue_data_diag,tissue_data_relapse)
-# head(tissue_data)
 ```
 
 ```{r add_tissue_metadata}
@@ -220,6 +190,10 @@ cna_calls <- get_cna_calls(data = cna_data)
 tissue_samples <- split(meta.data$SAMPLE_ID,f = list(meta.data$tissue_grouped),drop = T)
 tissue_samples
 ```
+```{r drop_low_counts}
+tissue_samples <- tissue_samples[unlist(lapply(tissue_samples,FUN = function(x){length(x) > 2}))]
+```
+
 
 ## Analysis
 ### CNA rates
@@ -304,7 +278,8 @@ pairwise.fishers.results
 cna_copies <- get_cna_changes(data = cna_data,genes = focal_genes_table$Gene.name,patients = meta.data$PATIENT_ID) %>%
                 mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse")) %>%
                 mutate(tissue = meta.data$tissue_grouped[match(SAMPLE_ID,meta.data$SAMPLE_ID)]) %>%
-                filter(!is.na(tissue)) #%>%
+                filter(!is.na(tissue)) %>%
+                filter(tissue != "uncertain")
                 # mutate(tissue = ifelse(is.na(tissue),"diagnosis",as.character(tissue)))
 ```
 
@@ -360,7 +335,8 @@ cna_count_anova[order(cna_count_anova$anova_pval),]
 ```{r ith_data}
 ith_table_tissue <- ith_table %>%
                       mutate(tissue = meta.data$tissue_grouped[match(sample,meta.data$SAMPLE_ID)]) %>%
-                      filter(!is.na(tissue))
+                      filter(!is.na(tissue)) %>%
+                      filter(tissue != "uncertain")
 ```
 
 ```{r ith_plot}
@@ -387,8 +363,9 @@ signatures_table <- signatures %>%
                      rownames_to_column(var = "signature") %>%
                      pivot_longer(cols = 2:ncol(.),names_to = "SAMPLE_ID",values_to = "exposure") %>%
                      mutate(tissue = meta.data$tissue_grouped[match(SAMPLE_ID,meta.data$SAMPLE_ID)]) %>%
-                     filter(!is.na(tissue))
-signatures_table
+                     filter(!is.na(tissue)) %>%
+                     filter(tissue != "uncertain")
+head(signatures_table)
 ```
 
 ```{r sig_plot}
@@ -433,8 +410,11 @@ signature_tissue_anova <- do.call(rbind,lapply(unique(signatures_table$signature
   return(out)
 }))
 signature_tissue_anova$q.val <- p.adjust(signature_tissue_anova$posthoc_pval,method = "bonferroni")
-signature_tissue_anova[order(signature_tissue_anova$anova_pval),]
+signature_tissue_anova_tab <- signature_tissue_anova[order(signature_tissue_anova$anova_pval),]
+write.table(signature_tissue_anova_tab,file = "data/signature_tissue_anova_results_table.tsv",quote = F,row.names = F,col.names = T,sep = "\t")
+signature_tissue_anova_tab
 ```
+### Diag/Relapse stratification
 
 ```{r cn_by_diag_relapse}
 obs_table <- as.matrix(table(cna_copies$group[cna_copies$gene == "BRCA1"],
@@ -443,8 +423,57 @@ obs_table <- as.matrix(table(cna_copies$group[cna_copies$gene == "BRCA1"],
 obs_table
 
 tissue_obs_sufficient <- colnames(obs_table)[which(apply(obs_table,MARGIN = 2,FUN = function(x) all(x > 2)))]
-
+tissue_obs_sufficient
 cna_copies_stratified <- cna_copies[cna_copies$tissue %in% tissue_obs_sufficient,]
+```
+
+```{r get_rates_Strat}
+tissue_samples_stratified <- split(meta.data$SAMPLE_ID[meta.data$tissue_grouped %in% tissue_obs_sufficient],
+                                   f = list(meta.data$tissue_grouped[meta.data$tissue_grouped %in% tissue_obs_sufficient],
+                                            meta.data$group[meta.data$tissue_grouped %in% tissue_obs_sufficient]),drop = T)
+
+cna_rates_tissue_stratified <- do.call(rbind,lapply(X = names(tissue_samples_stratified),FUN = function(x){
+  rates <- get_cna_rates(data = cna_calls[,colnames(cna_calls) %in% tissue_samples_stratified[[x]]],
+                            genes = focal_genes_table$Gene.name)
+  rates$tissue <- rep(x,times=nrow(rates))
+  rates <- rates %>%
+            separate(tissue,c("tissue","type")) %>%
+            mutate(type = case_when(type == "arx" ~ "diagnosis",
+                                    type == "rlps" ~ "relapse"))
+  return(rates)
+}))
+
+focal_rate_plot_amp <- ggplot(cna_rates_tissue_stratified[cna_rates_tissue_stratified$group == "amplification",]) +
+  geom_col(aes(x = type,y = rate,fill = type),
+           position="dodge",color="grey20") +
+  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+  labs(title = "") +
+  xlab("") +
+  ylab("rate (%)") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+          axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90),
+        legend.position = "bottom") +
+  facet_grid(cols = vars(tissue),rows = vars(gene),scales = "free")
+
+focal_rate_plot_del <- ggplot(cna_rates_tissue_stratified[cna_rates_tissue_stratified$group == "deletion",]) +
+  geom_col(aes(x = type,y = rate,fill = type),
+           position="dodge",color="grey20") +
+  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+  labs(title = "") +
+  xlab("") +
+  ylab("rate (%)") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+          axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90),
+        legend.position = "bottom") +
+  facet_grid(cols = vars(tissue),rows = vars(gene),scales = "free")
+
+focal_rate_plot_strat <- plot_grid(focal_rate_plot_amp,focal_rate_plot_del,ncol = 2,labels = c("A","B"))
+
+saveRDS(focal_rate_plot_strat,file = "plots/cna_rates_tissue_stratified.RDS")
+ggsave(plot = focal_rate_plot_strat,filename = "plots/cna_rates_tissue_stratified.png",width = 8,height = 8,units = "in",dpi = 300)
+focal_rate_plot_strat
 ```
 
 ```{r cn_by_diag_relapse_plot}
@@ -459,8 +488,8 @@ cn_count_tissue_plot <- ggplot(cna_copies_stratified) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90,vjust = 0.5))
 
-saveRDS(cn_count_tissue_plot,file = "plots/cn_count_tissue.RDS")
-ggsave(plot = cn_count_tissue_plot,filename = "plots/cn_count_tissue.png",width = 10,height = 8,units = "in",dpi = 300)
+saveRDS(cn_count_tissue_plot,file = "plots/cn_count_tissue_stratified.RDS")
+ggsave(plot = cn_count_tissue_plot,filename = "plots/cn_count_tissue_stratified.png",width = 10,height = 8,units = "in",dpi = 300)
 cn_count_tissue_plot
 ```
 
@@ -497,8 +526,8 @@ cn_sigs_tissueplot2 <- ggplot(signatures_table_group) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90,vjust = 0.5))
 
-saveRDS(cn_sigs_tissueplot1,file = "plots/cn_sigs_tissue.RDS")
-ggsave(plot = cn_count_tissue_plot,filename = "plots/cn_sigs_tissue.png",width = 10,height = 8,units = "in",dpi = 300)
+saveRDS(cn_sigs_tissueplot1,file = "plots/cn_sigs_tissue_strat.RDS")
+ggsave(plot = cn_count_tissue_plot,filename = "plots/cn_sigs_tissue_strat.png",width = 10,height = 8,units = "in",dpi = 300)
 cn_sigs_tissueplot1
 ```
 

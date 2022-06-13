@@ -473,7 +473,7 @@ norm_paired_changes_ploidy <- norm_paired_changes_all %>%
 
 ploidy_norm_gene_cn_plot <- ggplot(norm_paired_changes_ploidy) +
   geom_hline(yintercept = 0) +
-  geom_line(aes(group,`copy number`,group=PATIENT_ID),alpha = 0.3) +
+  geom_line(aes(group,`copy number`,group=PATIENT_ID),alpha = 0.15) +
   geom_jitter(aes(group,`copy number`,color=group),alpha = 0.3,
               position = position_dodge(width = 0.6)) +
   geom_violin(aes(group,`copy number`,color=group),fill=NA) +
@@ -514,6 +514,7 @@ ann_pt <- patient_data$pt_sensitivity_at_reg[match(rownames(cor_data_all_sub),
                                              paste0("BRITROC-",patient_data$britroc_number))]
 ann_stage <- patient_data$tumour_stage_at_diagnosis[match(rownames(cor_data_all_sub),
                                              paste0("BRITROC-",patient_data$britroc_number))]
+
 
 col_ann <- HeatmapAnnotation(age=ann_age,
                              prior_lines=as.factor(ann_prior),
@@ -627,6 +628,8 @@ norm_paired_changes_all
 norm_paired_changes_sub <- norm_paired_changes_all[norm_paired_changes_all$gene %in% focal_genes_table$Gene.name,]
 norm_paired_changes_sub[order(norm_paired_changes_sub$change),]
 ```
+Patient-specific alterations, while difficult to associate with specific clinical events or features as a singular observation, did demonstrate bioloigcally interesting genomic alterations. For example,  BRITROC-65 & BRITROC-37 demonstrated extreme gains of KRAS.
+
 
 ```{r patient_vignettes_2}
 get_patient_vig <- function(diff_matrix = NULL,pat.name = NULL){
@@ -663,6 +666,7 @@ get_patient_vig <- function(diff_matrix = NULL,pat.name = NULL){
 
 plotSegments <- function(object=NULL,pat.name=NULL,cn.max=15){
     diff_matrix_s <- object[,pat.name]
+    #diff_matrix_s <- round(diff_matrix_s,digits = 0)
     fdfiltfull <- as.data.frame(str_split(string = names(diff_matrix_s),pattern = ":|-",simplify = TRUE))
     colnames(fdfiltfull) <- c("chromosome","start","end")
     
@@ -709,7 +713,15 @@ plotSegments <- function(object=NULL,pat.name=NULL,cn.max=15){
     chrom.len$flate <- getcoordinates(chr = chrom.len$Group.1,pos = chrom.len$x.max,chrom.len = chrom.len)
 
     title <- pat.name
-    sub.title <- paste0("segments: ",seg.n)
+    sub.title <- paste0("age: ",unique(patient_data$age[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]),
+                        " | ",
+                        "status: ",unique(patient_data$status[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]),
+                        " | ",
+                        "stage: ",unique(patient_data$tumour_stage_at_diagnosis[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]),
+                        " | ",
+                        "platinum status: ",unique(patient_data$pt_sensitivity_at_reg[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]),
+                        " | ",
+                        "prior lines: ",unique(patient_data$pre_reg_chemo[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]))
     rect.col <- ifelse(seq_along(chrom.len$Group.1) %% 2 == 0,"white","grey95")
 
     graphics::par(mar=c(5, 4, 4, 4) + 0.2)
@@ -735,13 +747,11 @@ plotSegments <- function(object=NULL,pat.name=NULL,cn.max=15){
     graphics::abline(h = seq.int(round(min(segTab$segVal))-1,cn.max,1),lty="dashed",col="gray50")
     graphics::segments(x0 = segTab$startf,y0 = segTab$segVal,x1 = segTab$endf,y1 = segTab$segVal,lwd=3,col="blue")
 }
-pat_vig_246 <- get_patient_vig(diff_matrix = diff_matrix,pat.name = "BRITROC-246")
-ggsave2(pat_vig_246,filename = "plots/pat_vig_246.pdf")
-```
 
-- Plot gene per chromosome from most variable subset and GOterm analysis
-- Pattern of patient-level alterations 
-- Correlation / co-occurrence with SNV data
+pat_vig_65 <- get_patient_vig(diff_matrix = diff_matrix,pat.name = "BRITROC-65")
+ggsave2(pat_vig_65,filename = "plots/pat_vig_65.pdf",height = 12,width = 8)
+ggsave2(pat_vig_65,filename = "plots/pat_vig_65.png",height = 12,width = 8,dpi = 300)
+```
 
 ### Session info
 

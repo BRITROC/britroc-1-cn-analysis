@@ -503,6 +503,7 @@ paired_amp_changes <- get_patient_changes(data = copies,
 
 copy_state_groups <- ggplot(paired_amp_changes) +
   #geom_point(aes(x = gene,y=value,fill=group),position="jitter",alpha = 0.3) +
+  geom_line(aes(x = group,y=value,group=PATIENT_ID),alpha = 0.3) +
   geom_point(aes(x = group,y=value,color=group),
              position=position_jitterdodge(jitter.width = 0.2),
              alpha=0.2) +
