@@ -177,6 +177,122 @@ plotSegments <- function(object=NULL,pat.name=NULL,cn.max=15){
     graphics::abline(h = seq.int(round(min(segTab$segVal))-1,cn.max,1),lty="dashed",col="gray50")
     graphics::segments(x0 = segTab$startf,y0 = segTab$segVal,x1 = segTab$endf,y1 = segTab$segVal,lwd=3,col="blue")
 }
+
+get_patient_vig <- function(diff_matrix = NULL,pat.name = NULL){
+  pat.name <<- pat.name
+  seg_formula <- ~{
+  plotSegments(object = diff_matrix,pat.name = pat.name)
+  }
+  seg_plot <- ggdraw(seg_formula)
+  
+  gene_p1 <- ggplot(norm_paired_changes[norm_paired_changes$PATIENT_ID == pat.name,]) +
+    geom_col(aes(gene,change)) +
+    theme_bw() + theme(axis.text.x = element_text(angle = 90))
+  
+  ith_p2 <- ggplot() +
+              geom_jitter(data = ith[ith$patient != pat.name,],aes(group,ith,colour=group),
+                          alpha=0.4,
+                          position = position_dodge2(width = 0.4)) +
+              scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+              geom_point(data = ith[ith$patient == pat.name,],aes(group,ith),colour="red") +
+              theme_bw()
+  
+  sig_p3 <- ggplot() +
+              geom_jitter(data = signature.table[signature.table$PATIENT_ID != pat.name,],aes(group,exposure,colour=group),
+                          alpha=0.4,
+                          position = position_dodge2(width = 0.4)) +
+              scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+              geom_point(data = signature.table[signature.table$PATIENT_ID == pat.name,],aes(group,exposure),colour="red") +
+              facet_wrap(. ~ signature,nrow = 1) +
+              theme_bw() + theme(legend.position = "none",axis.text.x = element_text(angle = 90))
+  
+  pat_vig <- plot_grid(seg_plot,gene_p1,sig_p3,nrow=3,rel_heights = c(0.5,0.25,0.25),axis = "r",align = "h")
+  return(pat_vig)
+}
+
+plotSegments <- function(object=NULL,pat.name=NULL,cn.max=15){
+    diff_matrix_s <- object[,pat.name]
+    #diff_matrix_s <- round(diff_matrix_s,digits = 0)
+    fdfiltfull <- as.data.frame(str_split(string = names(diff_matrix_s),pattern = ":|-",simplify = TRUE))
+    colnames(fdfiltfull) <- c("chromosome","start","end")
+    
+    segTable<-c()
+    for(c in unique(fdfiltfull$chromosome)){
+        snfilt<-diff_matrix_s[fdfiltfull$chromosome==c]
+        fdfilt<-fdfiltfull[fdfiltfull$chromosome==c,]
+        sn.rle<-rle(snfilt)
+        starts <- cumsum(c(1, sn.rle$lengths[-length(sn.rle$lengths)]))
+        ends <- cumsum(sn.rle$lengths)
+        lapply(1:length(sn.rle$lengths), function(s) {
+          from <- fdfilt$start[starts[s]]
+          to <- fdfilt$end[ends[s]]
+          segValue <- sn.rle$value[s]
+          c(fdfilt$chromosome[starts[s]], from, to, segValue)
+        }) -> segtmp
+        segTableRaw <- data.frame(matrix(unlist(segtmp), ncol=4, byrow=T),stringsAsFactors=F)
+        segTable<-rbind(segTable,segTableRaw)
+    }
+    colnames(segTable) <- c("chromosome", "start", "end", "segVal")
+    segTable$chromosome <- factor(segTable$chromosome,levels = stringr::str_sort(unique(segTable$chromosome),numeric = T))
+    segTable <- segTable[order(segTable$chromosome,segTable$start),]
+
+    segTab <- segTable
+    
+    if(max(segTab$segVal) > cn.max){
+        segTab$segVal[segTab$segVal > cn.max] <- cn.max
+        ylim <- c(-cn.max,cn.max)
+    } else {
+        ylim <- c(-round(max(segTab$segVal))-1,round(max(segTab$segVal))+1)
+    }
+    
+    seg.n <- nrow(segTab)
+    chrom.len <- data.frame(Group.1=unique(segTab$chromosome))
+    chrom.len$x.max <- stats::aggregate(segTab$end,by = list(segTab$chromosome),FUN = max)$x
+    chrom.len$x.min <- stats::aggregate(segTab$start,by = list(segTab$chromosome),FUN = min)$x
+    chrom.len$Group.1 <- factor(chrom.len$Group.1,levels = stringr::str_sort(unique(chrom.len$Group.1),numeric = T))
+    chrom.len <- chrom.len[order(chrom.len$Group.1),]
+
+    segTab$startf <- getcoordinates(chr = segTab$chromosome,pos = segTab$start,chrom.len = chrom.len)
+    segTab$endf <- getcoordinates(chr = segTab$chromosome,pos = segTab$end,chrom.len = chrom.len)
+    chrom.len$flatm <- getcoordinates(chr = chrom.len$Group.1,pos = chrom.len$x.min,chrom.len = chrom.len)
+    chrom.len$flats <- getcoordinates(chr = chrom.len$Group.1,pos = chrom.len$x.max/2,chrom.len = chrom.len)
+    chrom.len$flate <- getcoordinates(chr = chrom.len$Group.1,pos = chrom.len$x.max,chrom.len = chrom.len)
+
+    title <- pat.name
+    sub.title <- paste0("age: ",unique(patient_data$age[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]),
+                        " | ",
+                        "status: ",unique(patient_data$status[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]),
+                        " | ",
+                        "stage: ",unique(patient_data$tumour_stage_at_diagnosis[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]),
+                        " | ",
+                        "platinum status: ",unique(patient_data$pt_sensitivity_at_reg[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]),
+                        " | ",
+                        "prior lines: ",unique(patient_data$pre_reg_chemo[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]))
+    rect.col <- ifelse(seq_along(chrom.len$Group.1) %% 2 == 0,"white","grey95")
+
+    graphics::par(mar=c(5, 4, 4, 4) + 0.2)
+    graphics::plot(NA,
+         xlab="chromosome",
+         ylab="copy number change",
+         las=1,
+         xlim=c(min(chrom.len$flatm), max(chrom.len$flate)),
+         ylim=ylim,
+         xaxs="i",
+         xaxt="n",
+         yaxp=c(ylim[1], ylim[2], ylim[2]-ylim[1]),
+         yaxs="i")
+    graphics::rect(xleft = chrom.len$flatm,
+         xright = chrom.len$flate,
+         ybottom = -100,ytop = 100,
+         col=rect.col,
+         border = NA)
+    graphics::axis(1, at=chrom.len$flats, labels=chrom.len$Group.1)
+    graphics::box()
+    graphics::mtext(side=3, line=2, at=-0.07, adj=0, cex=1.2, title)
+    graphics::mtext(side=3, line=1, at=-0.07, adj=0, cex=1, sub.title)
+    graphics::abline(h = seq.int(round(min(segTab$segVal))-1,cn.max,1),lty="dashed",col="gray50")
+    graphics::segments(x0 = segTab$startf,y0 = segTab$segVal,x1 = segTab$endf,y1 = segTab$segVal,lwd=3,col="blue")
+}
 ```
 
 ## Load data
@@ -628,129 +744,42 @@ norm_paired_changes_all
 norm_paired_changes_sub <- norm_paired_changes_all[norm_paired_changes_all$gene %in% focal_genes_table$Gene.name,]
 norm_paired_changes_sub[order(norm_paired_changes_sub$change),]
 ```
-Patient-specific alterations, while difficult to associate with specific clinical events or features as a singular observation, did demonstrate bioloigcally interesting genomic alterations. For example,  BRITROC-65 & BRITROC-37 demonstrated extreme gains of KRAS.
 
+Patient-specific alterations, while difficult to associate with specific clinical events or features as a singular observation, did demonstrate biologically interesting genomic alterations. For example,  BRITROC-65 & BRITROC-37 demonstrated extreme gains of KRAS.Whereas other patietns had notable losses of clinically relevant or frequently altered genes such as BRITROC-36 which had a 16 copy loss of AKT2 and 6 copy loss of NF1, and BRITROC-242 & BRITROC-246 which demonstrated more than 10 copy loss of CCNE1.
 
-```{r patient_vignettes_2}
-get_patient_vig <- function(diff_matrix = NULL,pat.name = NULL){
-  pat.name <<- pat.name
-  seg_formula <- ~{
-  plotSegments(object = diff_matrix,pat.name = pat.name)
-  }
-  seg_plot <- ggdraw(seg_formula)
-  
-  gene_p1 <- ggplot(norm_paired_changes[norm_paired_changes$PATIENT_ID == pat.name,]) +
-    geom_col(aes(gene,change)) +
-    theme_bw() + theme(axis.text.x = element_text(angle = 90))
-  
-  ith_p2 <- ggplot() +
-              geom_jitter(data = ith[ith$patient != pat.name,],aes(group,ith,colour=group),
-                          alpha=0.4,
-                          position = position_dodge2(width = 0.4)) +
-              scale_color_manual(values = colour_palettes$diagnosis_relapse) +
-              geom_point(data = ith[ith$patient == pat.name,],aes(group,ith),colour="red") +
-              theme_bw()
-  
-  sig_p3 <- ggplot() +
-              geom_jitter(data = signature.table[signature.table$PATIENT_ID != pat.name,],aes(group,exposure,colour=group),
-                          alpha=0.4,
-                          position = position_dodge2(width = 0.4)) +
-              scale_color_manual(values = colour_palettes$diagnosis_relapse) +
-              geom_point(data = signature.table[signature.table$PATIENT_ID == pat.name,],aes(group,exposure),colour="red") +
-              facet_wrap(. ~ signature,nrow = 1) +
-              theme_bw() + theme(legend.position = "none",axis.text.x = element_text(angle = 90))
-  
-  pat_vig <- plot_grid(seg_plot,gene_p1,sig_p3,nrow=3,rel_heights = c(0.5,0.25,0.25),axis = "r",align = "h")
-  return(pat_vig)
-}
-
-plotSegments <- function(object=NULL,pat.name=NULL,cn.max=15){
-    diff_matrix_s <- object[,pat.name]
-    #diff_matrix_s <- round(diff_matrix_s,digits = 0)
-    fdfiltfull <- as.data.frame(str_split(string = names(diff_matrix_s),pattern = ":|-",simplify = TRUE))
-    colnames(fdfiltfull) <- c("chromosome","start","end")
-    
-    segTable<-c()
-    for(c in unique(fdfiltfull$chromosome)){
-        snfilt<-diff_matrix_s[fdfiltfull$chromosome==c]
-        fdfilt<-fdfiltfull[fdfiltfull$chromosome==c,]
-        sn.rle<-rle(snfilt)
-        starts <- cumsum(c(1, sn.rle$lengths[-length(sn.rle$lengths)]))
-        ends <- cumsum(sn.rle$lengths)
-        lapply(1:length(sn.rle$lengths), function(s) {
-          from <- fdfilt$start[starts[s]]
-          to <- fdfilt$end[ends[s]]
-          segValue <- sn.rle$value[s]
-          c(fdfilt$chromosome[starts[s]], from, to, segValue)
-        }) -> segtmp
-        segTableRaw <- data.frame(matrix(unlist(segtmp), ncol=4, byrow=T),stringsAsFactors=F)
-        segTable<-rbind(segTable,segTableRaw)
-    }
-    colnames(segTable) <- c("chromosome", "start", "end", "segVal")
-    segTable$chromosome <- factor(segTable$chromosome,levels = stringr::str_sort(unique(segTable$chromosome),numeric = T))
-    segTable <- segTable[order(segTable$chromosome,segTable$start),]
-
-    segTab <- segTable
-    
-    if(max(segTab$segVal) > cn.max){
-        segTab$segVal[segTab$segVal > cn.max] <- cn.max
-        ylim <- c(-cn.max,cn.max)
-    } else {
-        ylim <- c(-round(max(segTab$segVal))-1,round(max(segTab$segVal))+1)
-    }
-    
-    seg.n <- nrow(segTab)
-    chrom.len <- data.frame(Group.1=unique(segTab$chromosome))
-    chrom.len$x.max <- stats::aggregate(segTab$end,by = list(segTab$chromosome),FUN = max)$x
-    chrom.len$x.min <- stats::aggregate(segTab$start,by = list(segTab$chromosome),FUN = min)$x
-    chrom.len$Group.1 <- factor(chrom.len$Group.1,levels = stringr::str_sort(unique(chrom.len$Group.1),numeric = T))
-    chrom.len <- chrom.len[order(chrom.len$Group.1),]
-
-    segTab$startf <- getcoordinates(chr = segTab$chromosome,pos = segTab$start,chrom.len = chrom.len)
-    segTab$endf <- getcoordinates(chr = segTab$chromosome,pos = segTab$end,chrom.len = chrom.len)
-    chrom.len$flatm <- getcoordinates(chr = chrom.len$Group.1,pos = chrom.len$x.min,chrom.len = chrom.len)
-    chrom.len$flats <- getcoordinates(chr = chrom.len$Group.1,pos = chrom.len$x.max/2,chrom.len = chrom.len)
-    chrom.len$flate <- getcoordinates(chr = chrom.len$Group.1,pos = chrom.len$x.max,chrom.len = chrom.len)
-
-    title <- pat.name
-    sub.title <- paste0("age: ",unique(patient_data$age[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]),
-                        " | ",
-                        "status: ",unique(patient_data$status[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]),
-                        " | ",
-                        "stage: ",unique(patient_data$tumour_stage_at_diagnosis[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]),
-                        " | ",
-                        "platinum status: ",unique(patient_data$pt_sensitivity_at_reg[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]),
-                        " | ",
-                        "prior lines: ",unique(patient_data$pre_reg_chemo[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]))
-    rect.col <- ifelse(seq_along(chrom.len$Group.1) %% 2 == 0,"white","grey95")
-
-    graphics::par(mar=c(5, 4, 4, 4) + 0.2)
-    graphics::plot(NA,
-         xlab="chromosome",
-         ylab="copy number change",
-         las=1,
-         xlim=c(min(chrom.len$flatm), max(chrom.len$flate)),
-         ylim=ylim,
-         xaxs="i",
-         xaxt="n",
-         yaxp=c(ylim[1], ylim[2], ylim[2]-ylim[1]),
-         yaxs="i")
-    graphics::rect(xleft = chrom.len$flatm,
-         xright = chrom.len$flate,
-         ybottom = -100,ytop = 100,
-         col=rect.col,
-         border = NA)
-    graphics::axis(1, at=chrom.len$flats, labels=chrom.len$Group.1)
-    graphics::box()
-    graphics::mtext(side=3, line=2, at=-0.07, adj=0, cex=1.2, title)
-    graphics::mtext(side=3, line=1, at=-0.07, adj=0, cex=1, sub.title)
-    graphics::abline(h = seq.int(round(min(segTab$segVal))-1,cn.max,1),lty="dashed",col="gray50")
-    graphics::segments(x0 = segTab$startf,y0 = segTab$segVal,x1 = segTab$endf,y1 = segTab$segVal,lwd=3,col="blue")
-}
-
+```{r plot_vigs_1}
 pat_vig_65 <- get_patient_vig(diff_matrix = diff_matrix,pat.name = "BRITROC-65")
 ggsave2(pat_vig_65,filename = "plots/pat_vig_65.pdf",height = 12,width = 8)
 ggsave2(pat_vig_65,filename = "plots/pat_vig_65.png",height = 12,width = 8,dpi = 300)
+pat_vig_65
+```
+
+```{r plot_vigs_2}
+pat_vig_37 <- get_patient_vig(diff_matrix = diff_matrix,pat.name = "BRITROC-37")
+ggsave2(pat_vig_37,filename = "plots/pat_vig_37.pdf",height = 12,width = 8)
+ggsave2(pat_vig_37,filename = "plots/pat_vig_37.png",height = 12,width = 8,dpi = 300)
+pat_vig_37
+```
+
+```{r plot_vigs_3}
+pat_vig_36 <- get_patient_vig(diff_matrix = diff_matrix,pat.name = "BRITROC-36")
+ggsave2(pat_vig_36,filename = "plots/pat_vig_36.pdf",height = 12,width = 8)
+ggsave2(pat_vig_36,filename = "plots/pat_vig_36.png",height = 12,width = 8,dpi = 300)
+pat_vig_36
+```
+
+```{r plot_vigs_4}
+pat_vig_242 <- get_patient_vig(diff_matrix = diff_matrix,pat.name = "BRITROC-242")
+ggsave2(pat_vig_242,filename = "plots/pat_vig_242.pdf",height = 12,width = 8)
+ggsave2(pat_vig_242,filename = "plots/pat_vig_242.png",height = 12,width = 8,dpi = 300)
+pat_vig_242
+```
+
+```{r plot_vigs_5}
+pat_vig_246 <- get_patient_vig(diff_matrix = diff_matrix,pat.name = "BRITROC-246")
+ggsave2(pat_vig_246,filename = "plots/pat_vig_246.pdf",height = 12,width = 8)
+ggsave2(pat_vig_246,filename = "plots/pat_vig_246.png",height = 12,width = 8,dpi = 300)
+pat_vig_246
 ```
 
 ### Session info
