@@ -257,13 +257,14 @@ plotSegments <- function(object=NULL,pat.name=NULL,cn.max=15){
     chrom.len$flatm <- getcoordinates(chr = chrom.len$Group.1,pos = chrom.len$x.min,chrom.len = chrom.len)
     chrom.len$flats <- getcoordinates(chr = chrom.len$Group.1,pos = chrom.len$x.max/2,chrom.len = chrom.len)
     chrom.len$flate <- getcoordinates(chr = chrom.len$Group.1,pos = chrom.len$x.max,chrom.len = chrom.len)
-
+    stage <- unique(patient_data$tumour_stage_at_diagnosis[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")])
+    substage <- as.character(unique(patient_data$tumour_substage_at_diagnosis[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]))
+    substage <- ifelse(is.na(substage),"",substage)
+    
     title <- pat.name
     sub.title <- paste0("age: ",unique(patient_data$age[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]),
                         " | ",
-                        "status: ",unique(patient_data$status[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]),
-                        " | ",
-                        "stage: ",unique(patient_data$tumour_stage_at_diagnosis[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]),
+                        "stage: ",paste0(stage,substage),
                         " | ",
                         "platinum status: ",unique(patient_data$pt_sensitivity_at_reg[patient_data$britroc_number == gsub(pat.name,pattern = "BRITROC-",replacement = "")]),
                         " | ",
@@ -445,7 +446,8 @@ norm_paired_change_summary$PATIENT_ID <- factor(norm_paired_change_summary$PATIE
 
 ggplot(norm_paired_change_summary) +
   geom_point(aes(change,PATIENT_ID,color=shift),alpha = 0.5) +
-  geom_boxplot(aes(change,PATIENT_ID,fill=shift),outlier.alpha = 0)
+  geom_boxplot(aes(change,PATIENT_ID,fill=shift),outlier.alpha = 0) +
+  theme_bw()
 ```
 
 ```{r change_cor_mat_select_genes}
@@ -744,6 +746,68 @@ norm_paired_changes_all
 norm_paired_changes_sub <- norm_paired_changes_all[norm_paired_changes_all$gene %in% focal_genes_table$Gene.name,]
 norm_paired_changes_sub[order(norm_paired_changes_sub$change),]
 ```
+```{r test}
+norm_paired_changes_all$status <- patient_data$pt_sensitivity_at_reg[match(norm_paired_changes_all$PATIENT_ID,
+                                                                           paste0("BRITROC-",patient_data$britroc_number))]
+norm_paired_changes_all$prior_lines <- patient_data$pre_reg_chemo[match(norm_paired_changes_all$PATIENT_ID,
+                                                           paste0("BRITROC-",patient_data$britroc_number))]
+ggplot(norm_paired_changes_all) +
+  geom_jitter(aes(status,change,group=status,color=status),position = position_dodge2(width = 0.3)) +
+  #geom_boxplot(aes(status,change),outlier.alpha = 0) +
+  geom_signif(aes(status,change),comparisons = list(c("resistant","sensitive"))) +
+  scale_color_manual(values = colour_palettes$resist_sensitive) +
+  theme_bw()
+
+ggplot(norm_paired_changes_all) +
+  geom_jitter(aes(as.factor(prior_lines),change,color=as.factor(prior_lines)),position = position_dodge2(width = 0.3)) +
+  #geom_boxplot(aes(status,change),outlier.alpha = 0) +
+  #geom_signif(aes(status,change),comparisons = list(c("resistant","sensitive"))) +
+  facet_wrap(. ~ status) +
+  theme_bw()
+
+norm_paired_changes_sub$status <- patient_data$pt_sensitivity_at_reg[match(norm_paired_changes_sub$PATIENT_ID,
+                                                                           paste0("BRITROC-",patient_data$britroc_number))]
+
+norm_paired_changes_sub$prior_lines <- patient_data$pre_reg_chemo[match(norm_paired_changes_sub$PATIENT_ID,
+                                                           paste0("BRITROC-",patient_data$britroc_number))]
+ggplot(norm_paired_changes_sub) +
+  geom_jitter(aes(status,change,group=status,color=status),position = position_dodge2(width = 0.3)) +
+  #geom_boxplot(aes(status,change),outlier.alpha = 0) +
+  geom_signif(aes(status,change),comparisons = list(c("resistant","sensitive"))) +
+  scale_color_manual(values = colour_palettes$resist_sensitive) +
+  theme_bw()
+
+
+t1 <- norm_paired_changes_all %>%
+  mutate(change_prop = ifelse(abs(change) > 3,"TRUE","FALSE")) %>%
+  group_by(PATIENT_ID) %>%
+  mutate(prop = sum(change_prop == "TRUE")/length(change_prop)) %>%
+  dplyr::select(-gene,-arx,-rlps,-change,-chr,-change_prop) %>%
+  distinct()
+
+ggplot(t1) +
+  geom_jitter(aes(status,prop,group=status,color=status),position = position_dodge2(width = 0.3)) +
+  geom_boxplot(aes(status,prop),outlier.alpha = 0) +
+  geom_signif(aes(status,prop),comparisons = list(c("resistant","sensitive")),test = "wilcox.test") +
+  scale_color_manual(values = colour_palettes$resist_sensitive) +
+  theme_bw()
+
+t2 <- norm_paired_changes_sub %>%
+  mutate(change_prop = ifelse(abs(change) > 3,"TRUE","FALSE")) %>%
+  group_by(PATIENT_ID) %>%
+  mutate(prop = sum(change_prop == "TRUE")/length(change_prop)) %>%
+  dplyr::select(-gene,-arx,-rlps,-change,-chr,-change_prop) %>%
+  distinct()
+
+ggplot(t2) +
+  geom_jitter(aes(status,prop,group=status,color=status),position = position_dodge2(width = 0.3)) +
+  geom_boxplot(aes(status,prop),outlier.alpha = 0) +
+  geom_signif(aes(status,prop),comparisons = list(c("resistant","sensitive")),test = "wilcox.test") +
+  scale_color_manual(values = colour_palettes$resist_sensitive) +
+  theme_bw()
+
+ggplot(norm_paired_changes_all) + geom_point(aes(arx,rlps,color=status),alpha=0.2) + theme_bw()
+```
 
 Patient-specific alterations, while difficult to associate with specific clinical events or features as a singular observation, did demonstrate biologically interesting genomic alterations. For example,  BRITROC-65 & BRITROC-37 demonstrated extreme gains of KRAS.Whereas other patietns had notable losses of clinically relevant or frequently altered genes such as BRITROC-36 which had a 16 copy loss of AKT2 and 6 copy loss of NF1, and BRITROC-242 & BRITROC-246 which demonstrated more than 10 copy loss of CCNE1.
 
@@ -787,4 +851,3 @@ pat_vig_246
 ```{r sessioninfo}
 sessionInfo()
 ```
-

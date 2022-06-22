@@ -779,7 +779,7 @@ broad_counts_arx_paired <- count_broad(data = broad_CNA_arx_paired,cohort="arx")
 broad_counts_rlps_paired <- count_broad(data = broad_CNA_rlps_paired,cohort="rlps")
 ```
 
-```{r cyto_fishers}
+```{r cyto_fishers_paired}
 cytoband_fishers_arx_rlps_paired <- calc_broad_freq_fishers(a = broad_counts_arx_paired,b = broad_counts_rlps_paired)
 cytoband_fishers_arx_rlps_paired
 ```
@@ -869,12 +869,12 @@ arm_CNA_rlps_paired <- extract_broad_CNA(data = abs_data[,colnames(abs_data) %in
                                    ploidys = get_named_ploidy(data = abs_data[,colnames(abs_data) %in% rlps_samples_paired]))
 ```
 
-```{r count_arm_amp}
+```{r count_arm_amp_paired}
 arm_counts_arx_paired <- count_broad(data = arm_CNA_arx_paired,cohort="arx")
 arm_counts_rlps_paired <- count_broad(data = arm_CNA_rlps_paired,cohort="rlps")
 ```
 
-```{r arm_fishers}
+```{r arm_fishers_paired}
 arm_fishers_arx_rlps_paired <- calc_broad_freq_fishers(a = arm_counts_arx_paired,b = arm_counts_rlps_paired)
 arm_fishers_arx_rlps_paired
 ```

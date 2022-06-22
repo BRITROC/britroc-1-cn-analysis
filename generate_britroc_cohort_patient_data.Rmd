@@ -80,6 +80,7 @@ survival_data <- as.data.frame(full_join(x = pat.data,y = chemo_data, by = c("br
                            diagnosis_date,
                            diagnosis_date_misc,
                            tumour_stage_at_diagnosis,
+                           tumour_substage_at_diagnosis,
                            registration_date,
                            date_of_death,
                            date_alive,

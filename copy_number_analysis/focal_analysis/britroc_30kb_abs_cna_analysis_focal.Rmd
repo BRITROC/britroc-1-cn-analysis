@@ -26,6 +26,7 @@ suppressPackageStartupMessages(suppressWarnings(library(biomaRt)))
 suppressPackageStartupMessages(suppressWarnings(library(Biobase)))
 suppressPackageStartupMessages(suppressWarnings(library(QDNAseqmod)))
 suppressPackageStartupMessages(suppressWarnings(library(cowplot)))
+suppressPackageStartupMessages(suppressWarnings(library(ggsignif)))
 ```
 
 ### Assign int. functions
@@ -499,7 +500,9 @@ Individual patients show distinct shifts in amplification rates for genes of cli
 paired_amp_changes <- get_patient_changes(data = copies,
                                               genes = focal_genes_table$Gene.name,
                                               patients = unique(meta.data$PATIENT_ID[meta.data$paired == TRUE])) %>%
-                       mutate(group = case_when(group == "rlps" ~ "relapse",group == "arx" ~ "diagnosis"))
+                       mutate(group = case_when(group == "rlps" ~ "relapse",group == "arx" ~ "diagnosis")) %>%
+                       mutate(pt_status = patient_data$pt_sensitivity_at_reg[match(PATIENT_ID,paste0("BRITROC-",patient_data$britroc_number))]) %>%
+                       mutate(prior_lines = as.factor(patient_data$pre_reg_chemo[match(PATIENT_ID,paste0("BRITROC-",patient_data$britroc_number))]))
 
 copy_state_groups <- ggplot(paired_amp_changes) +
   #geom_point(aes(x = gene,y=value,fill=group),position="jitter",alpha = 0.3) +
@@ -565,8 +568,6 @@ kable(cna_copies_results[cna_copies_results$Gene %in% focal_genes_table$Gene.nam
   kable_styling() %>% scroll_box(height = "200px")
 ```
 
-Expanding this analysis to all annotated protein coding genes provided in this dataset identified several genes at statistical significance in the unpaired sample set but failed to identify any statistically significant genes in the paired dataset, suggesting samples without paired samples are contributing noise which leads to gene significance. After multiple testing correction (FDR), no genes were statistically significant (p-values < 0.1 shown).
-
 ```{r copies_paired_all_genes}
 kable(cna_copies_results_paired[cna_copies_results_paired$pVal < 0.1,]) %>%
   kable_styling() %>% scroll_box(height = "200px")
@@ -614,19 +615,73 @@ norm_amp_changes$prior_lines <- patient_data$pre_reg_chemo[match(norm_amp_change
 
 norm_amp_changes$prior_lines <- as.factor(norm_amp_changes$prior_lines)
 
-gene_change_prior_lines <- ggplot(norm_amp_changes) +
+gene_change_prior_lines <- ggplot(norm_amp_changes[norm_amp_changes$prior_lines %in% c(1,2),]) +
   geom_point(aes(x = prior_lines,y = change,color=prior_lines),position = position_dodge2(width = 0.4)) +
   geom_boxplot(aes(x = prior_lines,y = change,fill=prior_lines),alpha=0.3,position = "dodge") +
-  facet_wrap(. ~ gene,scales = "free")
+  geom_signif(aes(x = prior_lines,y = change),comparison=list(c("1","2")),test = "wilcox.test",vjust = 1.5) +
+  scale_fill_manual(values=c("#e5f5f9","#99d8c9"),name = "prior lines") +
+  scale_color_manual(values=c("#e5f5f9","#99d8c9"),name = "prior lines") +
+  facet_wrap(. ~ gene,scales = "free") +
+  theme_bw()
 
 ggsave(plot = gene_change_prior_lines,filename = "plots/gene_change_prior_lines_plot.png",width = 8,height = 6,units = "in",dpi = 300)
-ggsave(plot = gene_change_prior_lines,filename = "plots/gene_change_prior_lines_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = gene_change_prior_lines,filename = "plots/gene_change_prior_lines_plot.pdf",width = 8,height = 6)
 gene_change_prior_lines
 ```
 
-### Sub amplification changes
+### Pt status copies
 
-- Investigation of CNA amplification numbers between "diploid" and "amplified"
+```{r pt_copies}
+table(patient_data$pt_sensitivity_at_reg)
+meta.data.prior <- meta.data %>%
+                    filter(paired == "TRUE") %>%
+                    mutate(pt_status = patient_data$pre_reg_chemo[match(PATIENT_ID,paste0("BRITROC-",patient_data$britroc_number))])
+
+norm_amp_changes$pt_status <- patient_data$pt_sensitivity_at_reg[match(norm_amp_changes$PATIENT_ID,paste0("BRITROC-",patient_data$britroc_number))]
+
+norm_amp_changes$pt_status <- as.factor(norm_amp_changes$pt_status)
+
+gene_change_pt_status <- ggplot(norm_amp_changes) +
+  geom_point(aes(x = pt_status,y = change,color=pt_status),position = position_dodge2(width = 0.4)) +
+  geom_boxplot(aes(x = pt_status,y = change,fill=pt_status),alpha=0.3,position = "dodge") +
+  geom_signif(aes(x = pt_status,y = change),comparison=list(c("resistant","sensitive")),test = "wilcox.test",vjust = 1.5) +
+  facet_wrap(. ~ gene,scales = "free") +
+  theme_bw()
+
+ggsave(plot = gene_change_pt_status,filename = "plots/gene_change_pt_status_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = gene_change_pt_status,filename = "plots/gene_change_pt_status_plot.pdf",width = 8,height = 6)
+gene_change_pt_status
+```
+
+### Paired prior lines of therapy copies
+
+```{r paired_prior_lines_copies}
+paired_gene_change_prior_lines <- ggplot(paired_amp_changes[paired_amp_changes$prior_lines %in% c(1,2),]) +
+  geom_point(aes(x = group,y = value,color=group),position = position_dodge2(width = 0.4)) +
+  geom_boxplot(aes(x = group,y = value,fill=group),alpha=0.3,position = "dodge") +
+  geom_signif(aes(x = group,y = value),comparison=list(c("diagnosis","relapse")),vjust = 1.5,test = "wilcox.test") +
+  facet_wrap(as.factor(prior_lines) ~ gene,scales = "free") +
+  theme_bw()
+
+ggsave(plot = paired_gene_change_prior_lines,filename = "plots/paired_gene_change_prior_lines_plot.png",width = 6,height = 8,units = "in",dpi = 300)
+ggsave(plot = paired_gene_change_prior_lines,filename = "plots/paired_gene_change_prior_lines_plot.pdf",width = 6,height = 8)
+paired_gene_change_prior_lines
+```
+
+### Paired Pt status copies
+
+```{r paired_pt_copies}
+paired_gene_change_pt_status <- ggplot(paired_amp_changes) +
+  geom_jitter(aes(x = group,y = value,color=group),position = position_dodge2(width = 0.4)) +
+  geom_boxplot(aes(x = group,y = value,fill=group),alpha=0.3,position = "dodge") +
+  geom_signif(aes(x = group,y = value),comparison=list(c("diagnosis","relapse")),vjust = 1.5,test = "wilcox.test") +
+  facet_wrap(pt_status ~ gene,scales = "free") +
+  theme_bw()
+
+ggsave(plot = paired_gene_change_pt_status,filename = "plots/paired_gene_change_pt_status_plot.png",width = 6,height = 8,units = "in",dpi = 300)
+ggsave(plot = paired_gene_change_pt_status,filename = "plots/paired_gene_change_pt_status_plot.pdf",width = 6,height = 8)
+paired_gene_change_pt_status
+```
 
 ## Session info
 

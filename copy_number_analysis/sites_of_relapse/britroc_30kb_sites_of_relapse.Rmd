@@ -222,6 +222,7 @@ focal_rate_plot <- ggplot(cna_rates_tissue) +
 
 saveRDS(focal_rate_plot,file = "plots/cna_rates_tissue.RDS")
 ggsave(plot = focal_rate_plot,filename = "plots/cna_rates_tissue.png",width = 8,height = 8,units = "in",dpi = 300)
+ggsave(plot = focal_rate_plot,filename = "plots/cna_rates_tissue.pdf",width = 8,height = 8)
 focal_rate_plot
 ```
 
@@ -297,6 +298,7 @@ cna_count_plot <- ggplot(cna_copies) +
 
 saveRDS(cna_count_plot,file = "plots/cna_count_tissue.RDS")
 ggsave(plot = cna_count_plot,filename = "plots/cna_count_tissue.png",width = 12,height = 8,units = "in",dpi = 300)
+ggsave(plot = cna_count_plot,filename = "plots/cna_count_tissue.pdf",width = 12,height = 8)
 cna_count_plot
 ```
 
@@ -349,6 +351,7 @@ ith_plot <- ggplot(ith_table_tissue) +
 
 saveRDS(ith_plot,file = "plots/ith_tissue.RDS")
 ggsave(plot = ith_plot,filename = "plots/ith_tissue.png",width = 10,height = 8,units = "in",dpi = 300)
+ggsave(plot = ith_plot,filename = "plots/ith_tissue.pdf",width = 10,height = 8)
 ith_plot
 ```
 
@@ -380,6 +383,7 @@ signature_plot <- ggplot(signatures_table) +
 
 saveRDS(signature_plot,file = "plots/signature_tissue.RDS")
 ggsave(plot = signature_plot,filename = "plots/signatures_tissue.png",width = 10,height = 8,units = "in",dpi = 300)
+ggsave(plot = signature_plot,filename = "plots/signatures_tissue.pdf",width = 10,height = 8)
 signature_plot
 ```
 
@@ -473,6 +477,7 @@ focal_rate_plot_strat <- plot_grid(focal_rate_plot_amp,focal_rate_plot_del,ncol 
 
 saveRDS(focal_rate_plot_strat,file = "plots/cna_rates_tissue_stratified.RDS")
 ggsave(plot = focal_rate_plot_strat,filename = "plots/cna_rates_tissue_stratified.png",width = 8,height = 8,units = "in",dpi = 300)
+ggsave(plot = focal_rate_plot_strat,filename = "plots/cna_rates_tissue_stratified.pdf",width = 8,height = 8)
 focal_rate_plot_strat
 ```
 
@@ -490,6 +495,7 @@ cn_count_tissue_plot <- ggplot(cna_copies_stratified) +
 
 saveRDS(cn_count_tissue_plot,file = "plots/cn_count_tissue_stratified.RDS")
 ggsave(plot = cn_count_tissue_plot,filename = "plots/cn_count_tissue_stratified.png",width = 10,height = 8,units = "in",dpi = 300)
+ggsave(plot = cn_count_tissue_plot,filename = "plots/cn_count_tissue_stratified.pdf",width = 10,height = 8)
 cn_count_tissue_plot
 ```
 
@@ -528,6 +534,7 @@ cn_sigs_tissueplot2 <- ggplot(signatures_table_group) +
 
 saveRDS(cn_sigs_tissueplot1,file = "plots/cn_sigs_tissue_strat.RDS")
 ggsave(plot = cn_count_tissue_plot,filename = "plots/cn_sigs_tissue_strat.png",width = 10,height = 8,units = "in",dpi = 300)
+ggsave(plot = cn_count_tissue_plot,filename = "plots/cn_sigs_tissue_strat.pdf",width = 10,height = 8)
 cn_sigs_tissueplot1
 ```
 
@@ -564,6 +571,7 @@ ith_tissueplot2 <- ggplot(ith_table_tissue_group) +
 
 saveRDS(ith_tissueplot1,file = "plots/ith_tissue_strat.RDS")
 ggsave(plot = ith_tissueplot1,filename = "plots/ith_tissue_strat.png",width = 10,height = 8,units = "in",dpi = 300)
+ggsave(plot = ith_tissueplot1,filename = "plots/ith_tissue_strat.pdf",width = 10,height = 8)
 ith_tissueplot1
 ```
 
