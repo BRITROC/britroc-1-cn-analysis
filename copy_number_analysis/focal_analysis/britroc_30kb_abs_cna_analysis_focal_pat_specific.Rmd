@@ -28,8 +28,6 @@ suppressPackageStartupMessages(suppressWarnings(library(cowplot)))
 suppressPackageStartupMessages(suppressWarnings(library(kableExtra)))
 suppressPackageStartupMessages(suppressWarnings(library(biomaRt)))
 suppressPackageStartupMessages(suppressWarnings(library(ComplexHeatmap)))
-#suppressPackageStartupMessages(suppressWarnings(library(topGO)))
-suppressPackageStartupMessages(suppressWarnings(library(VennDiagram)))
 suppressPackageStartupMessages(suppressWarnings(library(ggsignif)))
 suppressPackageStartupMessages(suppressWarnings(library(RColorBrewer)))
 
@@ -39,7 +37,6 @@ suppressPackageStartupMessages(suppressWarnings(library(RColorBrewer)))
 
 ```{r functions}
 source("data/focal_cna_analysis_funcs.R")
-source("data/nbclustfixed.R")
 source("../../colour_palettes.R")
 
 get_paired_genome_diffs <- function(data,method="mean",arx_samples=NULL,rlps_samples=NULL){
@@ -639,7 +636,7 @@ col_ann <- HeatmapAnnotation(age=ann_age,
                              platinum_status=ann_pt,
                              stage=as.factor(ann_stage),
                              col = list(age = circlize::colorRamp2(c(1,100),colors = c("white","purple")),
-                                        prior_lines = c("1"="#e5f5f9","2"="#99d8c9","4"="#2ca25f"),
+                                        prior_lines = colour_palettes$prior_lines,
                                         platinum_status = colour_palettes$resist_sensitive,
                                         stage = c("1"="#fef0d9","2"="#fdcc8a","3"="#fc8d59","4"="#d7301f")),
                              gp = gpar(col = "black"))
@@ -676,7 +673,6 @@ hmPlot
 ```
 
 ```{r gene_change_umap_and_kclusts}
-
 umap.data <- umap(cor_data_all_sub)
 
 u1 <- ggplot(as.data.frame(umap.data$layout)) +
@@ -746,70 +742,39 @@ norm_paired_changes_all
 norm_paired_changes_sub <- norm_paired_changes_all[norm_paired_changes_all$gene %in% focal_genes_table$Gene.name,]
 norm_paired_changes_sub[order(norm_paired_changes_sub$change),]
 ```
-```{r test}
+
+```{r gene_change_spread}
 norm_paired_changes_all$status <- patient_data$pt_sensitivity_at_reg[match(norm_paired_changes_all$PATIENT_ID,
                                                                            paste0("BRITROC-",patient_data$britroc_number))]
+
 norm_paired_changes_all$prior_lines <- patient_data$pre_reg_chemo[match(norm_paired_changes_all$PATIENT_ID,
                                                            paste0("BRITROC-",patient_data$britroc_number))]
-ggplot(norm_paired_changes_all) +
-  geom_jitter(aes(status,change,group=status,color=status),position = position_dodge2(width = 0.3)) +
-  #geom_boxplot(aes(status,change),outlier.alpha = 0) +
+
+#norm_paired_changes_all <- norm_paired_changes_all[sample(c(1:nrow(norm_paired_changes_all)),size = 10000,replace = F),]
+
+pt_jitter <- ggplot(norm_paired_changes_all) +
+  geom_jitter(aes(status,change,group=status,color=status),
+              alpha=0.2,
+              position = position_dodge2(width = 0.3)) +
   geom_signif(aes(status,change),comparisons = list(c("resistant","sensitive"))) +
   scale_color_manual(values = colour_palettes$resist_sensitive) +
-  theme_bw()
+  theme_bw() +
+  theme(legend.position = "none")
 
-ggplot(norm_paired_changes_all) +
-  geom_jitter(aes(as.factor(prior_lines),change,color=as.factor(prior_lines)),position = position_dodge2(width = 0.3)) +
-  #geom_boxplot(aes(status,change),outlier.alpha = 0) +
-  #geom_signif(aes(status,change),comparisons = list(c("resistant","sensitive"))) +
-  facet_wrap(. ~ status) +
-  theme_bw()
+pt_point <- ggplot(norm_paired_changes_all) +
+  geom_point(aes(arx,rlps,color=status),alpha=0.2) +
+  ylab("relapse") +
+  xlab("diagnosis") +
+  theme_bw() +
+  theme(legend.position = "bottom")
 
-norm_paired_changes_sub$status <- patient_data$pt_sensitivity_at_reg[match(norm_paired_changes_sub$PATIENT_ID,
-                                                                           paste0("BRITROC-",patient_data$britroc_number))]
-
-norm_paired_changes_sub$prior_lines <- patient_data$pre_reg_chemo[match(norm_paired_changes_sub$PATIENT_ID,
-                                                           paste0("BRITROC-",patient_data$britroc_number))]
-ggplot(norm_paired_changes_sub) +
-  geom_jitter(aes(status,change,group=status,color=status),position = position_dodge2(width = 0.3)) +
-  #geom_boxplot(aes(status,change),outlier.alpha = 0) +
-  geom_signif(aes(status,change),comparisons = list(c("resistant","sensitive"))) +
-  scale_color_manual(values = colour_palettes$resist_sensitive) +
-  theme_bw()
-
-
-t1 <- norm_paired_changes_all %>%
-  mutate(change_prop = ifelse(abs(change) > 3,"TRUE","FALSE")) %>%
-  group_by(PATIENT_ID) %>%
-  mutate(prop = sum(change_prop == "TRUE")/length(change_prop)) %>%
-  dplyr::select(-gene,-arx,-rlps,-change,-chr,-change_prop) %>%
-  distinct()
-
-ggplot(t1) +
-  geom_jitter(aes(status,prop,group=status,color=status),position = position_dodge2(width = 0.3)) +
-  geom_boxplot(aes(status,prop),outlier.alpha = 0) +
-  geom_signif(aes(status,prop),comparisons = list(c("resistant","sensitive")),test = "wilcox.test") +
-  scale_color_manual(values = colour_palettes$resist_sensitive) +
-  theme_bw()
-
-t2 <- norm_paired_changes_sub %>%
-  mutate(change_prop = ifelse(abs(change) > 3,"TRUE","FALSE")) %>%
-  group_by(PATIENT_ID) %>%
-  mutate(prop = sum(change_prop == "TRUE")/length(change_prop)) %>%
-  dplyr::select(-gene,-arx,-rlps,-change,-chr,-change_prop) %>%
-  distinct()
-
-ggplot(t2) +
-  geom_jitter(aes(status,prop,group=status,color=status),position = position_dodge2(width = 0.3)) +
-  geom_boxplot(aes(status,prop),outlier.alpha = 0) +
-  geom_signif(aes(status,prop),comparisons = list(c("resistant","sensitive")),test = "wilcox.test") +
-  scale_color_manual(values = colour_palettes$resist_sensitive) +
-  theme_bw()
-
-ggplot(norm_paired_changes_all) + geom_point(aes(arx,rlps,color=status),alpha=0.2) + theme_bw()
+pt_spread_plot <- plot_grid(pt_jitter,pt_point,nrow = 2,labels = c("A","B"))
+ggsave2(pt_spread_plot,filename = "plots/pt_spread_plot.pdf",height = 8,width = 7)
+ggsave2(pt_spread_plot,filename = "plots/pt_spread_plot.png",height = 8,width = 7,dpi = 300)
+pt_spread_plot
 ```
 
-Patient-specific alterations, while difficult to associate with specific clinical events or features as a singular observation, did demonstrate biologically interesting genomic alterations. For example,  BRITROC-65 & BRITROC-37 demonstrated extreme gains of KRAS.Whereas other patietns had notable losses of clinically relevant or frequently altered genes such as BRITROC-36 which had a 16 copy loss of AKT2 and 6 copy loss of NF1, and BRITROC-242 & BRITROC-246 which demonstrated more than 10 copy loss of CCNE1.
+Patient-specific alterations, while difficult to associate with specific clinical events or features as a singular observation, did demonstrate biologically interesting genomic alterations. For example,  BRITROC-65 & BRITROC-37 demonstrated extreme gains of KRAS.Whereas other patients had notable losses of clinically relevant or frequently altered genes such as BRITROC-36 which had a 16 copy loss of AKT2 and 6 copy loss of NF1, and BRITROC-242 & BRITROC-246 which demonstrated more than 10 copy loss of CCNE1.
 
 ```{r plot_vigs_1}
 pat_vig_65 <- get_patient_vig(diff_matrix = diff_matrix,pat.name = "BRITROC-65")

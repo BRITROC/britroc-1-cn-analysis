@@ -27,13 +27,15 @@ suppressPackageStartupMessages(suppressWarnings(library(Biobase)))
 suppressPackageStartupMessages(suppressWarnings(library(QDNAseqmod)))
 suppressPackageStartupMessages(suppressWarnings(library(cowplot)))
 suppressPackageStartupMessages(suppressWarnings(library(ggsignif)))
+suppressPackageStartupMessages(suppressWarnings(library(topGO)))
+suppressPackageStartupMessages(suppressWarnings(library(org.Hs.eg.db)))
 ```
 
 ### Assign int. functions
 
 ```{r functions}
 source("data/focal_cna_analysis_funcs.R")
-source("data/nbclustfixed.R")
+source("../../colour_palettes.R")
 ```
 
 ## Load data
@@ -48,7 +50,7 @@ tcga_gene_rates <- read.table("data/TCGA_gene_CNA_rates.txt",header = T,sep = "\
 tcga_gene_rates <- tcga_gene_rates %>%
                     dplyr::select(-Cytoband) %>%
                     relocate(Gene,Freq,CNA) %>%
-                    rename(c(gene="Gene",group="CNA",rate="Freq"))
+                    dplyr::rename(c(gene="Gene",group="CNA",rate="Freq"))
 
 meta.data <- read.table("../../copy_number_signatures/britroc_30kb_signature_data_meta.tsv",header = TRUE,sep = "\t")
 patient_data <- read.table("../../britroc_cohort_patient_data.tsv",header = T,sep = "\t")
@@ -160,6 +162,60 @@ kable(focal_cna_rates[order(focal_cna_rates$rate,decreasing = T),],row.names = F
   scroll_box(height = "200px")
 ```
 
+### Comparison to TCGA rates
+
+Rates of amplification and deletion between our cohort and TCGA alteration rates are different (with many genes having CNA rates twice that seen in our cohort). This difference is likely due to different sensitivity to CNA calling, in which the parameters used to define CNA alterations in this cohort are more stringent and as such called less frequently.
+
+```{r tcga_gene_rates}
+total_amp_rates <- get_cna_rates(data = cna_calls,genes = focal_genes_table$Gene.name)
+total_amp_rates$cohort <- rep("britroc",times=nrow(total_amp_rates))
+tcga_gene_rates$cohort <- rep("tcga",times=nrow(tcga_gene_rates))
+
+tcga_total_comparison <- rbind(total_amp_rates,tcga_gene_rates)
+
+britroc_tcga_comp_raw <- ggplot(tcga_total_comparison) +
+    geom_col(aes(x=gene,y=rate,fill=cohort),position = "dodge") +
+    ylab(label = "Rate (%)") +
+    facet_wrap(. ~ group) +
+    labs(title = "Gene CNA rates between BriTROC and TCGA - raw") +
+    theme_bw() + 
+    theme(axis.title.x = element_blank(),axis.text.x = element_text(vjust = 0.5,angle = 90))
+
+saveRDS(object = britroc_tcga_comp_raw,file = "plots/britroc_tcga_comp_raw.RDS",)
+ggsave(plot = britroc_tcga_comp_raw,filename = "plots/britroc_tcga_comp_raw.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = britroc_tcga_comp_raw,filename = "plots/britroc_tcga_comp_raw.pdf",width = 8,height = 6,units = "in",dpi = 300)
+britroc_tcga_comp_raw
+```
+
+Alterations in these genes, although called at lower frequencies, are still called at proportional rates to previous reports, where the most common alterations are consistent between the different data sets.
+
+```{r tcga_gene_rates_norm}
+total_amp_rates_norm <- total_amp_rates
+total_amp_rates_norm <- total_amp_rates_norm %>%
+  group_by(group) %>%
+  mutate(rate=rate / max(rate))
+
+tcga_gene_rates_norm <- tcga_gene_rates
+tcga_gene_rates_norm <- tcga_gene_rates_norm %>%
+  group_by(group) %>%
+  mutate(rate=rate / max(rate))
+
+tcga_total_comparison_norm <- rbind(total_amp_rates_norm,tcga_gene_rates_norm)
+
+britroc_tcga_comp_norm <- ggplot(tcga_total_comparison_norm) +
+    geom_col(aes(x=gene,y=rate,fill=cohort),position = "dodge") +
+    ylab(label = "normalised rate") +
+    facet_wrap(. ~ group) +
+    labs(title = "Gene CNA rates between BriTROC and TCGA - normalised") +
+    theme_bw() + 
+    theme(axis.title.x = element_blank(),axis.text.x = element_text(vjust = 0.5,angle = 90))
+
+saveRDS(object = britroc_tcga_comp_norm,file = "plots/britroc_tcga_comp_norm.RDS",)
+ggsave(plot = britroc_tcga_comp_norm,filename = "plots/britroc_tcga_comp_norm.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = britroc_tcga_comp_norm,filename = "plots/britroc_tcga_comp_norm.pdf",width = 8,height = 6,units = "in",dpi = 300)
+britroc_tcga_comp_norm
+```
+
 #### CNA plot - key genes
 
 ```{r cna_rate plot,fig.width=12}
@@ -209,43 +265,6 @@ ggsave(filename = "plots/combined_rate_plot_CNA.pdf",plot = cp,width = 8,height 
 cp
 ```
 
-
-```{r relapse_pt_sens}
-# sens_pats <- paste0("BRITROC-",patient_data$britroc_number[patient_data$pt_sensitivity_at_reg == "sensitive"])
-# 
-# rlps_sens <- get_cna_rates(data = cna_calls[,which(colnames(cna_calls) %in% meta.data$SAMPLE_ID[meta.data$group == "rlps"] & colnames(cna_calls) %in% meta.data$SAMPLE_ID[meta.data$PATIENT_ID %in% sens_pats])],genes = focal_genes_table$Gene.name)
-# rlps_sens$type <- rep("sensitive",times=nrow(rlps_sens))
-# 
-# rlps_resist <- get_cna_rates(data = cna_calls[,which(colnames(cna_calls) %in% meta.data$SAMPLE_ID[meta.data$group == "rlps"] & colnames(cna_calls) %in% meta.data$SAMPLE_ID[!meta.data$PATIENT_ID %in% sens_pats])],genes = focal_genes_table$Gene.name)
-# rlps_resist$type <- rep("resistant",times=nrow(rlps_resist))
-# 
-# rlps_pt_combined_rates <- rbind(rlps_sens,rlps_resist)
-# colnames(rlps_pt_combined_rates) <- c("gene","rate","type","group")
-# rlps_pt_combined_rates$rate[rlps_pt_combined_rates$type == "DEL"] <- -rlps_pt_combined_rates$rate[rlps_pt_combined_rates$type == "DEL"]
-# 
-# cp <- ggplot(rlps_pt_combined_rates) +
-#   geom_col(aes(x = group,y = rate,fill = type),color="grey20") +
-#   scale_fill_manual(values = colour_palettes$amplification_deletion) +
-#   labs(title = "Focal amplification / deletion rates") +
-#   xlab("") +
-#   ylab("rate (%)") +
-#   theme_bw() +
-#   theme(axis.title.x = element_blank(),
-#           axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90),
-#         legend.position = "bottom") +
-#   facet_grid(cols = vars(gene))
-# 
-# fishers_gene_CNA(data = cna_calls,
-#                             sub_a = meta.data$SAMPLE_ID[meta.data$group == "rlps" & meta.data$PATIENT_ID %in% sens_pats],
-#                             sub_b = meta.data$SAMPLE_ID[meta.data$group == "rlps" & !meta.data$PATIENT_ID %in% sens_pats],
-#                             genes = focal_genes_table$Gene.name)
-# 
-# saveRDS(object = cp,file = "plots/rlps_pt_rate_plot_CNA.png",)
-# ggsave(plot = cp,filename = "plots/rlps_pt_rate_plot_CNA.png",width = 8,height = 6,units = "in",dpi = 300)
-# ggsave(plot = cp,filename = "plots/rlps_pt_rate_plot_CNA.pdf",width = 8,height = 6,units = "in",dpi = 300)
-# cp
-```
-
 ```{r compare_gene_rates,fig.width=12}
 arx_len <- length(unique(meta.data$SAMPLE_ID[meta.data$group == "arx"]))
 rlps_len <- length(unique(meta.data$SAMPLE_ID[meta.data$group == "rlps"]))
@@ -274,24 +293,8 @@ ggsave(plot = amp_del_gene_plot,filename = "plots/amp_del_gene_plot_CNA.pdf",wid
 amp_del_gene_plot
 ```
 
-#### Fishers exact for CNA rates - paired
-
-```{r cna_rate_paired_fisher}
-cna_differences_paired <- fishers_gene_CNA(data = cna_calls,
-                            sub_a = meta.data$SAMPLE_ID[meta.data$group == "arx" & meta.data$paired == "TRUE"],
-                            sub_b = meta.data$SAMPLE_ID[meta.data$group == "rlps" & meta.data$paired == "TRUE"],
-                            genes = focal_genes_table$Gene.name)
-
-kable(cna_differences_paired$amplification) %>%
-  kable_styling() %>%
-  scroll_box(height = "200px")
-
-kable(cna_differences_paired$deletion) %>%
-  kable_styling() %>%
-  scroll_box(height = "200px")
-```
-
-##### Amplification
+### Fishers exact for CNA rates
+##### unpaired
 
 ```{r cna_rates_fisher_amp}
 cna_differences <- fishers_gene_CNA(data = cna_calls,
@@ -299,11 +302,28 @@ cna_differences <- fishers_gene_CNA(data = cna_calls,
                      sub_b = meta.data$SAMPLE_ID[meta.data$group == "rlps"],
                      genes = focal_genes_table$Gene.name)
 
-kable(cna_differences$amplification) %>%
+kable(cna_differences$amplification[order(cna_differences$amplification$p.value) & cna_differences$amplification$p.value < 0.05,]) %>%
   kable_styling() %>%
   scroll_box(height = "200px")
 
-kable(cna_differences$deletion) %>%
+kable(cna_differences$deletion[order(cna_differences$deletion$p.value) & cna_differences$deletion$p.value < 0.05,]) %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
+```
+
+#### paired
+
+```{r cna_rate_paired_fisher}
+cna_differences_paired <- fishers_gene_CNA(data = cna_calls,
+                            sub_a = meta.data$SAMPLE_ID[meta.data$group == "arx" & meta.data$paired == "TRUE"],
+                            sub_b = meta.data$SAMPLE_ID[meta.data$group == "rlps" & meta.data$paired == "TRUE"],
+                            genes = focal_genes_table$Gene.name)
+
+kable(cna_differences_paired$amplification[order(cna_differences_paired$amplification$p.value) & cna_differences_paired$amplification$p.value < 0.05,]) %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
+
+kable(cna_differences_paired$deletion[order(cna_differences_paired$deletion$p.value) & cna_differences_paired$deletion$p.value < 0.05,]) %>%
   kable_styling() %>%
   scroll_box(height = "200px")
 ```
@@ -350,26 +370,52 @@ prior_line_plot1
 ```
 
 ```{r prior_fishers}
-fishers_gene_CNA(data = cna_calls,
+cna_differences_prior1 <- fishers_gene_CNA(data = cna_calls,
                      sub_a = meta.data.prior$SAMPLE_ID[meta.data.prior$group == "diagnosis" &
                                                          meta.data.prior$prior_lines == "1"],
                      sub_b = meta.data.prior$SAMPLE_ID[meta.data.prior$group == "relapse" &
                                                          meta.data.prior$prior_lines == "1"],
                      genes = focal_genes_table$Gene.name)
 
-fishers_gene_CNA(data = cna_calls,
+cna_differences_prior2 <- fishers_gene_CNA(data = cna_calls,
                      sub_a = meta.data.prior$SAMPLE_ID[meta.data.prior$group == "diagnosis" &
                                                          meta.data.prior$prior_lines == "2"],
                      sub_b = meta.data.prior$SAMPLE_ID[meta.data.prior$group == "relapse" &
                                                          meta.data.prior$prior_lines == "2"],
                      genes = focal_genes_table$Gene.name)
 
-fishers_gene_CNA(data = cna_calls,
+cna_differences_prior3 <- fishers_gene_CNA(data = cna_calls,
                      sub_a = meta.data.prior$SAMPLE_ID[meta.data.prior$group == "diagnosis" &
                                                          meta.data.prior$prior_lines == "3"],
                      sub_b = meta.data.prior$SAMPLE_ID[meta.data.prior$group == "relapse" &
                                                          meta.data.prior$prior_lines == "3"],
                      genes = focal_genes_table$Gene.name)
+```
+
+```{r prior_fishers_table}
+kable(cna_differences_prior1$amplification[order(cna_differences_prior1$amplification$p.value) & cna_differences_prior1$amplification$p.value < 0.05,]) %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
+
+kable(cna_differences_prior1$deletion[order(cna_differences_prior1$deletion$p.value) & cna_differences_prior1$deletion$p.value < 0.05,]) %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
+
+kable(cna_differences_prior2$amplification[order(cna_differences_prior2$amplification$p.value) & cna_differences_prior2$amplification$p.value < 0.05,]) %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
+
+kable(cna_differences_prior2$deletion[order(cna_differences_prior2$deletion$p.value) & cna_differences_prior2$deletion$p.value < 0.05,]) %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
+
+kable(cna_differences_prior3$amplification[order(cna_differences_prior3$amplification$p.value) & cna_differences_prior3$amplification$p.value < 0.05,]) %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
+
+kable(cna_differences_prior3$deletion[order(cna_differences_prior3$deletion$p.value) & cna_differences_prior3$deletion$p.value < 0.05,]) %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
 ```
 
 ```{r prior_lines_rates_paired}
@@ -405,26 +451,14 @@ prior_paired_line_plot1 <- ggplot(prior_paired_rates) +
   facet_wrap(prior_paired_lines ~ group,nrow=2,scales = "free_x") + 
     theme(axis.title.x = element_blank(),axis.text.x = element_text(vjust = 0.5,angle = 90),legend.position = "none")
 
-prior_paired_lines_freq <- data.frame(freq=unlist(lapply(prior_paired_samples,FUN=function(x) nrow(x)))) %>%
-  rownames_to_column(var = "names") %>%
-  mutate(prior_paired_lines = str_split(names,pattern = "\\.",simplify = T)[,1]) %>%
-  mutate(group = str_split(names,pattern = "\\.",simplify = T)[,2])
-
-prior_paired_line_plot2 <- ggplot(prior_paired_lines_freq) +
-  geom_col(aes(group,freq,fill=group)) +
-  facet_wrap(. ~ prior_paired_lines) +
-  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
-  theme_bw() + theme(legend.position = "bottom")
-
 #prior_paired_lines_cna_focal_plot <- plot_grid(prior_paired_line_plot1,prior_paired_line_plot2,nrow = 2)
 ggsave2(filename = "plots/prior_paired_lines_cna_focal_paired_plot.png",plot = prior_paired_line_plot1,width = 8,height = 8,units = "in",dpi = 300)
 ggsave2(filename = "plots/prior_paired_lines_cna_focal_paired_plot.pdf",plot = prior_paired_line_plot1,width = 8,height = 8,units = "in",dpi = 300)
 prior_paired_line_plot1
-prior_paired_line_plot2
 ```
 
 ```{r prior_fishers_paired}
-fishers_gene_CNA(data = cna_calls,
+cna_differences_paired_prior1 <- fishers_gene_CNA(data = cna_calls,
                      sub_a = meta.data.prior$SAMPLE_ID[meta.data.prior$group == "diagnosis" &
                                                          meta.data.prior$prior_paired_lines == "1" &
                                                          meta.data.prior$paired == "TRUE"],
@@ -433,7 +467,7 @@ fishers_gene_CNA(data = cna_calls,
                                                          meta.data.prior$paired == "TRUE"],
                      genes = focal_genes_table$Gene.name)
 
-fishers_gene_CNA(data = cna_calls,
+cna_differences_paired_prior2 <- fishers_gene_CNA(data = cna_calls,
                      sub_a = meta.data.prior$SAMPLE_ID[meta.data.prior$group == "diagnosis" &
                                                          meta.data.prior$prior_paired_lines == "2" &
                                                          meta.data.prior$paired == "TRUE"],
@@ -441,6 +475,28 @@ fishers_gene_CNA(data = cna_calls,
                                                          meta.data.prior$prior_paired_lines == "2" &
                                                          meta.data.prior$paired == "TRUE"],
                      genes = focal_genes_table$Gene.name)
+```
+
+```{r prior_fishers_paired_table}
+kable(cna_differences_paired_prior1$amplification[order(cna_differences_paired_prior1$amplification$p.value) &
+                                                    cna_differences_paired_prior1$amplification$p.value < 0.05,]) %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
+
+kable(cna_differences_paired_prior1$deletion[order(cna_differences_paired_prior1$deletion$p.value) &
+                                               cna_differences_paired_prior1$deletion$p.value < 0.05,]) %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
+
+kable(cna_differences_paired_prior2$amplification[order(cna_differences_paired_prior2$amplification$p.value) &
+                                                    cna_differences_paired_prior2$amplification$p.value < 0.05,]) %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
+
+kable(cna_differences_paired_prior2$deletion[order(cna_differences_paired_prior2$deletion$p.value) &
+                                               cna_differences_paired_prior2$deletion$p.value < 0.05,]) %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
 ```
 
 ```{r prior_plot_comb}
@@ -496,7 +552,7 @@ ggsave2(filename = "plots/pt_status_cna_focal_plot.pdf",plot = pt_line_plot1,wid
 pt_line_plot1
 ```
 
-```{r prior_fishers}
+```{r pt_status_fishers}
 fishers_gene_CNA(data = cna_calls,
                      sub_a = meta.data.pt$SAMPLE_ID[meta.data.pt$group == "diagnosis" &
                                                          meta.data.pt$pt_status == "sensitive"],
@@ -545,25 +601,13 @@ pt_paired_line_plot1 <- ggplot(pt_paired_rates) +
   facet_wrap(pt_paired_lines ~ group,nrow=2,scales = "free_x") + 
     theme(axis.title.x = element_blank(),axis.text.x = element_text(vjust = 0.5,angle = 90),legend.position = "none")
 
-pt_paired_lines_freq <- data.frame(freq=unlist(lapply(pt_paired_samples,FUN=function(x) nrow(x)))) %>%
-  rownames_to_column(var = "names") %>%
-  mutate(pt_paired_lines = str_split(names,pattern = "\\.",simplify = T)[,1]) %>%
-  mutate(group = str_split(names,pattern = "\\.",simplify = T)[,2])
-
-pt_paired_line_plot2 <- ggplot(pt_paired_lines_freq) +
-  geom_col(aes(group,freq,fill=group)) +
-  facet_wrap(. ~ pt_paired_lines) +
-  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
-  theme_bw() + theme(legend.position = "bottom")
-
 #pt_paired_lines_cna_focal_plot <- plot_grid(pt_paired_line_plot1,pt_paired_line_plot2,nrow = 2)
 ggsave2(filename = "plots/pt_paired_cna_focal_paired_plot.png",plot = pt_paired_line_plot1,width = 8,height = 8,units = "in",dpi = 300)
 ggsave2(filename = "plots/pt_paired_cna_focal_paired_plot.pdf",plot = pt_paired_line_plot1,width = 8,height = 8,units = "in",dpi = 300)
 pt_paired_line_plot1
-pt_paired_line_plot2
 ```
 
-```{r prior_fishers}
+```{r pt_status_fishers_paired}
 print("sensitive-paired")
 fishers_gene_CNA(data = cna_calls,
                      sub_a = meta.data.pt$SAMPLE_ID[meta.data.pt$group == "diagnosis" &
@@ -596,69 +640,38 @@ ggsave2(plot = pt_status_cna_focal_plot,
 pt_status_cna_focal_plot
 ```
 
-### Comparison to TCGA rates
-
-Rates of amplification and deletion between our cohort and TCGA alteration rates are different (with many genes having CNA rates twice that seen in our cohort). This difference is likely due to different sensitivity to CNA calling, in which the parameters used to define CNA alterations in this cohort are more stringent and as such called less frequently.
-
-```{r tcga_gene_rates}
-total_amp_rates <- get_cna_rates(data = cna_calls,genes = focal_genes_table$Gene.name)
-total_amp_rates$cohort <- rep("britroc",times=nrow(total_amp_rates))
-tcga_gene_rates$cohort <- rep("tcga",times=nrow(tcga_gene_rates))
-
-tcga_total_comparison <- rbind(total_amp_rates,tcga_gene_rates)
-
-britroc_tcga_comp_raw <- ggplot(tcga_total_comparison) +
-    geom_col(aes(x=gene,y=rate,fill=cohort),position = "dodge") +
-    ylab(label = "Rate (%)") +
-    facet_wrap(. ~ group) +
-    labs(title = "Gene CNA rates between BriTROC and TCGA - raw") +
-    theme_bw() + 
-    theme(axis.title.x = element_blank(),axis.text.x = element_text(vjust = 0.5,angle = 90))
-
-saveRDS(object = britroc_tcga_comp_raw,file = "plots/britroc_tcga_comp_raw.RDS",)
-ggsave(plot = britroc_tcga_comp_raw,filename = "plots/britroc_tcga_comp_raw.png",width = 8,height = 6,units = "in",dpi = 300)
-ggsave(plot = britroc_tcga_comp_raw,filename = "plots/britroc_tcga_comp_raw.pdf",width = 8,height = 6,units = "in",dpi = 300)
-britroc_tcga_comp_raw
-```
-
-Alterations in these genes, although called at lower frequencies, are still called at proportional rates to previous reports, where the most common alterations are consistent between the different data sets.
-
-```{r tcga_gene_rates_norm}
-total_amp_rates_norm <- total_amp_rates
-total_amp_rates_norm <- total_amp_rates_norm %>%
-  group_by(group) %>%
-  mutate(rate=rate / max(rate))
-
-tcga_gene_rates_norm <- tcga_gene_rates
-tcga_gene_rates_norm <- tcga_gene_rates_norm %>%
-  group_by(group) %>%
-  mutate(rate=rate / max(rate))
-
-tcga_total_comparison_norm <- rbind(total_amp_rates_norm,tcga_gene_rates_norm)
-
-britroc_tcga_comp_norm <- ggplot(tcga_total_comparison_norm) +
-    geom_col(aes(x=gene,y=rate,fill=cohort),position = "dodge") +
-    ylab(label = "normalised rate") +
-    facet_wrap(. ~ group) +
-    labs(title = "Gene CNA rates between BriTROC and TCGA - normalised") +
-    theme_bw() + 
-    theme(axis.title.x = element_blank(),axis.text.x = element_text(vjust = 0.5,angle = 90))
-
-saveRDS(object = britroc_tcga_comp_norm,file = "plots/britroc_tcga_comp_norm.RDS",)
-ggsave(plot = britroc_tcga_comp_norm,filename = "plots/britroc_tcga_comp_norm.png",width = 8,height = 6,units = "in",dpi = 300)
-ggsave(plot = britroc_tcga_comp_norm,filename = "plots/britroc_tcga_comp_norm.pdf",width = 8,height = 6,units = "in",dpi = 300)
-britroc_tcga_comp_norm
-```
-
 ### Gene copy counts
 
-Comparison of CNA rates between samples is a single metric to measure the prevalence of CNA changes between samples but as this study has absolute copy number profiles, an alternative is to measure copy number value changes between samples. Because of the limited impact of heterozygous loss of genes has on cell survival, as tumour suppressors are not typically haploinsufficent, the focus of this analysis is on amplifications which can take a greater range of values.
+Comparison of CNA rates between samples is a single metric to measure the prevalence of CNA changes between samples but as this study has absolute copy number profiles, an alternative is to measure copy number value distributions and net changes between diagnosis and relapse settings.
 
 ```{r copies_ext}
 copies <- extracted
 ```
 
-#### Amplifcation changes
+#### Mann-Whitney amplification magnitude - paired
+
+Using the changes derived above, a mann-whitney can be used across the cohort to test the median amplification state of a given gene to test for a coordinated shift in CNA between primary and relapse cases. Below performs this test in both the paired and all samples.
+
+For specific genes of interest, most genes with sufficient amplification observations did not demonstrate a coordinated shift in copy number state, for both paired and unpaired sample sets.
+
+```{r gene_copies_paired}
+cna_copies_results_paired <- cna_median_copies(data = copies,min_obs = 3,
+                         sub_a = meta.data$SAMPLE_ID[meta.data$group == "arx" & meta.data$paired == TRUE],
+                         sub_b = meta.data$SAMPLE_ID[meta.data$group == "rlps" & meta.data$paired == TRUE],p.adj = "fdr")
+
+kable(cna_copies_results_paired[cna_copies_results_paired$pVal %in% focal_genes_table$Gene.name,]) %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
+```
+
+
+```{r copies_paired_all_genes}
+kable(cna_copies_results_paired[cna_copies_results_paired$pVal < 0.05,]) %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
+```
+
+### Copy changes
 
 Individual patients show distinct shifts in amplification rates for genes of clinical interest, where amplification rates can either remain constant, reduce, or increase, both collectively and independently. Plots below show the range of profile changes between primary and relapse. 
 
@@ -711,27 +724,6 @@ ggsave(plot = paired_amp_changes_plot,filename = "plots/paired_amp_changes_plot.
 paired_amp_changes_plot
 ```
 
-#### Mann-Whitney amplification magnitude - paired
-
-Using the changes derived above, a mann-whitney can be used across the cohort to test the median amplification state of a given gene to test for a coordinated shift in CNA between primary and relapse cases. Below performs this test in both the paired and all samples.
-
-For specific genes of interest, most genes with sufficient amplification observations did not demonstrate a coordinated shift in copy number state, for both paired and unpaired sample sets.
-
-```{r gene_copies_paired}
-cna_copies_results_paired <- cna_median_copies(data = copies,min_obs = 3,
-                         sub_a = meta.data$SAMPLE_ID[meta.data$group == "arx" & meta.data$paired == TRUE],
-                         sub_b = meta.data$SAMPLE_ID[meta.data$group == "rlps" & meta.data$paired == TRUE],p.adj = "fdr")
-
-kable(head(cna_copies_results_paired[cna_copies_results_paired$Gene %in% focal_genes_table$Gene.name,])) %>%
-  kable_styling() %>% scroll_box(height = "200px")
-```
-
-
-```{r copies_paired_all_genes}
-kable(cna_copies_results_paired[cna_copies_results_paired$pVal < 0.1,]) %>%
-  kable_styling() %>% scroll_box(height = "200px")
-```
-
 ### Paired prior lines of therapy copies
 
 ```{r paired_prior_lines_copies}
@@ -742,7 +734,12 @@ paired_gene_prior_lines <- ggplot(paired_amp_changes[paired_amp_changes$prior_li
   facet_wrap(as.factor(prior_lines) ~ gene,scales = "free_y") +
   scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
   theme_bw() +
-  theme(legend.position = "bottom")
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 90),
+        axis.title.x = element_blank())
+
+table(paired_amp_changes$prior_lines[paired_amp_changes$prior_lines %in% c(1,2) & paired_amp_changes$gene == "AKT1"],
+      paired_amp_changes$group[paired_amp_changes$prior_lines %in% c(1,2) & paired_amp_changes$gene == "AKT1"])
 
 ggsave(plot = paired_gene_prior_lines,filename = "plots/paired_gene_prior_lines_plot.png",width = 6,height = 8,units = "in",dpi = 300)
 ggsave(plot = paired_gene_prior_lines,filename = "plots/paired_gene_prior_lines_plot.pdf",width = 6,height = 8)
@@ -772,7 +769,12 @@ paired_gene_pt_status <- ggplot(paired_amp_changes) +
   facet_wrap(pt_status ~ gene,scales = "free_y") +
   scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
   theme_bw() +
-  theme(legend.position = "bottom")
+  theme(legend.position = "bottom",
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 90))
+
+table(paired_amp_changes$pt_status[paired_amp_changes$gene == "AKT1"],
+      paired_amp_changes$group[paired_amp_changes$gene == "AKT1"])
 
 ggsave(plot = paired_gene_pt_status,filename = "plots/paired_gene_pt_status_plot.png",width = 6,height = 8,units = "in",dpi = 300)
 ggsave(plot = paired_gene_pt_status,filename = "plots/paired_gene_pt_status_plot.pdf",width = 6,height = 8)
@@ -790,22 +792,33 @@ cn_copies_pt_resist <- cna_median_copies(data = copies,min_obs = 3,
                          sub_b = paired_amp_changes$SAMPLE_ID[paired_amp_changes$group == "relapse" & paired_amp_changes$pt_status == "resistant"],
                          p.adj = "fdr")
 cn_copies_pt_sensitive[cn_copies_pt_sensitive$qVal < 0.05,]
+write.table(x = cn_copies_pt_sensitive[cn_copies_pt_sensitive$qVal < 0.05,],
+            file = "data/cn_copies_pt_sensitive.tsv",quote = F,sep = "\t",row.names = F,col.names = T)
 head(cn_copies_pt_resist)
 ```
 
 ```{r paired_pt_status_enrich}
-writeLines(text = as.character(cn_copies_pt_sensitive$Gene[cn_copies_pt_sensitive$qVal < 0.05]),sep = "\n",con = "data/gene_sensitive_GOlist.txt")
-writeLines(text = as.character(cn_copies_pt_resist$Gene[cn_copies_pt_resist$qVal < 0.05]),sep = "\n",con = "data/gene_resist_GOlist.txt")
-```
+GO.ids <- mapIds(x = org.Hs.eg.db,keys = as.character(cn_copies_pt_sensitive$Gene),keytype = "SYMBOL",column = "GO",multiVals = "list")
+geneL <- cn_copies_pt_sensitive$qVal
+names(geneL) <- as.character(cn_copies_pt_sensitive$Gene)
+GOdata <- new("topGOdata",
+              ontology = "BP",
+              allGenes = geneL,
+              geneSel = geneSelection,
+              annot = annFUN.gene2GO,
+              gene2GO = GO.ids,
+              nodeSize = 5)
 
-```{r pt_status_enrich_result}
-if(file.exists("data/gene_sensitive_GOlist_analysis.txt")){
-  tb <- read.table("data/gene_sensitive_GOlist_analysis.txt",header = T,sep = "\t",skip = 6)
-  print("fishers")
-  print("FDR correction")
-  colnames(tb) <- c("GO.BioProcess","Ref.list","Test.list","expected","over.under","fold.enrichment","pval","qval")
-  tb
-}
+resultFisher <- runTest(GOdata, algorithm = "classic", statistic = "fisher")
+allRes <- GenTable(GOdata,Fisher = resultFisher,topNodes = 500,numChar = 5000)
+allRes$Fisher <- as.numeric(allRes$Fisher)
+allRes$qVal <- p.adjust(allRes$Fisher,method = "fdr")
+
+kable(allRes[allRes$qVal < 0.05,])  %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
+
+write.table(x = allRes[allRes$qVal < 0.05,],file = "data/pt_sensitive_topGO_results.tsv",quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 #### Normalised changes
@@ -930,6 +943,32 @@ ggsave(plot = gene_change_pt_status,filename = "plots/gene_change_pt_status_plot
 gene_change_pt_status
 ```
 
+```{r sik2}
+fishers_gene_CNA(data = cna_calls,
+                            sub_a = meta.data$SAMPLE_ID[meta.data$group == "arx" & meta.data$paired == "TRUE"],
+                            sub_b = meta.data$SAMPLE_ID[meta.data$group == "rlps" & meta.data$paired == "TRUE"],
+                            genes = "SIK2")
+
+cna_copies_results_paired[cna_copies_results_paired$Gene == "SIK2",]
+
+ggplot(paired_amp_changes_all[paired_amp_changes_all$gene == "SIK2",]) +
+  #geom_point(aes(x = gene,y=value,fill=group),position="jitter",alpha = 0.3) +
+  geom_line(aes(x = group,y=value,group=PATIENT_ID),alpha = 0.3) +
+  geom_point(aes(x = group,y=value,color=group),
+             position=position_jitterdodge(jitter.width = 0.2),
+             alpha=0.2) +
+  geom_boxplot(aes(x = group,y=value,fill=group),outlier.shape = NA) +
+  ylab("copy number") +
+  xlab("") +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+  facet_wrap(. ~ gene,scales = "free") +
+  ggsignif::geom_signif(aes(x = group,y=value),vjust = 1.2,
+                        comparisons = list(c("diagnosis","relapse")),
+                        test = "wilcox.test") +
+  theme_bw() +
+  theme(legend.position = "bottom")
+```
 ## Session info
 
 ```{r session_info}
