@@ -555,3 +555,115 @@ get_patient <- function(samples = NULL){
 
 # Misc colour palette - 7 sigs
 cbPalette <- c(RColorBrewer::brewer.pal(8,"Dark2"),RColorBrewer::brewer.pal(9,"Set1"),"black")
+
+## additional 
+
+lighten <- function(color, factor = 0.5) {
+    if ((factor > 1) | (factor < 0)) stop("factor needs to be within [0,1]")
+    col <- col2rgb(color)
+    col <- col + (255 - col)*factor
+    col <- rgb(t(col), maxColorValue=255)
+    col
+}
+
+# Generate signature box plot
+sig_box_plot <- function(sig_quants = NULL,test="t.test",plot_title = NULL,paired=FALSE){
+    if(is.null(sig_quants)){
+        stop("No signature exposure quants provided")
+    }
+    x <- sig_quants
+    if(paired){
+        sig_box_data <- base::merge(x = rownames_to_column(
+            as.data.frame(t(x)),var = "Sample"),
+            y = patient.meta[patient.meta$SAMPLE_ID %in% colnames(x),c("PATIENT_ID","SAMPLE_ID","group")],
+            by.x = "Sample",
+            by.y = "SAMPLE_ID")
+        sig_box_data_long <- pivot_longer(data = sig_box_data,cols = c(2:8),names_to = "Signature") %>%
+            mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse")) %>%
+            group_by(PATIENT_ID,Signature,group) %>%
+            summarise(across(.cols = value,.fns = median))
+    } else {
+        sig_box_data <- base::merge(x = rownames_to_column(
+            as.data.frame(t(x)),var = "Sample"),
+            y = patient.meta[patient.meta$SAMPLE_ID %in% colnames(x),c("SAMPLE_ID","group")],
+            by.x = "Sample",
+            by.y = "SAMPLE_ID")
+        sig_box_data_long <- pivot_longer(data = sig_box_data,cols = c(2:8),names_to = "Signature") %>%
+            mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse"))
+    }
+    if(paired){
+        if(test == "t.test"){
+            test.p <- c()
+            for(i in unique(sig_box_data_long$Signature)){
+                p <- t.test(x = sig_box_data_long$value[sig_box_data_long$group == "diagnosis" & sig_box_data_long$Signature == i],
+                            y = sig_box_data_long$value[sig_box_data_long$group == "relapse" & sig_box_data_long$Signature == i],paired = TRUE)$p.value
+                test.p <- append(test.p,p)
+            }
+        } else if(test == "wilcox.test"){
+            test.p <- c()
+            for(i in unique(sig_box_data_long$Signature)){
+                p <- wilcox.test(x = sig_box_data_long$value[sig_box_data_long$group == "diagnosis" & sig_box_data_long$Signature == i],
+                                 y = sig_box_data_long$value[sig_box_data_long$group == "relapse" & sig_box_data_long$Signature == i],paired = TRUE)$p.value
+                test.p <- append(test.p,p)
+            }
+        } else {
+            stop("unknown statistical test provided - t.test or wilcox.test")
+        }
+    } else {
+        if(test == "t.test"){
+            test.p <- c()
+            for(i in unique(sig_box_data_long$Signature)){
+                p <- t.test(x = sig_box_data_long$value[sig_box_data_long$group == "diagnosis" & sig_box_data_long$Signature == i],
+                            y = sig_box_data_long$value[sig_box_data_long$group == "relapse" & sig_box_data_long$Signature == i])$p.value
+                test.p <- append(test.p,p)
+            }
+        } else if(test == "wilcox.test"){
+            test.p <- c()
+            for(i in unique(sig_box_data_long$Signature)){
+                p <- wilcox.test(x = sig_box_data_long$value[sig_box_data_long$group == "diagnosis" & sig_box_data_long$Signature == i],
+                                 y = sig_box_data_long$value[sig_box_data_long$group == "relapse" & sig_box_data_long$Signature == i])$p.value
+                test.p <- append(test.p,p)
+            }
+        } else {
+            stop("unknown statistical test provided - t.test or wilcox.test")
+        }
+    }
+    if(is.null(plot_title)){
+        plot_title <- "Signature exposures by signature between groups"
+    }
+    ggplot(data = sig_box_data_long) +
+        geom_jitter(aes(x = Signature,y = value,color=group),
+                    alpha=0.3,position = position_jitterdodge(jitter.width = 0.2)) +
+        geom_boxplot(aes(x = Signature,y = value,fill=group),outlier.colour = NA) +
+        # geom_signif(aes(x = Signature,y = value),
+        #             annotations = ifelse(test.p < 0.01,formatC(test.p,format = "e",digits = 2),signif(test.p,digits = 2)),
+        #                                  xmin = seq.int(0.5,6.5,1)+0.2,
+        #                                  xmax = seq.int(1.5,7.5,1)-0.2,
+        #                                  y_position = 0.9) +
+        labs(title = plot_title) +
+        scale_y_continuous(name = "Exposure",limits = c(0,1)) +
+        scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+        scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+        theme_bw()
+}
+
+get_seg_counts <- function(abs_data = NULL){
+    if(is.null(abs_data)){
+        stop("No data provided")
+    }
+    sample_n <- length(colnames(abs_data))
+    to_use <- fData(abs_data)$use
+    sample_segs <- c()
+    for(i in 1:sample_n){
+        cn_obj <- abs_data[to_use,i]
+        sample_name <- colnames(cn_obj)
+        segments <- assayDataElement(cn_obj,"segmented")
+        run.enc <- rle(as.numeric(segments))
+        seg_count <- as.numeric(length(run.enc$lengths))
+        sample_segs <- rbind(sample_segs,c(sample_name,seg_count))
+    }
+    sample_segs <- as.data.frame(sample_segs)
+    colnames(sample_segs) <- c("sample","segments")
+    sample_segs$segments <- as.numeric(sample_segs$segments)
+    return(sample_segs)
+}
