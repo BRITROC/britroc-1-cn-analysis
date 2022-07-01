@@ -145,7 +145,7 @@ plot_sigs_immune <- function(data=NULL,data2=NULL,marker=NULL){
     
     title <- ggdraw() + 
       draw_label(
-        marker,
+        paste0(marker," (high to low cells / \u00b5m \u00b2)"),
         fontface = 'bold',
         x = 0,
         hjust = 0
@@ -188,14 +188,14 @@ head(immune.data_cd8_foxp3)
 ```{r summarise_immune_table}
 immune.data_cd3_cd20 <- immune.data_cd3_cd20 %>%
     select(ID,9:ncol(.)) %>%
-    group_by(ID) %>%
-    summarise_all(median) %>%
     mutate(all_CD3 = CD3_Positive_Cells / Tissue_Area) %>%
     mutate(all_CD20 = CD20_Positive_Cells / Tissue_Area) %>%
     mutate(tumour_CD3 = Tumour_CD3_Positive_Cells / Tumour_Tissue_Area) %>%
     mutate(tumour_CD20 = Tumour_CD20_Positive_Cells / Tumour_Tissue_Area) %>%
     mutate(stroma_CD3 = Stroma_CD3_Positive_Cells / Stroma_Tissue_Area) %>%
     mutate(stroma_CD20 = Stroma_CD20_Positive_Cells / Stroma_Tissue_Area) %>%
+    group_by(ID) %>%
+    summarise_all(median) %>%
     select(ID,all_CD3,all_CD20,tumour_CD3,tumour_CD20,stroma_CD3,stroma_CD20) %>%
     pivot_longer(cols = -1,names_to = "marker",values_to = "normalised_cells") %>%
     mutate(tissue = case_when(str_split(marker,pattern = "_",simplify = T)[,1] == "tumour" ~ "tumour",
@@ -205,14 +205,14 @@ immune.data_cd3_cd20 <- immune.data_cd3_cd20 %>%
 
 immune.data_cd8_foxp3 <- immune.data_cd8_foxp3 %>%
     select(ID,9:ncol(.)) %>%
-    group_by(ID) %>%
-    summarise_all(median) %>%
     mutate(all_CD8 = CD8_Positive_Cells / Tissue_Area) %>%
     mutate(all_FOXP3 = FOXP3_Positive_Cells / Tissue_Area) %>%
     mutate(tumour_CD8 = Tumour_CD8_Positive_Cells / Tumour_Tissue_Area) %>%
     mutate(tumour_FOXP3 = Tumour_FOXP3_Positive_Cells / Tumour_Tissue_Area) %>%
     mutate(stroma_CD8 = Stroma_CD8_Positive_Cells / Stroma_Tissue_Area) %>%
     mutate(stroma_FOXP3 = Stroma_FOXP3_Positive_Cells / Stroma_Tissue_Area) %>%
+    group_by(ID) %>%
+    summarise_all(median) %>%
     select(ID,all_CD8,all_FOXP3,tumour_CD8,tumour_FOXP3,stroma_CD8,stroma_FOXP3) %>%
     pivot_longer(cols = -1,names_to = "marker",values_to = "normalised_cells") %>%
     mutate(tissue = case_when(str_split(marker,pattern = "_",simplify = T)[,1] == "tumour" ~ "tumour",
@@ -225,15 +225,21 @@ all(immune.data_cd8_foxp3$ID %in% immune.data_cd3_cd20$ID)
 ```
 
 ```{r combined_immune}
-immune.data <- rbind(immune.data_cd3_cd20,immune.data_cd8_foxp3)
+immune.data <- rbind(immune.data_cd3_cd20,immune.data_cd8_foxp3) %>%
+    #deal with zero for log transformation
+    mutate(normalised_cells = normalised_cells + min(normalised_cells[normalised_cells != 0],na.rm = T)) %>%
+    filter(!is.na(normalised_cells))
+
 head(immune.data)
 ```
 
 ```{r plot_immune_summary}
 ggplot(immune.data) +
-    geom_violin(aes(marker,log10(normalised_cells),color=marker)) +
+    geom_violin(aes(marker,log(normalised_cells),color=marker)) +
     facet_wrap(. ~ tissue) +
-    theme_bw()
+    ylab("log(cells / \u00b5m \u00b2)") +
+    theme_bw() +
+    theme(axis.title.x = element_blank())
 ```
 
 ```{r subset_signatures}
@@ -322,6 +328,7 @@ sig_immune_cor_a <- ggplot(sig_immune[sig_immune$tissue == "all",]) +
              p.digits = 2,
              method = "pearson") +
     labs(title = "all") +
+    xlab("log(cells / \u00b5m \u00b2)") +
     theme_bw() +
     theme(legend.position = "none")
 
@@ -334,6 +341,7 @@ sig_immune_cor_t <- ggplot(sig_immune[sig_immune$tissue == "tumour",]) +
              p.digits = 2,
              method = "pearson") +
     labs(title = "tumour") +
+    xlab("log(cells / \u00b5m \u00b2)") +
     theme_bw() +
     theme(legend.position = "none")
 
@@ -346,10 +354,13 @@ sig_immune_cor_s <- ggplot(sig_immune[sig_immune$tissue == "stroma",]) +
              p.digits = 2,
              method = "pearson") +
     labs(title = "stroma") +
+    xlab("log(cells / \u00b5m \u00b2)") +
     theme_bw() +
     theme(legend.position = "none")
 
-plot_grid(sig_immune_cor_a,sig_immune_cor_t,sig_immune_cor_s,ncol = 2,labels = c("A","B","C"))
+sig_immune_cor_a
+sig_immune_cor_t
+sig_immune_cor_s
 ```
 
 ```{r session.info}
