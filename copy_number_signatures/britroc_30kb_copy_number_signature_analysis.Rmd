@@ -42,7 +42,7 @@ source("../colour_palettes.R")
 
 ```{r meta.data}
 # Load abs cn meta data and add arx/rlps annotation based on sample name prefix
-load("britroc_30kb_signature_data.rds")
+load("britroc_30kb_signature_data.Rdata")
 # Factor of samples in patient order for exposure plots etc
 patient_sorted_samples <- factor(patient.meta$SAMPLE_ID[order(patient.meta$PATIENT_ID)],
                                  levels = unique(patient.meta$SAMPLE_ID[order(patient.meta$PATIENT_ID)]))

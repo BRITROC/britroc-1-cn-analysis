@@ -29,6 +29,7 @@ suppressPackageStartupMessages(suppressWarnings(library(kableExtra)))
 suppressPackageStartupMessages(suppressWarnings(library(biomaRt)))
 suppressPackageStartupMessages(suppressWarnings(library(ComplexHeatmap)))
 suppressPackageStartupMessages(suppressWarnings(library(ggsignif)))
+suppressPackageStartupMessages(suppressWarnings(library(ggrepel)))
 suppressPackageStartupMessages(suppressWarnings(library(RColorBrewer)))
 
 ```
@@ -763,6 +764,9 @@ pt_jitter <- ggplot(norm_paired_changes_all) +
 
 pt_point <- ggplot(norm_paired_changes_all) +
   geom_point(aes(arx,rlps,color=status),alpha=0.2) +
+  geom_text_repel(data = norm_paired_changes_all[abs(norm_paired_changes_all$change) > 30,],
+                            aes(arx,rlps,color=status,label=gene),
+                  box.padding = 0.5, max.overlaps = Inf) +
   ylab("relapse") +
   xlab("diagnosis") +
   theme_bw() +
