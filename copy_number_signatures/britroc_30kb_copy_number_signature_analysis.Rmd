@@ -46,6 +46,7 @@ load("britroc_30kb_signature_data.Rdata")
 # Factor of samples in patient order for exposure plots etc
 patient_sorted_samples <- factor(patient.meta$SAMPLE_ID[order(patient.meta$PATIENT_ID)],
                                  levels = unique(patient.meta$SAMPLE_ID[order(patient.meta$PATIENT_ID)]))
+patient.data <- read.table("../britroc_cohort_patient_data.tsv",header = TRUE,sep = "\t")
 ```
 
 ### Load abs data
@@ -238,6 +239,92 @@ saveRDS(object = sig_bar_plot_paired_alt,file = "plots/signatures_stacked_bar_al
 ggsave(sig_bar_plot_paired_alt,filename = "plots/signatures_stacked_bar_alt.png",width = 6,height = 8,units = "in",dpi = 300)
 ggsave(sig_bar_plot_paired_alt,filename = "plots/signatures_stacked_bar_alt.pdf",width = 6,height = 8,units = "in",dpi = 300)
 sig_bar_plot_paired_alt
+```
+
+### Pt status and prior lines
+
+```{r pt_status_sig}
+sig_bar$pt_status <- patient.data$pt_sensitivity_at_reg[match(sig_bar$PATIENT_ID,paste0("BRITROC-",patient.data$britroc_number))]
+sig_bar$prior_lines <- patient.data$pre_reg_chemo[match(sig_bar$PATIENT_ID,paste0("BRITROC-",patient.data$britroc_number))]
+
+sig_bar_filt <- sig_bar %>%
+                  filter(!is.na(pt_status) & !is.na(prior_lines)) %>%
+                  mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse"))
+                  
+
+ggplot(sig_bar_filt) +
+  geom_col(aes(SAMPLE_ID,value,fill=signature)) +
+  facet_wrap(group ~ pt_status,
+             scales = "free_x") +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_fill_manual(values = cbPalette) +
+  ylab("exposure") +
+  xlab("sample") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position = "bottom")
+
+ggplot(data = sig_bar_filt) +
+    geom_boxplot(aes(x = pt_status,y = value,fill=pt_status)) +
+    geom_signif(aes(x = pt_status,y = value),
+                test = "wilcox.test",comparisons = list(c("resistant","sensitive")),vjust = 1.2) +
+    facet_wrap(. ~ signature,scales = "free_x",nrow = 2) +
+    scale_fill_manual(values = colour_palettes$resist_sensitive) +
+    theme_bw()
+
+ggplot(data = sig_bar_filt) +
+    geom_boxplot(aes(x = pt_status,y = value,fill=pt_status)) +
+    geom_signif(aes(x = pt_status,y = value),
+                test = "wilcox.test",comparisons = list(c("resistant","sensitive")),vjust = 1.2) +
+    facet_wrap(group ~ signature,scales = "free_x",nrow = 2) +
+    theme_bw()
+
+ggplot(data = sig_bar_filt) +
+    geom_boxplot(aes(x = group,y = value,fill=group)) +
+    geom_signif(aes(x = group,y = value),
+                test = "wilcox.test",comparisons = list(c("diagnosis","relapse")),vjust = 1.2) +
+    facet_wrap(pt_status ~ signature,scales = "free_x",nrow = 2) +
+    scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+    theme_bw()
+
+```
+
+```{r prior_lines_sig}
+ggplot(sig_bar_filt[sig_bar_filt$prior_lines < 5,]) +
+  geom_col(aes(SAMPLE_ID,value,fill=signature)) +
+  facet_wrap(group ~ prior_lines,
+             scales = "free_x") +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_fill_manual(values = cbPalette) +
+  ylab("exposure") +
+  xlab("sample") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position = "bottom")
+
+ggplot(data = sig_bar_filt[sig_bar_filt$prior_lines < 5,]) +
+    geom_boxplot(aes(x = as.factor(prior_lines),y = value,fill=as.factor(prior_lines))) +
+    geom_signif(aes(x = as.factor(prior_lines),y = value),
+                test = "wilcox.test",comparisons = list(c("1","2")),vjust = 1.2) +
+    facet_wrap(. ~ signature,scales = "free_x",nrow = 2) +
+    scale_fill_manual(values = colour_palettes$prior_lines) +
+    theme_bw()
+
+ggplot(data = sig_bar_filt[sig_bar_filt$prior_lines < 5,]) +
+    geom_boxplot(aes(x = as.factor(prior_lines),y = value,fill=as.factor(prior_lines))) +
+    facet_grid(rows = vars(group),cols = vars(signature),scales = "free_x") +
+    scale_fill_manual(values = colour_palettes$prior_lines) +
+    theme_bw()
+
+ggplot(data = sig_bar_filt[sig_bar_filt$prior_lines < 5,]) +
+    geom_boxplot(aes(x = group,y = value,fill=group)) +
+    geom_signif(aes(x = group,y = value),
+                test = "wilcox.test",comparisons = list(c("diagnosis","relapse")),vjust = 1.2) +
+    facet_grid(rows = vars(as.factor(prior_lines)),cols = vars(signature),scales = "free_x") +
+    scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+    theme_bw()
 ```
 
 ### All samples
