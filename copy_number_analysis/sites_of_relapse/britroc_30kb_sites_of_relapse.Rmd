@@ -115,7 +115,8 @@ site_table <- left_join(sample_table,diag_tissue_table,"fk_histological_id") %>%
                 unite("tissue_site",c("tissue_site.x","tissue_site.y"),sep = ",",remove = TRUE,na.rm = TRUE) %>%
                 rename("PATIENT_ID"="fk_britroc_number","SAMPLE_ID"="name") %>%
                 filter(type %in% c("archival","relapse")) %>%
-                filter(SAMPLE_ID %in% meta.data$SAMPLE_ID)
+                filter(SAMPLE_ID %in% meta.data$SAMPLE_ID) %>%
+                filter(tissue_site != "")
 ```
 
 ```{r normalise_tissue}
@@ -193,7 +194,6 @@ tissue_samples
 ```{r drop_low_counts}
 tissue_samples <- tissue_samples[unlist(lapply(tissue_samples,FUN = function(x){length(x) > 2}))]
 ```
-
 
 ## Analysis
 ### CNA rates
@@ -450,7 +450,7 @@ cna_rates_tissue_stratified <- do.call(rbind,lapply(X = names(tissue_samples_str
 focal_rate_plot_amp <- ggplot(cna_rates_tissue_stratified[cna_rates_tissue_stratified$group == "amplification",]) +
   geom_col(aes(x = type,y = rate,fill = type),
            position="dodge",color="grey20") +
-  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
   labs(title = "") +
   xlab("") +
   ylab("rate (%)") +
@@ -463,7 +463,7 @@ focal_rate_plot_amp <- ggplot(cna_rates_tissue_stratified[cna_rates_tissue_strat
 focal_rate_plot_del <- ggplot(cna_rates_tissue_stratified[cna_rates_tissue_stratified$group == "deletion",]) +
   geom_col(aes(x = type,y = rate,fill = type),
            position="dodge",color="grey20") +
-  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
   labs(title = "") +
   xlab("") +
   ylab("rate (%)") +

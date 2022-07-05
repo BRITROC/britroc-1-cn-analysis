@@ -242,6 +242,14 @@ ggplot(immune.data) +
     theme(axis.title.x = element_blank())
 ```
 
+```{r plot_immune_corr}
+immune.data.wide <- immune.data %>%
+                      pivot_wider(id_cols = c("ID","tissue"),names_from = marker,values_from = normalised_cells)
+
+GGally::ggpairs(immune.data.wide,aes(color=tissue),columns = 3:6) +
+  theme_bw()
+```
+
 ```{r subset_signatures}
 sig_quants <- sig_quants[row.names(sig_quants) %in% immune.data$ID,]
 
