@@ -265,29 +265,46 @@ ggplot(sig_bar_filt) +
         axis.ticks.x = element_blank(),
         legend.position = "bottom")
 
-ggplot(data = sig_bar_filt) +
+sig_pt_plot <- ggplot(data = sig_bar_filt) +
     geom_boxplot(aes(x = pt_status,y = value,fill=pt_status)) +
     geom_signif(aes(x = pt_status,y = value),
-                test = "wilcox.test",comparisons = list(c("resistant","sensitive")),vjust = 1.2) +
+                test = "wilcox.test",comparisons = list(c("resistant","sensitive")),vjust = 1.3) +
     facet_wrap(. ~ signature,scales = "free_x",nrow = 2) +
     scale_fill_manual(values = colour_palettes$resist_sensitive) +
-    theme_bw()
+    theme_bw() +
+    theme(legend.position = "bottom")
 
-ggplot(data = sig_bar_filt) +
+sig_pt_plot_strat_group <- ggplot(data = sig_bar_filt) +
     geom_boxplot(aes(x = pt_status,y = value,fill=pt_status)) +
     geom_signif(aes(x = pt_status,y = value),
-                test = "wilcox.test",comparisons = list(c("resistant","sensitive")),vjust = 1.2) +
+                test = "wilcox.test",comparisons = list(c("resistant","sensitive")),vjust = 1.3) +
     facet_wrap(group ~ signature,scales = "free_x",nrow = 2) +
-    theme_bw()
+    theme_bw() +
+    theme(legend.position = "bottom")
 
-ggplot(data = sig_bar_filt) +
+sig_group_strat_pt <- ggplot(data = sig_bar_filt) +
     geom_boxplot(aes(x = group,y = value,fill=group)) +
     geom_signif(aes(x = group,y = value),
-                test = "wilcox.test",comparisons = list(c("diagnosis","relapse")),vjust = 1.2) +
+                test = "wilcox.test",comparisons = list(c("diagnosis","relapse")),vjust = 1.3) +
     facet_wrap(pt_status ~ signature,scales = "free_x",nrow = 2) +
     scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
-    theme_bw()
+    theme_bw() +
+    theme(legend.position = "bottom")
 
+saveRDS(object = sig_pt_plot,file = "plots/sig_pt_plot.RDS")
+ggsave(sig_pt_plot,filename = "plots/sig_pt_plot.png",width = 9,height = 6,units = "in",dpi = 300)
+ggsave(sig_pt_plot,filename = "plots/sig_pt_plot.pdf",width = 9,height = 6,units = "in",dpi = 300)
+sig_pt_plot
+
+saveRDS(object = sig_pt_plot_strat_group,file = "plots/sig_pt_plot_strat_group.RDS")
+ggsave(sig_pt_plot_strat_group,filename = "plots/sig_pt_plot_strat_group.png",width = 9,height = 6,units = "in",dpi = 300)
+ggsave(sig_pt_plot_strat_group,filename = "plots/sig_pt_plot_strat_group.pdf",width = 9,height = 6,units = "in",dpi = 300)
+sig_pt_plot_strat_group
+
+saveRDS(object = sig_group_strat_pt,file = "plots/sig_group_strat_pt.RDS")
+ggsave(sig_group_strat_pt,filename = "plots/sig_group_strat_pt.png",width = 9,height = 6,units = "in",dpi = 300)
+ggsave(sig_group_strat_pt,filename = "plots/sig_group_strat_pt.pdf",width = 9,height = 6,units = "in",dpi = 300)
+sig_group_strat_pt
 ```
 
 ```{r prior_lines_sig}
