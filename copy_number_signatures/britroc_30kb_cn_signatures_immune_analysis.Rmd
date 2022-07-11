@@ -326,6 +326,7 @@ sig_immune <- as.data.frame(sig_quants) %>%
     left_join(immune.data,.,by="ID") %>%
     pivot_longer(cols = 5:ncol(.),names_to = "signature",values_to = "exposure") %>%
     filter(!is.na(exposure))
+sig_immune$patient_id <- meta.data$PATIENT_ID[match(sig_immune$ID,meta.data$SAMPLE_ID)]
 head(sig_immune)
 ```
 
@@ -385,8 +386,16 @@ ggsave(sig_immune_cor_s,filename = "plots/sig_immune_cor_stroma.pdf",width = 8,h
 sig_immune_cor_s
 ```
 
+```{r glmm}
+length(unique(sig_immune$patient_id))
+# library(lme4)
+# glmm <- glmer(exposure ~ log(normalised_cells) + tissue  + (1|patient_id),family = poisson(),
+#              data = sig_immune[sig_immune$marker == "CD8" & sig_immune$tissue != "all" & sig_immune$signature == "s1",])
+# summary(glmm)
+# anova(glmm)
+```
+
 ```{r combine_samples}
-sig_immune$patient_id <- meta.data$PATIENT_ID[match(sig_immune$ID,meta.data$SAMPLE_ID)]
 sig_immune_comb_samples <- sig_immune %>%
                             group_by(patient_id,marker,signature,tissue) %>%
                             summarise(across(.cols = c(normalised_cells,exposure),.fns = median))
