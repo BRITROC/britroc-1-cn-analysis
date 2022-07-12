@@ -778,6 +778,29 @@ ggsave2(pt_spread_plot,filename = "plots/pt_spread_plot.png",height = 8,width = 
 pt_spread_plot
 ```
 
+```{r gene_change_spread_pat_strat}
+ggplot(norm_paired_changes_all) +
+  geom_jitter(aes(status,change,group=status,color=status),
+              alpha=0.2,
+              position = position_dodge2(width = 0.3)) +
+  geom_signif(aes(status,change),comparisons = list(c("resistant","sensitive"))) +
+  facet_wrap(. ~ PATIENT_ID) +
+  scale_color_manual(values = colour_palettes$resist_sensitive) +
+  theme_bw() +
+  theme(legend.position = "none")
+
+ggplot(norm_paired_changes_all) +
+  geom_point(aes(arx,rlps,color=status),alpha=0.2) +
+  #geom_text_repel(data = norm_paired_changes_all[abs(norm_paired_changes_all$change) > 30,],
+    #                        aes(arx,rlps,color=status,label=gene),
+     #             box.padding = 0.5, max.overlaps = Inf) +
+  facet_wrap(. ~ PATIENT_ID) +
+  ylab("relapse") +
+  xlab("diagnosis") +
+  theme_bw() +
+  theme(legend.position = "bottom")
+```
+
 Patient-specific alterations, while difficult to associate with specific clinical events or features as a singular observation, did demonstrate biologically interesting genomic alterations. For example,  BRITROC-65 & BRITROC-37 demonstrated extreme gains of KRAS.Whereas other patients had notable losses of clinically relevant or frequently altered genes such as BRITROC-36 which had a 16 copy loss of AKT2 and 6 copy loss of NF1, and BRITROC-242 & BRITROC-246 which demonstrated more than 10 copy loss of CCNE1.
 
 ```{r plot_vigs_1}
