@@ -55,6 +55,8 @@ tcga_gene_rates <- tcga_gene_rates %>%
 meta.data <- read.table("../../copy_number_signatures/britroc_30kb_signature_data_meta.tsv",header = TRUE,sep = "\t")
 patient_data <- read.table("../../britroc_cohort_patient_data.tsv",header = T,sep = "\t")
 
+im_list <- c(1,2,32,43,48,54,72,86,111,125,135,144,147,177,186,201,219,229,234,244,261)
+
 cytoband <- read.table("data/hg19_cytobands.tsv",header = T,sep = "\t")
 cytoband$length <- cytoband$end - cytoband$start
 ```

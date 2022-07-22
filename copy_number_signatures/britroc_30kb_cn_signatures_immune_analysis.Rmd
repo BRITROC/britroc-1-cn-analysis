@@ -17,22 +17,23 @@ knitr::opts_chunk$set(echo = TRUE)
 ### Load libraries
 
 ```{r library_load, warning=FALSE}
-# Load required libraries with supressed start-up text
-suppressMessages(library(tidyverse))
-suppressMessages(library(kableExtra))
-suppressMessages(library(reshape2))
-suppressMessages(library(cowplot))
-suppressMessages(library(RColorBrewer))
-suppressMessages(library(ggsignif))
-suppressMessages(library(ggpubr))
+# Load required libraries with suppressed start-up text
+library(tidyverse)
+library(GGally)
+library(cowplot)
+library(ggpubr)
+library(lmerTest)
+library(lme4)
+library(compositions)
+library(logisticPCA)
 ```
 
 ### Source functions
 
 ```{r source_scripts}
 # Load main functions
-source("data/britroc_30kb_functions.R")
-source("../colour_palettes.R")
+#source("data/britroc_30kb_functions.R")
+#source("../colour_palettes.R")
 
 plot_sigs_immune <- function(data=NULL,data2=NULL,marker=NULL){
     if(is.null(data)){
@@ -112,37 +113,6 @@ plot_sigs_immune <- function(data=NULL,data2=NULL,marker=NULL){
             axis.ticks.x = element_blank(),
             legend.position = "none") + guides(color=guide_legend(nrow=1,byrow=TRUE))
     
-    immune.data.a <- data %>%
-                        filter(marker == .env$marker, tissue == "all") %>%
-                        arrange(normalised_cells)
-    
-    sig_bar.a <- data2[data2$SAMPLE_ID %in% immune.data.a$ID,]
-    sig_bar.a$SAMPLE_ID <- factor(sig_bar.a$SAMPLE_ID,levels = unique(immune.data.a$ID[order(immune.data.a$normalised_cells)]))
-    
-    sig_bar_plot.a <- ggplot(sig_bar.a) +
-        geom_col(aes(SAMPLE_ID,value,fill=signature)) +
-        scale_y_continuous(expand = c(0,0)) +
-        scale_fill_manual(values = cbPalette) +
-        ylab("exposure") +
-        theme_bw() +
-        theme(axis.text.x = element_blank(),
-            axis.ticks.x = element_blank(),
-            axis.title.x = element_blank(),
-            legend.position = "none") + guides(fill=guide_legend(nrow=1,byrow=TRUE))
-    
-    sig_line_plot.a <- ggplot(sig_bar.a) +
-        geom_line(orientation = "x",aes(SAMPLE_ID,value,group=signature,color=signature),alpha=0.5) +
-        geom_smooth(aes(SAMPLE_ID,value,group=signature,color=signature),method = "lm",se = F) +
-        scale_y_continuous(expand = c(0,0),limits = c(0,1)) +
-        scale_color_manual(values = cbPalette) +
-        facet_wrap(. ~ signature,nrow = 1) +
-        ylab("exposure") +
-        xlab(paste0("sample (all ",marker, ")")) +
-        theme_bw() +
-        theme(axis.text.x = element_blank(),
-            axis.ticks.x = element_blank(),
-            legend.position = "none") + guides(color=guide_legend(nrow=1,byrow=TRUE))
-    
     title <- ggdraw() + 
       draw_label(
         paste0(marker," (low to high cells / \u00b5m \u00b2)"),
@@ -153,8 +123,7 @@ plot_sigs_immune <- function(data=NULL,data2=NULL,marker=NULL){
     
     plot_grid(title,plot_grid(plot_grid(sig_bar_plot.t,sig_line_plot.t,nrow = 2),
              plot_grid(sig_bar_plot.s,sig_line_plot.s,nrow = 2),
-             plot_grid(sig_bar_plot.a,sig_line_plot.a,nrow = 2),
-             ncol = 3,labels = c("A","B","C")),rel_heights = c(0.1,1),nrow = 2)
+             ncol = 2,labels = c("A","B","C")),rel_heights = c(0.1,1),nrow = 2)
 }
 ```
 
@@ -180,80 +149,130 @@ head(sig_quants)
 ### Load immune data
 
 ```{r immune}
-immune.data_cd3_cd20 <- read.table("data/Clean_BRITROC_CD3_CD20.csv",header = T,sep = ",")
-immune.data_cd8_foxp3 <- read.table("data/Clean_BRITROC_CD8_FOXP3.csv",header = T,sep = ",")
+immune.data_cd3_cd20_raw <- read.table("data/Clean_BRITROC_CD3_CD20.csv",header = T,sep = ",")
+immune.data_cd8_foxp3_raw <- read.table("data/Clean_BRITROC_CD8_FOXP3.csv",header = T,sep = ",")
 
 head(immune.data_cd3_cd20)
 head(immune.data_cd8_foxp3)
 ```
 
 ```{r summarise_immune_table}
-immune.data_cd3_cd20 <- immune.data_cd3_cd20 %>%
-    select(ID,9:ncol(.)) %>%
-    mutate(all_CD3 = CD3_Positive_Cells / Tissue_Area) %>%
-    mutate(all_CD20 = CD20_Positive_Cells / Tissue_Area) %>%
-    mutate(tumour_CD3 = Tumour_CD3_Positive_Cells / Tumour_Tissue_Area) %>%
-    mutate(tumour_CD20 = Tumour_CD20_Positive_Cells / Tumour_Tissue_Area) %>%
-    mutate(stroma_CD3 = Stroma_CD3_Positive_Cells / Stroma_Tissue_Area) %>%
-    mutate(stroma_CD20 = Stroma_CD20_Positive_Cells / Stroma_Tissue_Area) %>%
-    group_by(ID) %>%
-    summarise_all(median) %>%
-    select(ID,all_CD3,all_CD20,tumour_CD3,tumour_CD20,stroma_CD3,stroma_CD20) %>%
-    pivot_longer(cols = -1,names_to = "marker",values_to = "normalised_cells") %>%
-    mutate(tissue = case_when(str_split(marker,pattern = "_",simplify = T)[,1] == "tumour" ~ "tumour",
-                              str_split(marker,pattern = "_",simplify = T)[,1] == "all" ~ "all",
-                              str_split(marker,pattern = "_",simplify = T)[,1] == "stroma" ~ "stroma")) %>%
-    mutate(marker = str_split(marker,pattern = "_",simplify = T)[,2])
+immune.data_cd3_cd20 <- immune.data_cd3_cd20_raw %>%
+    mutate(image_id = paste(ID,row_number(),sep = "_")) %>%
+    arrange(ID) %>%
+    #select(ID,image_id,Image_Tag,9:ncol(.)) %>%
+    select(ID,image_id,Image_Tag,12:ncol(.)) %>%
+    pivot_longer(cols = c(4,7),names_to = "tissue",values_to = "tissue_area") %>%
+    mutate(tissue = case_when(str_split(tissue,pattern = "_",simplify = T)[,1] == "Tumour" ~ "tumour",
+                              str_split(tissue,pattern = "_",simplify = T)[,1] == "Stroma" ~ "stroma")) %>%
+    mutate(Stroma_CD3_Positive_Cells = ifelse(tissue == "tumour",NA,Stroma_CD3_Positive_Cells)) %>%
+    mutate(Stroma_CD20_Positive_Cells = ifelse(tissue == "tumour",NA,Stroma_CD20_Positive_Cells)) %>%
+    mutate(Tumour_CD3_Positive_Cells = ifelse(tissue == "stroma",NA,Tumour_CD3_Positive_Cells)) %>%
+    mutate(Tumour_CD20_Positive_Cells = ifelse(tissue == "stroma",NA,Tumour_CD20_Positive_Cells)) %>%
+    pivot_longer(cols = c(4:7),names_to = "marker",values_to = "cells") %>%
+    mutate(marker = case_when(str_split(marker,pattern = "_",simplify = T)[,2] == "CD3" ~ "CD3",
+                              str_split(marker,pattern = "_",simplify = T)[,2] == "CD20" ~ "CD20")) %>%
+    filter(!is.na(cells))
 
-immune.data_cd8_foxp3 <- immune.data_cd8_foxp3 %>%
-    select(ID,9:ncol(.)) %>%
-    mutate(all_CD8 = CD8_Positive_Cells / Tissue_Area) %>%
-    mutate(all_FOXP3 = FOXP3_Positive_Cells / Tissue_Area) %>%
-    mutate(tumour_CD8 = Tumour_CD8_Positive_Cells / Tumour_Tissue_Area) %>%
-    mutate(tumour_FOXP3 = Tumour_FOXP3_Positive_Cells / Tumour_Tissue_Area) %>%
-    mutate(stroma_CD8 = Stroma_CD8_Positive_Cells / Stroma_Tissue_Area) %>%
-    mutate(stroma_FOXP3 = Stroma_FOXP3_Positive_Cells / Stroma_Tissue_Area) %>%
-    group_by(ID) %>%
-    summarise_all(median) %>%
-    select(ID,all_CD8,all_FOXP3,tumour_CD8,tumour_FOXP3,stroma_CD8,stroma_FOXP3) %>%
-    pivot_longer(cols = -1,names_to = "marker",values_to = "normalised_cells") %>%
-    mutate(tissue = case_when(str_split(marker,pattern = "_",simplify = T)[,1] == "tumour" ~ "tumour",
-                              str_split(marker,pattern = "_",simplify = T)[,1] == "all" ~ "all",
-                              str_split(marker,pattern = "_",simplify = T)[,1] == "stroma" ~ "stroma")) %>%
-    mutate(marker = str_split(marker,pattern = "_",simplify = T)[,2])
+    
+#     
+# mutate(tumour_CD3 = Tumour_CD3_Positive_Cells / Tumour_Tissue_Area) %>%
+#     mutate(tumour_CD20 = Tumour_CD20_Positive_Cells / Tumour_Tissue_Area) %>%
+#     mutate(stroma_CD3 = Stroma_CD3_Positive_Cells / Stroma_Tissue_Area) %>%
+#     mutate(stroma_CD20 = Stroma_CD20_Positive_Cells / Stroma_Tissue_Area) %>%
+#     select(image_id,ID,Image_Tag,tumour_CD3,tumour_CD20,stroma_CD3,stroma_CD20) %>%
+#     pivot_longer(cols = -c(1:2),names_to = "marker",values_to = "normalised_cells") %>%
+#     mutate(tissue = case_when(str_split(marker,pattern = "_",simplify = T)[,1] == "tumour" ~ "tumour",
+#                               str_split(marker,pattern = "_",simplify = T)[,1] == "stroma" ~ "stroma")) %>%
+#     mutate(marker = str_split(marker,pattern = "_",simplify = T)[,2])
+
+immune.data_cd8_foxp3 <- immune.data_cd8_foxp3_raw %>%
+    mutate(image_id = paste(ID,row_number(),sep = "_")) %>%
+    arrange(ID) %>%
+    #select(ID,image_id,9:ncol(.)) %>%
+    select(ID,image_id,Image_Tag,12:ncol(.)) %>%
+    pivot_longer(cols = c(4,7),names_to = "tissue",values_to = "tissue_area") %>%
+    mutate(tissue = case_when(str_split(tissue,pattern = "_",simplify = T)[,1] == "Tumour" ~ "tumour",
+                              str_split(tissue,pattern = "_",simplify = T)[,1] == "Stroma" ~ "stroma")) %>%
+    mutate(Stroma_CD8_Positive_Cells = ifelse(tissue == "tumour",NA,Stroma_CD8_Positive_Cells)) %>%
+    mutate(Stroma_FOXP3_Positive_Cells = ifelse(tissue == "tumour",NA,Stroma_FOXP3_Positive_Cells)) %>%
+    mutate(Tumour_CD8_Positive_Cells = ifelse(tissue == "stroma",NA,Tumour_CD8_Positive_Cells)) %>%
+    mutate(Tumour_FOXP3_Positive_Cells = ifelse(tissue == "stroma",NA,Tumour_FOXP3_Positive_Cells)) %>%
+    pivot_longer(cols = c(4:7),names_to = "marker",values_to = "cells") %>%
+    mutate(marker = case_when(str_split(marker,pattern = "_",simplify = T)[,2] == "CD8" ~ "CD8",
+                              str_split(marker,pattern = "_",simplify = T)[,2] == "FOXP3" ~ "FOXP3")) %>%
+    filter(!is.na(cells))
+
+    # mutate(all_CD8 = CD8_Positive_Cells / Tissue_Area) %>%
+    # mutate(all_FOXP3 = FOXP3_Positive_Cells / Tissue_Area) %>%
+    # mutate(tumour_CD8 = Tumour_CD8_Positive_Cells / Tumour_Tissue_Area) %>%
+    # mutate(tumour_FOXP3 = Tumour_FOXP3_Positive_Cells / Tumour_Tissue_Area) %>%
+    # mutate(stroma_CD8 = Stroma_CD8_Positive_Cells / Stroma_Tissue_Area) %>%
+    # mutate(stroma_FOXP3 = Stroma_FOXP3_Positive_Cells / Stroma_Tissue_Area) %>%
+    # select(image_id,ID,tumour_CD8,tumour_FOXP3,stroma_CD8,stroma_FOXP3) %>%
+    # pivot_longer(cols = -c(1:2),names_to = "marker",values_to = "normalised_cells") %>%
+    # mutate(tissue = case_when(str_split(marker,pattern = "_",simplify = T)[,1] == "tumour" ~ "tumour",
+    #                           str_split(marker,pattern = "_",simplify = T)[,1] == "stroma" ~ "stroma")) %>%
+    # mutate(marker = str_split(marker,pattern = "_",simplify = T)[,2])
 
 all(immune.data_cd3_cd20$ID %in% immune.data_cd8_foxp3$ID)
 all(immune.data_cd8_foxp3$ID %in% immune.data_cd3_cd20$ID)
+overlapping_samples <- intersect(immune.data_cd3_cd20$ID,immune.data_cd8_foxp3$ID)
 ```
 
 ```{r combined_immune}
-immune.data <- rbind(immune.data_cd3_cd20,immune.data_cd8_foxp3) %>%
-    #deal with zero for log transformation
-    mutate(normalised_cells = normalised_cells + min(normalised_cells[normalised_cells != 0],na.rm = T)) %>%
-    filter(!is.na(normalised_cells))
+immune.data <- rbind(immune.data_cd3_cd20,immune.data_cd8_foxp3)
+
+## Add new marker for total t-cell population (CD3 + CD8)
+## This is actually challenging as CD3 and CD8 are on different raw input files so the
+## relationship between cell counts is hard to identify. Here I assume that matching sample id and image_tag
+## relate to a single image with different stains, I sum the cells across both markers and take the median tissue area
+# immune.data <- immune.data %>%
+#     filter(ID %in% overlapping_samples) %>%
+#     group_by(ID,tissue,Image_Tag) %>%
+#     #group_map(~.x) 
+#     group_modify(~ add_row(.x,data.frame(image_id=.$image_id[1],
+#                                tissue_area=median(.$tissue_area[.$marker == "CD3"],.$tissue_area[.$marker == "CD8"],na.rm = T),
+#                                marker="tCD3",
+#                                cells=(.$cells[.$marker == "CD3"] + .$cells[.$marker == "CD8"]))))
+immune.data <- immune.data %>%
+                mutate(normalised_cells = cells/tissue_area) %>%
+                filter(ID %in% overlapping_samples) %>%
+                filter(!is.na(normalised_cells)) %>%
+                select(-cells,-tissue_area)
 
 head(immune.data)
 ```
 
 ```{r plot_immune_summary,fig.width=12}
 ggplot(immune.data) +
-    geom_violin(aes(marker,log(normalised_cells),color=marker)) +
-    facet_wrap(. ~ tissue) +
-    ylab("log(cells / \u00b5m \u00b2)") +
+    geom_density(aes(log1p(normalised_cells),color=marker)) +
+    facet_wrap(tissue ~ marker,scales = "free",ncol = 4) +
+    ylab("cells / \u00b5m \u00b2") +
+    theme_bw() +
+    theme(axis.title.x = element_blank())
+
+ggplot(immune.data) +
+    geom_bar(aes(ifelse(normalised_cells > 0,TRUE,FALSE),fill=marker)) +
+    facet_wrap(tissue ~ marker,scales = "free",ncol = 4) +
+    ylab("zero value count") +
     theme_bw() +
     theme(axis.title.x = element_blank())
 ```
 
 ```{r plot_immune_corr,fig.width=12,warning=FALSE}
 immune.data.wide <- immune.data %>%
-                      pivot_wider(id_cols = c("ID","tissue"),names_from = marker,values_from = normalised_cells)
+                      #filter(ID %in% immune.data_cd3_cd20$ID & ID %in% immune.data_cd8_foxp3$ID) %>%
+                      #mutate(n = row_number()) %>%
+                      pivot_wider(id_cols = c("image_id","ID","tissue"),
+                                  names_from = marker,values_from = normalised_cells)
 
-pairs_plot <- GGally::ggpairs(immune.data.wide,aes(color=tissue),columns = 3:6) +
+pairs_plot <- GGally::ggpairs(immune.data.wide,aes(color=tissue),columns = 3:7) +
   theme_bw()
 
-saveRDS(object = pairs_plot,file = "plots/immune_marker_pairs_plot.RDS")
-ggsave(pairs_plot,filename = "plots/immune_marker_pairs_plot.png",width = 8,height = 6,units = "in",dpi = 300)
-ggsave(pairs_plot,filename = "plots/immune_marker_pairs_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
+#saveRDS(object = pairs_plot,file = "plots/immune_marker_pairs_plot.RDS")
+#ggsave(pairs_plot,filename = "plots/immune_marker_pairs_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+#ggsave(pairs_plot,filename = "plots/immune_marker_pairs_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
 pairs_plot
 ```
 
@@ -276,7 +295,7 @@ sig_bar$SAMPLE_ID <- factor(sig_bar$SAMPLE_ID,levels = sample_order)
 sig_bar_plot <- ggplot(sig_bar) +
     geom_col(aes(SAMPLE_ID,value,fill=signature)) +
     scale_y_continuous(expand = c(0,0)) +
-    scale_fill_manual(values = cbPalette) +
+    #scale_fill_manual(values = cbPalette) +
     ylab("exposure") +
     theme_bw() +
     theme(axis.text.x = element_blank(),
@@ -288,7 +307,7 @@ sig_line_plot <- ggplot(sig_bar) +
     geom_line(orientation = "x",aes(SAMPLE_ID,value,group=signature,color=signature),alpha=0.5) +
     geom_smooth(aes(SAMPLE_ID,value,group=signature,color=signature),method="lm",se = F) +
     scale_y_continuous(expand = c(0,0),limits = c(0,1)) +
-    scale_color_manual(values = cbPalette) +
+    #scale_color_manual(values = cbPalette) +
     facet_wrap(. ~ signature,nrow = 1) +
     ylab("exposure") +
     xlab("sample") +
@@ -300,55 +319,40 @@ sig_line_plot <- ggplot(sig_bar) +
 plot_grid(sig_bar_plot,sig_line_plot,nrow = 2)
 ```
 
-```{r plot_sigs_CD3,fig.width=12}
-CD3_plot <- plot_sigs_immune(data = immune.data,data2 = sig_bar,marker = "CD3")
-CD3_plot
-```
+```{r plot_sigs,fig.width=12}
+# CD3_plot <- plot_sigs_immune(data = immune.data,data2 = sig_bar,marker = "CD3")
+# CD3_plot
 
-```{r plot_sigs_CD20,fig.width=12}
-CD20_plot <- plot_sigs_immune(data = immune.data,data2 = sig_bar,marker = "CD20")
-CD20_plot
-```
+# CD20_plot <- plot_sigs_immune(data = immune.data,data2 = sig_bar,marker = "CD20")
+# CD20_plot
 
-```{r plot_sigs_CD8,fig.width=12}
-CD8_plot <- plot_sigs_immune(data = immune.data,data2 = sig_bar,marker = "CD8")
-CD8_plot
-```
+# CD8_plot <- plot_sigs_immune(data = immune.data,data2 = sig_bar,marker = "CD8")
+# CD8_plot
 
-```{r plot_sigs_FOXP3,fig.width=12}
-FOXP3_plot <- plot_sigs_immune(data = immune.data,data2 = sig_bar,marker = "FOXP3")
-FOXP3_plot
+# FOXP3_plot <- plot_sigs_immune(data = immune.data,data2 = sig_bar,marker = "FOXP3")
+# FOXP3_plot
 ```
 
 ```{r sig_immune_comb}
 sig_immune <- as.data.frame(sig_quants) %>%
     rownames_to_column(var = "ID") %>%
     left_join(immune.data,.,by="ID") %>%
-    pivot_longer(cols = 5:ncol(.),names_to = "signature",values_to = "exposure") %>%
+    pivot_longer(cols = 7:ncol(.),names_to = "signature",values_to = "exposure") %>%
     filter(!is.na(exposure))
+
 sig_immune$patient_id <- meta.data$PATIENT_ID[match(sig_immune$ID,meta.data$SAMPLE_ID)]
-head(sig_immune)
+sig_immune <- sig_immune %>%
+                filter(!is.na(patient_id))
+head(sig_immune,n = 10)
+#write.table(sig_immune,file = "britroc_immune_data.tsv",quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r sig_immune_plot,fig.width=12}
-sig_immune_cor_a <- ggplot(sig_immune[sig_immune$tissue == "all",]) +
-    geom_point(aes(log(normalised_cells),exposure,color=signature)) +
-    geom_smooth(aes(log(normalised_cells),exposure),method = "lm",se=F) +
-    facet_grid(rows = vars(marker),cols = vars(signature)) +
-    stat_cor(aes(log(normalised_cells),exposure),label.sep = "\n",
-             r.digits = 2,
-             p.digits = 2,
-             method = "spearman") +
-    labs(title = "all") +
-    xlab("log(cells / \u00b5m \u00b2)") +
-    theme_bw() +
-    theme(legend.position = "none")
-
 sig_immune_cor_t <- ggplot(sig_immune[sig_immune$tissue == "tumour",]) +
-    geom_point(aes(log(normalised_cells),exposure,color=signature)) +
-    geom_smooth(aes(log(normalised_cells),exposure),method = "lm",se=F) +
+    geom_point(aes(normalised_cells,exposure,color=signature)) +
+    geom_smooth(aes(normalised_cells,exposure),method = "lm",se=F) +
     facet_grid(rows = vars(marker),cols = vars(signature)) +
-    stat_cor(aes(log(normalised_cells),exposure),label.sep = "\n",
+    stat_cor(aes(normalised_cells,exposure),label.sep = "\n",
              r.digits = 2,
              p.digits = 2,
              method = "spearman") +
@@ -358,10 +362,10 @@ sig_immune_cor_t <- ggplot(sig_immune[sig_immune$tissue == "tumour",]) +
     theme(legend.position = "none")
 
 sig_immune_cor_s <- ggplot(sig_immune[sig_immune$tissue == "stroma",]) +
-    geom_point(aes(log(normalised_cells),exposure,color=signature)) +
-    geom_smooth(aes(log(normalised_cells),exposure),method = "lm",se=F) +
+    geom_point(aes(normalised_cells,exposure,color=signature)) +
+    geom_smooth(aes(normalised_cells,exposure),method = "lm",se=F) +
     facet_grid(rows = vars(marker),cols = vars(signature)) +
-    stat_cor(aes(log(normalised_cells),exposure),label.sep = "\n",
+    stat_cor(aes(normalised_cells,exposure),label.sep = "\n",
              r.digits = 2,
              p.digits = 2,
              method = "spearman") +
@@ -370,83 +374,164 @@ sig_immune_cor_s <- ggplot(sig_immune[sig_immune$tissue == "stroma",]) +
     theme_bw() +
     theme(legend.position = "none")
 
-saveRDS(object = sig_immune_cor_a,file = "plots/sig_immune_cor_all.RDS")
-ggsave(sig_immune_cor_a,filename = "plots/sig_immune_cor_all.png",width = 8,height = 6,units = "in",dpi = 300)
-ggsave(sig_immune_cor_a,filename = "plots/sig_immune_cor_all.pdf",width = 8,height = 6,units = "in",dpi = 300)
-sig_immune_cor_a
-
-saveRDS(object = sig_immune_cor_t,file = "plots/sig_immune_cor_tumour.RDS")
-ggsave(sig_immune_cor_t,filename = "plots/sig_immune_cor_tumour.png",width = 8,height = 6,units = "in",dpi = 300)
-ggsave(sig_immune_cor_t,filename = "plots/sig_immune_cor_tumour.pdf",width = 8,height = 6,units = "in",dpi = 300)
+#saveRDS(object = sig_immune_cor_t,file = "plots/sig_immune_cor_tumour.RDS")
+#ggsave(sig_immune_cor_t,filename = "plots/sig_immune_cor_tumour.png",width = 8,height = 6,units = "in",dpi = 300)
+#ggsave(sig_immune_cor_t,filename = "plots/sig_immune_cor_tumour.pdf",width = 8,height = 6,units = "in",dpi = 300)
 sig_immune_cor_t
 
-saveRDS(object = sig_immune_cor_s,file = "plots/sig_immune_cor_stroma.RDS")
-ggsave(sig_immune_cor_s,filename = "plots/sig_immune_cor_stroma.png",width = 8,height = 6,units = "in",dpi = 300)
-ggsave(sig_immune_cor_s,filename = "plots/sig_immune_cor_stroma.pdf",width = 8,height = 6,units = "in",dpi = 300)
+#saveRDS(object = sig_immune_cor_s,file = "plots/sig_immune_cor_stroma.RDS")
+#ggsave(sig_immune_cor_s,filename = "plots/sig_immune_cor_stroma.png",width = 8,height = 6,units = "in",dpi = 300)
+#ggsave(sig_immune_cor_s,filename = "plots/sig_immune_cor_stroma.pdf",width = 8,height = 6,units = "in",dpi = 300)
 sig_immune_cor_s
 ```
 
-```{r glmm}
-length(unique(sig_immune$patient_id))
-# library(lme4)
-# glmm <- glmer(exposure ~ log(normalised_cells) + tissue  + (1|patient_id),family = poisson(),
-#              data = sig_immune[sig_immune$marker == "CD8" & sig_immune$tissue != "all" & sig_immune$signature == "s1",])
-# summary(glmm)
-# anova(glmm)
+```{r glmm_data_prep}
+sig_immune$status <- patient.data$pt_sensitivity_at_reg[match(gsub(sig_immune$patient_id,
+                                                                  pattern = "BRITROC-",replacement = ""),patient.data$britroc_number)]
+
+sig_immune <- droplevels(sig_immune)
+head(sig_immune)
 ```
 
-```{r combine_samples}
-sig_immune_comb_samples <- sig_immune %>%
-                            group_by(patient_id,marker,signature,tissue) %>%
-                            summarise(across(.cols = c(normalised_cells,exposure),.fns = median))
-dim(sig_immune)
-dim(sig_immune_comb_samples)
+# STEPS
 
-sig_immune_cor_a2 <- ggplot(sig_immune_comb_samples[sig_immune_comb_samples$tissue == "all",]) +
-    geom_point(aes(log(normalised_cells),exposure,color=signature)) +
-    geom_smooth(aes(log(normalised_cells),exposure),method = "lm",se=F) +
-    facet_grid(rows = vars(marker),cols = vars(signature)) +
-    stat_cor(aes(log(normalised_cells),exposure),label.sep = "\n",
-             r.digits = 2,
-             p.digits = 2,
-             method = "spearman") +
-    labs(title = "all") +
-    xlab("log(cells / \u00b5m \u00b2)") +
-    theme_bw() +
-    theme(legend.position = "none")
+  ## Randomly sample a single sample from each patient
+    ## check for outlier samples 
+  ## Determine model family from immune cell dists.
+  ## Transform signatures
+    ### Dichotomised
+    ### ILR with imputation
+    ### ALR
+    ### Dichotomised logistic PCA
+  ## Other covariates? Pt_status?
+  ## Compare with and without signatures in model using LHR / anova
+  ## All markers or separate model for each marker of interest?
 
-sig_immune_cor_t2 <- ggplot(sig_immune_comb_samples[sig_immune_comb_samples$tissue == "tumour",]) +
-    geom_point(aes(log(normalised_cells),exposure,color=signature)) +
-    geom_smooth(aes(log(normalised_cells),exposure),method = "lm",se=F) +
-    facet_grid(rows = vars(marker),cols = vars(signature)) +
-    stat_cor(aes(log(normalised_cells),exposure),label.sep = "\n",
-             r.digits = 2,
-             p.digits = 2,
-             method = "spearman") +
+```{r setseed}
+set.seed(seed = 9990)
+```
+
+```{r patient_sampling}
+## Gather patient-sample table from long data
+patient_groups <- sig_immune %>%
+  select(ID,patient_id) %>%
+  distinct() %>%
+  arrange(patient_id)
+
+## Randomly sample single sample_id for each patient
+patient_groups_sampled <- patient_groups %>%
+                            group_by(patient_id) %>%
+                            # sampling rows by grouped tibble
+                            slice_sample(n = 1)
+
+## Check sample counts per patient
+table(patient_groups_sampled$patient_id)
+
+sig_immune_subset <- sig_immune %>%
+                      filter(ID %in% patient_groups_sampled$ID)
+head(sig_immune_subset)
+```
+
+```{r exposure_transformation}
+sig_immune_subset$exposure_dichot <- ifelse(sig_immune_subset$exposure > 0,1,0)
+```
+
+```{r exposure_logisticPCA}
+sig_dichot_wide <- sig_immune_subset %>%
+                    select(-exposure) %>%
+                    pivot_wider(names_from = signature,values_from = exposure_dichot)
+
+head(sig_dichot_wide[,9:ncol(sig_dichot_wide)])
+
+logiPCA <- logisticPCA::logisticPCA(sig_dichot_wide[,9:ncol(sig_dichot_wide)],m = 0,k = 7)
+logiPCA$PCs[,1]
+plot(logiPCA)
+plot(logiPCA, type = "scores") 
+```
+
+```{r ALR}
+
+```
+
+```{r lmer_model_1}
+sig_immune_subset_list <- split(sig_immune_subset,f = as.factor(sig_immune_subset$marker))
+
+glmm_out <- lapply(sig_immune_subset_list,FUN = function(x){
+  glmmR <- lmerTest::lmer(log1p(normalised_cells) ~ tissue + (1|patient_id),
+                        data = x)
+  glmm <- lmerTest::lmer(log1p(normalised_cells) ~ exposure_dichot + tissue + (1|patient_id),
+                       data = x)
+  ## Add residual and plot
+  x$residual <- resid(glmm) ## variance across tissue and patient.
+  return(list(glmm,glmmR,x))
+})
+
+plot_residuals <- function(x = glmm_out){
+  lapply(x,FUN = function(y){
+    tissue_res <- ggplot(y[[3]]) +
+      geom_boxplot(aes(tissue,residual)) +
+      theme_bw()
+    patient_res <- ggplot(y[[3]]) +
+      geom_boxplot(aes(patient_id,residual)) +
+      theme_bw() +
+      theme(axis.text.x = element_blank(),
+            axis.ticks.x = element_blank())
+    plot_grid(tissue_res,patient_res,nrow = 2)
+  })
+}
+
+compare_models <- function(x = glmm_out){
+  aov_out <- list()
+  lapply(x,FUN = function(y){
+    aov <- anova(y[[1]],y[[2]])
+  })
+}
+
+
+compare_models(glmm_out)
+plot_residuals(glmm_out)
+
+## if different then inclusion in the model expressed as a function of variance by modelling heteroscadacity
+## Still assumption of normal distribution of residuals and random effects
+## Assumption of homoscecdacity
+```
+
+```{r test_glmm}
+anova(glmmR,glmm) ## lmerTest-specific method
+```
+
+```{r diag_relapse}
+sig_immune$group <- ifelse(gsub(sig_immune$patient_id,pattern = "BRITROC-",replacement = "") %in% im_list,"im_list","non-im_list")
+
+ggplot(sig_immune[sig_immune$tissue == "tumour" & sig_immune$marker == "CD8",]) +
+    geom_point(aes(y=normalised_cells,x=group,color=group),position = position_dodge2(width = 0.3)) +
+    geom_violin(aes(y=normalised_cells,x=group,color=group),fill=NA,position = "dodge") +
+    #geom_smooth(aes(log(normalised_cells),exposure),method = "lm",se=F) +
+    facet_grid(cols = vars(signature)) +
+    # stat_cor(aes(log(normalised_cells),exposure),label.sep = "\n",
+    #          r.digits = 2,
+    #          p.digits = 2,
+    #          method = "spearman") +
     labs(title = "tumour") +
-    xlab("log(cells / \u00b5m \u00b2)") +
+    xlab("patient group") +
     theme_bw() +
-    theme(legend.position = "none")
+    theme(legend.position = "none",axis.text.x = element_text(angle = 90))
 
-sig_immune_cor_s2 <- ggplot(sig_immune_comb_samples[sig_immune_comb_samples$tissue == "stroma",]) +
-    geom_point(aes(log(normalised_cells),exposure,color=signature)) +
-    geom_smooth(aes(log(normalised_cells),exposure),method = "lm",se=F) +
-    facet_grid(rows = vars(marker),cols = vars(signature)) +
-    stat_cor(aes(log(normalised_cells),exposure),label.sep = "\n",
-             r.digits = 2,
-             p.digits = 2,
-             method = "spearman") +
+ggplot(sig_immune[sig_immune$tissue == "stroma" & sig_immune$marker == "CD8",]) +
+    geom_point(aes(y=normalised_cells,x=group,color=group),position = position_dodge2(width = 0.3)) +
+    geom_violin(aes(y=normalised_cells,x=group,color=group),fill=NA,position = "dodge") +
+    #geom_smooth(aes(log(normalised_cells),exposure),method = "lm",se=F) +
+    facet_grid(cols = vars(signature)) +
+    # stat_cor(aes(log(normalised_cells),exposure),label.sep = "\n",
+    #          r.digits = 2,
+    #          p.digits = 2,
+    #          method = "spearman") +
     labs(title = "stroma") +
-    xlab("log(cells / \u00b5m \u00b2)") +
+    xlab("patient group") +
     theme_bw() +
-    theme(legend.position = "none")
-
-sig_immune_cor_a2
-sig_immune_cor_t2
-sig_immune_cor_s2
+    theme(legend.position = "none",axis.text.x = element_text(angle = 90))
 ```
 
 ```{r session.info}
 sessionInfo()
 ```
-
