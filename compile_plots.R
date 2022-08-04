@@ -37,14 +37,39 @@ signature_paired_line <- signature_paired_line + theme(legend.position = "none")
 
 sig_legend_a <- get_legend(
     signature_stacked_all + 
-        guides(color = guide_legend(nrow = 1)) +
+        guides(fill = guide_legend(nrow = 1)) +
         theme(legend.position = "bottom")
 )
 
 sig_legend_b <- get_legend(
     sig_box_wilcox + 
-        guides(color = guide_legend(nrow = 1)) +
+        guides(fill = guide_legend(nrow = 1)) +
         theme(legend.position = "bottom")
+)
+
+## Load signature-pt plots
+sig_pt_bar_plot <- readRDS("copy_number_signatures/plots/sig_pt_bar_plot.RDS")
+sig_pt_bar_plot <- sig_pt_bar_plot + theme(legend.position = "none")
+
+sig_pt_plot <- readRDS("copy_number_signatures/plots/sig_pt_plot.RDS")
+sig_pt_plot <- sig_pt_plot + theme(legend.position = "none")
+
+sig_pt_plot_strat_group <- readRDS("copy_number_signatures/plots/sig_pt_plot_strat_group.RDS")
+sig_pt_plot_strat_group <- sig_pt_plot_strat_group + theme(legend.position = "none")
+
+sig_group_strat_pt <- readRDS("copy_number_signatures/plots/sig_group_strat_pt.RDS")
+sig_group_strat_pt <- sig_group_strat_pt + theme(legend.position = "none")
+
+sig_pt_legend_a <- get_legend(
+  sig_pt_bar_plot + 
+    guides(fill = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+
+sig_pt_legend_b <- get_legend(
+  sig_pt_plot + 
+    guides(fil = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
 )
 
 ## Load tissue plots
@@ -69,12 +94,12 @@ cna_tissue_sigs <- cna_tissue_sigs + theme(legend.position = "none",
 
 tissue_legend_a <- get_legend(
   cna_tissue_counts + 
-    guides(color = guide_legend(nrow = 1)) +
+    guides(fill = guide_legend(nrow = 1)) +
     theme(legend.position = "bottom")
 )
 tissue_legend_b <- get_legend(
   cna_tissue_rates + 
-    guides(color = guide_legend(nrow = 1)) +
+    guides(fill = guide_legend(nrow = 1)) +
     theme(legend.position = "bottom")
 )
 
@@ -110,34 +135,51 @@ focal_heatmap_plot <- readRDS("copy_number_analysis/focal_analysis/plots/gene_ch
 ## Figure 2
 # Thomas
 
-## Figure 3
+## Figure 3 cn figure
 fig3 <- plot_grid(substraction_plot,focal_rates_clinic,labels = c("A","B"),nrow = 2)
 ggsave2(filename = "plots/figure_3_render.png",plot = fig3,width = 11,height = 8,units = "in",dpi = 300)
 ggsave2(filename = "plots/figure_3_render.pdf",plot = fig3,width = 11,height = 8,units = "in",dpi = 300)
 
-## Figure 4
+## Figure 4 - signature unpaired
+fig4 <- plot_grid(signature_stacked_all,
+                  sig_box_wilcox,
+                  sig_group_strat_pt,
+                  plot_grid(sig_legend_a,sig_legend_b,ncol = 2,labels = c("","")),
+                  nrow = 4,
+                  rel_heights = c(1,0.5,0.5,0.1),
+                  labels = c("A","B","C"))
+ggsave2(filename = "plots/figure_4_render.png",plot = fig4,width = 10,height = 12,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_4_render.pdf",plot = fig4,width = 10,height = 12,units = "in",dpi = 300)
 
-fig4 <- plot_grid(signature_stacked_all,sig_box_wilcox,plot_grid(sig_legend_a,sig_legend_b,ncol = 2,labels = c("","")),
-                  nrow = 3,
-                  rel_heights = c(1,1,0.1),
-                  labels = c("A","B"))
-ggsave2(filename = "plots/figure_4_render.png",plot = fig4,width = 10,height = 11,units = "in",dpi = 300)
-ggsave2(filename = "plots/figure_4_render.pdf",plot = fig4,width = 10,height = 11,units = "in",dpi = 300)
-
-## Figure 5
+## Figure 5 - signature paired
 fig5 <- plot_grid(plot_grid(signature_paired_line,
                   plot_grid(signature_stacked_alt,empty,ncol = 2,labels = c("B","C")),
                   nrow = 2,
-                  rel_heights = c(0.4,0.6),
+                  rel_heights = c(0.4,0.6,0.4),
                   labels = c("A","")),nrow = 2,
                   plot_grid(sig_legend_a,sig_legend_b,ncol = 2,labels = c("","")),rel_heights = c(1,0.1))
-ggsave2(filename = "plots/figure_5_render.png",plot = fig5,width = 10,height = 9,units = "in",dpi = 300)
-ggsave2(filename = "plots/figure_5_render.pdf",plot = fig5,width = 10,height = 9,units = "in",dpi = 300)
 
-## Figure 6
+ggsave2(filename = "plots/figure_5_render.png",plot = fig5,width = 9,height = 11,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_5_render.pdf",plot = fig5,width = 9,height = 11,units = "in",dpi = 300)
+
+## Figure 6 - focal_heatmap
 fig6 <- plot_grid(focal_heatmap_plot,focal_pairs_plot,nrow = 2,labels = c("A","B"))
 ggsave2(filename = "plots/figure_6_render.png",plot = fig6,width = 8,height = 10,units = "in",dpi = 300)
 ggsave2(filename = "plots/figure_6_render.pdf",plot = fig6,width = 8,height = 10,units = "in",dpi = 300)
+
+## Figure 7 - sig_pt
+fig7 <- plot_grid(plot_grid(sig_pt_bar_plot,sig_pt_plot,sig_pt_plot_strat_group,
+                            labels = c("A","B","C"),
+                            nrow = 3,
+                            rel_heights = c(1,0.5,1)),
+                  plot_grid(empty,sig_pt_legend_a,sig_pt_legend_b,
+                            nrow = 1,
+                            rel_widths = c(0.1,1,1)),
+                  rel_heights = c(1.5,0.1),
+                  nrow = 2)
+
+ggsave2(filename = "plots/figure_7_render.png",plot = fig7,width = 8,height = 12,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_7_render.pdf",plot = fig7,width = 8,height = 12,units = "in",dpi = 300)
 
 ## Supplemental - TCGA-Britroc focal rate comparison 
 britroc_tcga_comp_raw <- readRDS("copy_number_analysis/focal_analysis/plots/britroc_tcga_comp_raw.RDS")

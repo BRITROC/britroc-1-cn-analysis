@@ -1,0 +1,130 @@
+---
+title: "Analysis of primary resistant patients - BriTROC"
+author: "Philip Smith"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Load libraries
+
+```{r load_libraries}
+# Load libraries
+suppressPackageStartupMessages(suppressWarnings(library(tidyverse)))
+#suppressPackageStartupMessages(suppressWarnings(library(kableExtra)))
+#suppressPackageStartupMessages(suppressWarnings(library(biomaRt)))
+#suppressPackageStartupMessages(suppressWarnings(library(Biobase)))
+#suppressPackageStartupMessages(suppressWarnings(library(QDNAseqmod)))
+#suppressPackageStartupMessages(suppressWarnings(library(cowplot)))
+suppressPackageStartupMessages(suppressWarnings(library(ggsignif)))
+#suppressPackageStartupMessages(suppressWarnings(library(topGO)))
+#suppressPackageStartupMessages(suppressWarnings(library(org.Hs.eg.db)))
+```
+
+```{r functions}
+source("data/focal_cna_analysis_funcs.R")
+source("../../copy_number_signatures/data/britroc_30kb_functions.R")
+source("../../colour_palettes.R")
+```
+
+```{r meta.data}
+# Load abs cn meta data and add arx/rlps annotation based on sample name prefix
+load("../../copy_number_signatures/britroc_30kb_signature_data.Rdata")
+# Factor of samples in patient order for exposure plots etc
+patient_sorted_samples <- factor(patient.meta$SAMPLE_ID[order(patient.meta$PATIENT_ID)],
+                                 levels = unique(patient.meta$SAMPLE_ID[order(patient.meta$PATIENT_ID)]))
+patient.data <- read.table("../../britroc_cohort_patient_data.tsv",header = TRUE,sep = "\t")
+
+primary_resist_pats <- read.table("../../britroc_primary_platinum_resistant_patient_list.tsv",header = T,sep = "\t")
+```
+
+```{r cn_data}
+extracted <- readRDS("data/extracted_output.RDS")
+cna_calls <- readRDS("data/cna_calls_output.RDS")
+```
+
+```{r signatures}
+t.sig_quants <- t(sig_quants)
+sample_order <- rownames(t.sig_quants[order(t.sig_quants[,1],t.sig_quants[,2],t.sig_quants[,3],
+                                            t.sig_quants[,4],t.sig_quants[,5],t.sig_quants[,6],decreasing = T),])
+```
+
+```{r signature_long}
+sig_bar <- as.data.frame(sig_quants) %>%
+  rownames_to_column(var = "signature") %>%
+  pivot_longer(cols = -1,names_to="SAMPLE_ID") %>%
+  left_join(y = patient.meta,by = "SAMPLE_ID") %>%
+  #filter(paired == TRUE) %>%
+  dplyr::select(-c(ploidy,purity,TP53cn,expected_TP53_AF,TP53freq,use,notes,paired)) #%>%
+  # group_by(signature,group) %>%
+  # summarise(across(value,.fns = mean))
+  
+#sig_bar$SAMPLE_ID <- factor(sig_bar$SAMPLE_ID,levels = unique(sig_bar$SAMPLE_ID[order(sig_bar$value,sig_bar$signature,decreasing = T)]))
+sig_bar$SAMPLE_ID <- factor(sig_bar$SAMPLE_ID,levels = sample_order)
+
+sig_bar$pt_status <- patient.data$pt_sensitivity_at_reg[match(sig_bar$PATIENT_ID,paste0("BRITROC-",patient.data$britroc_number))]
+sig_bar$prior_lines <- patient.data$pre_reg_chemo[match(sig_bar$PATIENT_ID,paste0("BRITROC-",patient.data$britroc_number))]
+```
+
+```{r sig_plot}
+sig_bar_plot <- ggplot(sig_bar) +
+  geom_col(aes(SAMPLE_ID,value,fill=signature)) +
+  facet_wrap(. ~ group,nrow = 2,
+             labeller = labeller(group = c(arx="diagnosis",rlps="relapse")),scales = "free_x") +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_fill_manual(values = cbPalette) +
+  ylab("exposure") +
+  xlab("sample") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position = "bottom")
+sig_bar_plot
+```
+
+```{r pt_status_im_list}
+sig_bar_filt <- sig_bar %>%
+                  filter(!is.na(pt_status) & !is.na(prior_lines)) %>%
+                  mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse"))
+
+sig_bar_filt$platinum_resistance <- ifelse(sig_bar_filt$PATIENT_ID %in% primary_resist_pats$PATIENT_ID,"primary resistant","non-primary resistant")
+
+ggplot(data = sig_bar_filt) +
+    geom_jitter(aes(x = platinum_resistance,y = value),alpha=0.1) +
+    geom_violin(aes(x = platinum_resistance,y = value,colour = platinum_resistance),
+                fill=NA) +
+    geom_signif(aes(x = platinum_resistance,y = value),
+                test = "wilcox.test",comparisons = list(c("primary resistant","non-primary resistant")),
+                vjust = 1.8) +
+    ylab("exposure") +
+    facet_wrap(. ~ signature,nrow = 1) +
+    theme_bw() +
+    theme(legend.position = "bottom",
+          axis.text.x = element_text(angle = 90,hjust = 1,vjust = 0.5),
+          axis.title.x = element_blank())
+
+ggplot(data = sig_bar_filt) +
+    geom_jitter(aes(x = platinum_resistance,y = value),alpha=0.1) +
+    geom_violin(aes(x = platinum_resistance,y = value,
+                    color = platinum_resistance),fill=NA) +
+    geom_signif(aes(x = platinum_resistance,y = value),
+                test = "wilcox.test",comparisons = list(c("primary resistant","non-primary resistant")),
+                vjust = 1.3,
+                y_position = c(0.85,0.75,0.95)) +
+    ylab("exposure") +
+    facet_wrap(group ~ signature,nrow = 2) +
+    theme_bw() +
+    theme(legend.position = "right",
+          axis.text.x = element_text(angle = 90,hjust = 1,vjust = 0.5),
+          axis.title.x = element_blank())
+```
+
+```{r session_info}
+sessionInfo()
+```
