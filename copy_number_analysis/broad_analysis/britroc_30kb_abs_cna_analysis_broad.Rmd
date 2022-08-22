@@ -11,18 +11,19 @@ output:
 ## Initial steps
 ### Load libraries
 
-```{r load_libraries}
+```{r load_libraries,warning=F}
 # Load libraries
-suppressPackageStartupMessages(library(Biobase))
-suppressPackageStartupMessages(library(QDNAseqmod))
-suppressPackageStartupMessages(library(tidyverse))
-suppressPackageStartupMessages(library(cowplot))
-suppressPackageStartupMessages(library(kableExtra))
-suppressPackageStartupMessages(library(ggrepel))
-suppressPackageStartupMessages(library(ggpubr))
-suppressPackageStartupMessages(suppressWarnings(library(biomaRt)))
-suppressPackageStartupMessages(suppressWarnings(library(org.Hs.eg.db)))
-suppressPackageStartupMessages(suppressWarnings(library(topGO)))
+library(Biobase)
+library(QDNAseqmod)
+library(tidyverse)
+library(cowplot)
+library(kableExtra)
+library(ggrepel)
+library(ggpubr)
+library(biomaRt)
+library(org.Hs.eg.db)
+library(topGO)
+library(ReactomePA)
 ```
 
 ### Functions
@@ -278,6 +279,15 @@ kable(allRes[allRes$qVal < 0.05,])  %>%
   scroll_box(height = "200px")
 
 write.table(x = allRes[allRes$qVal < 0.05,],file = "data/substraction_topGO_results.tsv",quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
+```{r reactome_pathway}
+entrez_ids <- mapIds(x = org.Hs.eg.db,keys = as.character(proteinOverlaps),keytype = "SYMBOL",column = "ENTREZID")
+reactome <- enrichPathway(gene=entrez_ids,pvalueCutoff=0.05, readable=T)
+reactome_results <- reactome@result
+head(reactome_results)
+write.table(x = reactome_results[reactome_results$pvalue < 0.05,],file = "data/substraction_reactome_results.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ### Segments

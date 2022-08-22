@@ -8,13 +8,14 @@ output:
     toc_float: TRUE
 ---
 
-```{r libs}
+```{r libs,warning=F}
 ## compile figures from plot panels
 library(ggplot2)
 library(ggrepel)
 library(ggpubr)
 library(cowplot)
 library(magick)
+library(pdftools)
 ```
 
 ```{r empty_plot}
@@ -68,16 +69,18 @@ fig1 <- plot_grid(flow_chart,
 ## Figure 1 render
 ggsave2(filename = "plots/figure_1_render.png",plot = fig1,width = 9,height = 8,units = "in",dpi = 600)
 ggsave2(filename = "plots/figure_1_render.pdf",plot = fig1,width = 9,height = 8,units = "in",dpi = 600)
+fig1
 ```
 
 ```{r fig2}
 ## Figure 2
-# Thomas
+# rendered elsewhere
 ```
 
 ```{r fig3}
 ## Load plots
-substraction_plot <- readRDS("copy_number_analysis/broad_analysis/plots/genome_paired_substractionPlot.RDS")
+#substraction_plot <- readRDS("copy_number_analysis/broad_analysis/plots/genome_paired_substractionPlot.RDS") ## issues with PositionNudgeRepel error
+substraction_plot <- ggdraw() + draw_image(magick::image_read_pdf("copy_number_analysis/broad_analysis/plots/genome_paired_substractionPlot.pdf",density = 600))
 focal_rates_clinic <- readRDS("copy_number_analysis/focal_analysis/plots/amp_del_gene_plot_CNA.RDS")
 
 ## Modify plots
@@ -95,6 +98,7 @@ fig3 <- plot_grid(substraction_plot,
 ## Figure 3 render
 ggsave2(filename = "plots/figure_3_render.png",plot = fig3,width = 11,height = 8,units = "in",dpi = 300)
 ggsave2(filename = "plots/figure_3_render.pdf",plot = fig3,width = 11,height = 8,units = "in",dpi = 300)
+fig3
 ```
 
 ```{r fig4}
@@ -133,12 +137,15 @@ fig4 <- plot_grid(signature_stacked_all,
 ## Figure 4 render
 ggsave2(filename = "plots/figure_4_render.png",plot = fig4,width = 10,height = 12,units = "in",dpi = 300)
 ggsave2(filename = "plots/figure_4_render.pdf",plot = fig4,width = 10,height = 12,units = "in",dpi = 300)
+fig4
 ```
 
 ```{r fig5}
 ## Load plots
 signature_paired_line <- readRDS("copy_number_signatures/plots/paired_line_plot.RDS")
 signature_stacked_alt <- readRDS("copy_number_signatures/plots/signatures_stacked_bar_alt.RDS")
+radar_plot <- ggdraw() + draw_image(magick::image_read_pdf("copy_number_signatures/plots/compile_radar.pdf",
+                                                      density = 600))
 
 ## Modify plots
 signature_paired_line <- signature_paired_line + theme(legend.position = "none")
@@ -160,7 +167,7 @@ sig_legend_b <- get_legend(
 ## Figure 5 compile
 fig5 <- plot_grid(plot_grid(signature_paired_line,
                   plot_grid(signature_stacked_alt,
-                            empty,
+                            radar_plot,
                             ncol = 2,labels = c("B","C")),
                   nrow = 2,
                   rel_heights = c(0.4,0.6,0.4),
@@ -168,11 +175,29 @@ fig5 <- plot_grid(plot_grid(signature_paired_line,
                   plot_grid(sig_legend_a,sig_legend_b,ncol = 2,labels = c("","")),rel_heights = c(1,0.1))
 
 ## Figure 5 render
-ggsave2(filename = "plots/figure_5_render.png",plot = fig5,width = 9,height = 11,units = "in",dpi = 300)
-ggsave2(filename = "plots/figure_5_render.pdf",plot = fig5,width = 9,height = 11,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_5_render.png",plot = fig5,width = 9,height = 10,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_5_render.pdf",plot = fig5,width = 9,height = 10,units = "in",dpi = 300)
+fig5
 ```
 
-```{r fig6}
+```{r fig_6_patient_level}
+
+# DOES NOT CURRENTLY RENDER DUE TO CORRELATION PLOT REQUIREMENTS
+
+## Load plots
+# focal_pairs_plot <- readRDS("copy_number_analysis/focal_analysis/plots/gene_pairs_plot.RDS")
+# focal_heatmap_plot <- readRDS("copy_number_analysis/focal_analysis/plots/gene_change_heatmap.RDS")
+# 
+# ## Figure T1 compile
+# fig6 <- plot_grid(focal_heatmap_plot,focal_pairs_plot,nrow = 2,labels = c("A","B"))
+# 
+# ## Figure T1 render
+# ggsave2(filename = "plots/figure_6_render.png",plot = fig6,width = 8,height = 10,units = "in",dpi = 300)
+# ggsave2(filename = "plots/figure_6_render.pdf",plot = fig6,width = 8,height = 10,units = "in",dpi = 300)
+# fig6
+```
+
+```{r fig7}
 ## Load plots
 sig_bar_plot_primary_pt_diag <- readRDS("copy_number_analysis/focal_analysis/plots/sig_bar_plot_primary_pt_diag.RDS")
 sig_dist_primary_pt_diag <- readRDS("copy_number_analysis/focal_analysis/plots/sig_dist_primary_pt_diag.RDS")
@@ -183,7 +208,7 @@ sig_primary_beta_results <- ggdraw() +
 
 ## Modify plots
 sig_bar_plot_primary_pt_diag <- sig_bar_plot_primary_pt_diag + theme(legend.position = "none")
-sig_dist_primary_pt_diag <- sig_dist_primary_pt + theme(legend.position = "none",axis.text.x = element_blank())
+sig_dist_primary_pt_diag <- sig_dist_primary_pt_diag + theme(legend.position = "none",axis.text.x = element_blank())
 #sig_dist_primary_pt_group_strat <- sig_dist_primary_pt_group_strat + theme(legend.position = "none",axis.text.x = element_blank())
 
 ## Get legends
@@ -198,12 +223,13 @@ sig_pt_primary_legend_b <- get_legend(
     guides(fill = guide_legend(nrow = 1)) +
     theme(legend.position = "bottom")
 )
-### Figure 6 compile
-fig6 <- plot_grid(plot_grid(cn_focal_rate_primary_pt_diag,
+### Figure 7 compile
+fig7 <- plot_grid(plot_grid(cn_focal_rate_primary_pt_diag,
                             sig_bar_plot_primary_pt_diag,
                             sig_dist_primary_pt_diag,
-                            sig_primary_beta_results,
-                    labels = c("A","B","C","D"),
+                            plot_grid(sig_primary_beta_results,empty,
+                                      ncol = 2,labels = c("D","E")),
+                    labels = c("A","B","C",""),
                     nrow = 4,
                     rel_heights = c(1,1,0.6,1)),
           plot_grid(empty,sig_pt_primary_legend_a,empty,sig_pt_primary_legend_b,
@@ -212,33 +238,17 @@ fig6 <- plot_grid(plot_grid(cn_focal_rate_primary_pt_diag,
           rel_heights = c(1.5,0.1),
           nrow = 2)
 
-
-## Plot
-fig6
-
-## Figure 6 render
-ggsave2(filename = "plots/figure_6_render.png",plot = fig6,width = 8,height = 12,units = "in",dpi = 300)
-ggsave2(filename = "plots/figure_6_render.pdf",plot = fig6,width = 8,height = 12,units = "in",dpi = 300)
+## Figure 7 render
+ggsave2(filename = "plots/figure_7_render.png",plot = fig7,width = 8,height = 12,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_7_render.pdf",plot = fig7,width = 8,height = 12,units = "in",dpi = 300)
+fig7
 ```
 
-```{r fig7}
-
+```{r fig8}
+## Rendered in sig_immune_analysis
 ```
 
-```{r fig?_patient_level}
-## Load plots
-focal_pairs_plot <- readRDS("copy_number_analysis/focal_analysis/plots/gene_pairs_plot.RDS")
-focal_heatmap_plot <- readRDS("copy_number_analysis/focal_analysis/plots/gene_change_heatmap.RDS")
-
-## Figure T1 compile
-fig_S6 <- plot_grid(focal_heatmap_plot,focal_pairs_plot,nrow = 2,labels = c("A","B"))
-
-## Figure T1 render
-ggsave2(filename = "plots/figure_6_render.png",plot = fig6,width = 8,height = 10,units = "in",dpi = 300)
-ggsave2(filename = "plots/figure_6_render.pdf",plot = fig6,width = 8,height = 10,units = "in",dpi = 300)
-```
-
-```{r fig?_pt_status}
+```{r fig_pt_status}
 ## Load plots
 sig_pt_bar_plot <- readRDS("copy_number_signatures/plots/sig_pt_bar_plot.RDS")
 sig_pt_bar_plot <- sig_pt_bar_plot + theme(legend.position = "none")
@@ -275,9 +285,10 @@ fig7S <- plot_grid(plot_grid(sig_pt_bar_plot,sig_pt_plot,sig_pt_plot_strat_group
 ## Plot render
 ggsave2(filename = "plots/figure_7S_render.png",plot = fig7S,width = 8,height = 12,units = "in",dpi = 300)
 ggsave2(filename = "plots/figure_7S_render.pdf",plot = fig7S,width = 8,height = 12,units = "in",dpi = 300)
+fig7S
 ```
 
-```{r fig?_tissue_diffs}
+```{r fig_tissue_diffs}
 ## Load plots
 cna_tissue_rates <- readRDS("copy_number_analysis/sites_of_relapse/plots/cna_rates_tissue.RDS")
 cna_tissue_counts <- readRDS("copy_number_analysis/sites_of_relapse/plots/cna_count_tissue.RDS")
@@ -324,10 +335,10 @@ tissue_supplemental1 <- plot_grid(plot_grid(plot_grid(cna_tissue_counts,labels =
 
 ggsave2(filename = "plots/tissue_supplemental1.png",plot = tissue_supplemental1,width = 10,height = 12,units = "in",dpi = 300)
 ggsave2(filename = "plots/tissue_supplemental1.pdf",plot = tissue_supplemental1,width = 10,height = 12,units = "in",dpi = 300)
-
+tissue_supplemental1
 ```
 
-```{r fig?_tissue_diffs_strat}
+```{r fig_tissue_diffs_strat}
 ## Load supplemental tissue plots
 cn_tissue_counts_strat <- readRDS("copy_number_analysis/sites_of_relapse/plots/cn_count_tissue.RDS")
 cn_tissue_counts_strat <- cn_tissue_counts_strat + theme(legend.position = "none",axis.title.x = element_blank(),
@@ -361,9 +372,10 @@ tissue_supplemental2 <- plot_grid(plot_grid(cn_tissue_counts_strat,
 
 ggsave2(filename = "plots/tissue_supplemental2.png",plot = tissue_supplemental2,width = 10,height = 12,units = "in",dpi = 300)
 ggsave2(filename = "plots/tissue_supplemental2.pdf",plot = tissue_supplemental2,width = 10,height = 12,units = "in",dpi = 300)
+tissue_supplemental2
 ```
 
-```{r fig?_focal_rate_compare}
+```{r fig_focal_rate_compare}
 ## Supplemental - TCGA-Britroc focal rate comparison 
 britroc_tcga_comp_raw <- readRDS("copy_number_analysis/focal_analysis/plots/britroc_tcga_comp_raw.RDS")
 britroc_tcga_comp_norm <- readRDS("copy_number_analysis/focal_analysis/plots/britroc_tcga_comp_norm.RDS")
@@ -383,12 +395,37 @@ sup_plot_britroc_tcga_rates <- plot_grid(britroc_tcga_comp_raw,britroc_tcga_comp
 ## Plot render
 ggsave2(filename = "plots/supplemental_figure_tcga_britroc_rates.png",plot = sup_plot_britroc_tcga_rates,width = 8,height = 8,units = "in",dpi = 300)
 ggsave2(filename = "plots/supplemental_figure_tcga_britroc_rates.pdf",plot = sup_plot_britroc_tcga_rates,width = 8,height = 8,units = "in",dpi = 300)
+sup_plot_britroc_tcga_rates
 ```
 
 ```{r misc}
 sig_box_paired_wilcox <- readRDS("copy_number_signatures/plots/sig_box_paired_wilcox.RDS")
 sig_box_paired_wilcox <- sig_box_paired_wilcox +
     labs(title = "",caption = "") + theme(legend.position = "none")
+sig_box_paired_wilcox
+```
+
+```{r fig_ternary_combination,warning=F}
+## List plots
+pdf.list <- list.files(path = "copy_number_signatures/plots/ternary_all_combinations/",pattern = "ternary_all",full.names = TRUE)
+
+## Load plots
+plot.list <- lapply(pdf.list,FUN = function(x){
+  name <- gsub(gsub(x = x,pattern = "copy_number_signatures/plots/ternary_all_combinations/ternary_all_",replacement = ""),pattern = ".pdf",replacement = "")
+  plot <- ggdraw() +
+          draw_image(magick::image_read_pdf(x,density = 600))
+  plot <- plot +
+            theme(plot.margin = unit(c(0,0,0,0), "cm"))
+  return(plot)
+})
+
+## Plot compile
+ternary_all <- plot_grid(plotlist = plot.list,nrow = 7,ncol = 5)
+
+## Plot render
+ggsave2(filename = "plots/supplemental_figure_ternary_sig_plots_all.png",plot = ternary_all,width = 8,height = 12,units = "in",dpi = 300)
+ggsave2(filename = "plots/supplemental_figure_ternary_sig_plots_all.pdf",plot = ternary_all,width = 8,height = 12,units = "in",dpi = 300)
+ternary_all
 ```
 
 ```{r session_info}
