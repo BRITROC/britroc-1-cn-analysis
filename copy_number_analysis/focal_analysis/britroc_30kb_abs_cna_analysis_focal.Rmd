@@ -191,7 +191,7 @@ britroc_tcga_comp_raw <- ggplot(tcga_total_comparison) +
     theme_bw() + 
     theme(axis.title.x = element_blank(),axis.text.x = element_text(vjust = 0.5,angle = 90))
 
-saveRDS(object = britroc_tcga_comp_raw,file = "plots/britroc_tcga_comp_raw.RDS",)
+saveRDS(object = britroc_tcga_comp_raw,file = "plots/britroc_tcga_comp_raw.RDS")
 ggsave(plot = britroc_tcga_comp_raw,filename = "plots/britroc_tcga_comp_raw.png",width = 8,height = 6,units = "in",dpi = 300)
 ggsave(plot = britroc_tcga_comp_raw,filename = "plots/britroc_tcga_comp_raw.pdf",width = 8,height = 6,units = "in",dpi = 300)
 britroc_tcga_comp_raw

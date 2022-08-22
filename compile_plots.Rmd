@@ -1,0 +1,396 @@
+---
+title: "compile_plots"
+author: "Philip Smith"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+---
+
+```{r libs}
+## compile figures from plot panels
+library(ggplot2)
+library(ggrepel)
+library(ggpubr)
+library(cowplot)
+library(magick)
+```
+
+```{r empty_plot}
+## Empty place holder
+empty <- ggplot() +
+          theme_bw() +
+          theme(panel.border = element_blank())
+```
+
+```{r fig1}
+## Load plot
+## Temp flow chart load
+flow_chart <- ggdraw() + draw_image(magick::image_read("plots/temp_Fig1A_flow_diagram.png",density = 600))
+cohort_plot <- readRDS("plots/cohort_plot.RDS")
+reg_surv_plot <- readRDS("plots/reg_surv_plot.RDS")
+
+## Modify plot
+cohort_plot <- cohort_plot +
+                theme(legend.position = "none",
+                      plot.title = element_blank())
+
+reg_surv_plot <- reg_surv_plot +
+                    theme(legend.position = "none")
+
+## Get legends
+cohort_legend  <- get_legend(
+    cohort_plot + 
+        guides(fill = guide_legend(nrow = 2)) +
+        theme(legend.position = "bottom",legend.margin = margin())
+)
+
+reg_surv_legend <- get_legend(
+    reg_surv_plot + 
+        #guides(fill = guide_legend(nrow = 1)) +
+        theme(legend.position = "bottom")
+)
+
+## Figure 1 compile
+fig1 <- plot_grid(flow_chart,
+                  plot_grid(cohort_plot,reg_surv_plot,
+                            labels = c("B","C"),
+                            rel_widths = c(0.7,0.3),
+                            ncol = 2),
+                  plot_grid(cohort_legend,
+                            reg_surv_legend,
+                            rel_widths = c(0.7,0.3),
+                            ncol = 2),
+                  labels = c("A","",""),
+                  nrow = 3,rel_heights = c(0.45,0.45,0.05))
+
+## Figure 1 render
+ggsave2(filename = "plots/figure_1_render.png",plot = fig1,width = 9,height = 8,units = "in",dpi = 600)
+ggsave2(filename = "plots/figure_1_render.pdf",plot = fig1,width = 9,height = 8,units = "in",dpi = 600)
+```
+
+```{r fig2}
+## Figure 2
+# Thomas
+```
+
+```{r fig3}
+## Load plots
+substraction_plot <- readRDS("copy_number_analysis/broad_analysis/plots/genome_paired_substractionPlot.RDS")
+focal_rates_clinic <- readRDS("copy_number_analysis/focal_analysis/plots/amp_del_gene_plot_CNA.RDS")
+
+## Modify plots
+focal_rates_clinic <- focal_rates_clinic +
+                        ylab("rate (%)") +
+                        theme(legend.position = "bottom",
+                              axis.text.x = element_text(hjust = 1))
+
+## Figure 3 compile
+fig3 <- plot_grid(substraction_plot,
+                  focal_rates_clinic,
+                  labels = c("A","B"),
+                  nrow = 2)
+
+## Figure 3 render
+ggsave2(filename = "plots/figure_3_render.png",plot = fig3,width = 11,height = 8,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_3_render.pdf",plot = fig3,width = 11,height = 8,units = "in",dpi = 300)
+```
+
+```{r fig4}
+## Load plots 
+signature_stacked_all <- readRDS("copy_number_signatures/plots/signatures_allSamples_stacked_bar.RDS")
+sig_box_wilcox <- readRDS("copy_number_signatures/plots/sig_box_wilcox.RDS")
+sig_group_strat_pt <- readRDS("copy_number_signatures/plots/sig_group_strat_pt.RDS")
+
+## Get legends
+sig_legend_a <- get_legend(
+    signature_stacked_all + 
+        guides(fill = guide_legend(nrow = 1)) +
+        theme(legend.position = "bottom")
+)
+
+sig_legend_b <- get_legend(
+    sig_box_wilcox + 
+        guides(fill = guide_legend(nrow = 1)) +
+        theme(legend.position = "bottom")
+)
+
+## Modify plots
+signature_stacked_all <- signature_stacked_all + theme(legend.position = "none")
+sig_box_wilcox <- sig_box_wilcox + labs(title = "",caption = "") + theme(legend.position = "none")
+sig_group_strat_pt <- sig_group_strat_pt + theme(legend.position = "none")
+
+## Figure 4 compile
+fig4 <- plot_grid(signature_stacked_all,
+                  sig_box_wilcox,
+                  sig_group_strat_pt,
+                  plot_grid(sig_legend_a,sig_legend_b,ncol = 2,labels = c("","")),
+                  nrow = 4,
+                  rel_heights = c(1,0.5,0.5,0.1),
+                  labels = c("A","B","C"))
+
+## Figure 4 render
+ggsave2(filename = "plots/figure_4_render.png",plot = fig4,width = 10,height = 12,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_4_render.pdf",plot = fig4,width = 10,height = 12,units = "in",dpi = 300)
+```
+
+```{r fig5}
+## Load plots
+signature_paired_line <- readRDS("copy_number_signatures/plots/paired_line_plot.RDS")
+signature_stacked_alt <- readRDS("copy_number_signatures/plots/signatures_stacked_bar_alt.RDS")
+
+## Modify plots
+signature_paired_line <- signature_paired_line + theme(legend.position = "none")
+signature_stacked_alt <- signature_stacked_alt + theme(legend.position = "none")
+
+## Get legends
+sig_legend_a <- get_legend(
+    signature_stacked_all + 
+        guides(fill = guide_legend(nrow = 1)) +
+        theme(legend.position = "bottom")
+)
+
+sig_legend_b <- get_legend(
+    sig_box_wilcox + 
+        guides(fill = guide_legend(nrow = 1)) +
+        theme(legend.position = "bottom")
+)
+
+## Figure 5 compile
+fig5 <- plot_grid(plot_grid(signature_paired_line,
+                  plot_grid(signature_stacked_alt,
+                            empty,
+                            ncol = 2,labels = c("B","C")),
+                  nrow = 2,
+                  rel_heights = c(0.4,0.6,0.4),
+                  labels = c("A","")),nrow = 2,
+                  plot_grid(sig_legend_a,sig_legend_b,ncol = 2,labels = c("","")),rel_heights = c(1,0.1))
+
+## Figure 5 render
+ggsave2(filename = "plots/figure_5_render.png",plot = fig5,width = 9,height = 11,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_5_render.pdf",plot = fig5,width = 9,height = 11,units = "in",dpi = 300)
+```
+
+```{r fig6}
+## Load plots
+sig_bar_plot_primary_pt_diag <- readRDS("copy_number_analysis/focal_analysis/plots/sig_bar_plot_primary_pt_diag.RDS")
+sig_dist_primary_pt_diag <- readRDS("copy_number_analysis/focal_analysis/plots/sig_dist_primary_pt_diag.RDS")
+cn_focal_rate_primary_pt_diag <- readRDS("copy_number_analysis/focal_analysis/plots/primary_pt_rate_plot2.RDS")
+sig_primary_beta_results <- ggdraw() +
+                              draw_image(magick::image_read("copy_number_signatures/plots/TEMP_primary_pt_sig_logR_partial_ILR_diagnosis_beta_values.png",
+                                                      density = 600))
+
+## Modify plots
+sig_bar_plot_primary_pt_diag <- sig_bar_plot_primary_pt_diag + theme(legend.position = "none")
+sig_dist_primary_pt_diag <- sig_dist_primary_pt + theme(legend.position = "none",axis.text.x = element_blank())
+#sig_dist_primary_pt_group_strat <- sig_dist_primary_pt_group_strat + theme(legend.position = "none",axis.text.x = element_blank())
+
+## Get legends
+sig_pt_primary_legend_a <- get_legend(
+  sig_bar_plot_primary_pt_diag + 
+    guides(fill = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+
+sig_pt_primary_legend_b <- get_legend(
+  sig_dist_primary_pt_diag + 
+    guides(fill = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+### Figure 6 compile
+fig6 <- plot_grid(plot_grid(cn_focal_rate_primary_pt_diag,
+                            sig_bar_plot_primary_pt_diag,
+                            sig_dist_primary_pt_diag,
+                            sig_primary_beta_results,
+                    labels = c("A","B","C","D"),
+                    nrow = 4,
+                    rel_heights = c(1,1,0.6,1)),
+          plot_grid(empty,sig_pt_primary_legend_a,empty,sig_pt_primary_legend_b,
+                    nrow = 2,
+                    rel_widths = c(0.1,1,1)),
+          rel_heights = c(1.5,0.1),
+          nrow = 2)
+
+
+## Plot
+fig6
+
+## Figure 6 render
+ggsave2(filename = "plots/figure_6_render.png",plot = fig6,width = 8,height = 12,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_6_render.pdf",plot = fig6,width = 8,height = 12,units = "in",dpi = 300)
+```
+
+```{r fig7}
+
+```
+
+```{r fig?_patient_level}
+## Load plots
+focal_pairs_plot <- readRDS("copy_number_analysis/focal_analysis/plots/gene_pairs_plot.RDS")
+focal_heatmap_plot <- readRDS("copy_number_analysis/focal_analysis/plots/gene_change_heatmap.RDS")
+
+## Figure T1 compile
+fig_S6 <- plot_grid(focal_heatmap_plot,focal_pairs_plot,nrow = 2,labels = c("A","B"))
+
+## Figure T1 render
+ggsave2(filename = "plots/figure_6_render.png",plot = fig6,width = 8,height = 10,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_6_render.pdf",plot = fig6,width = 8,height = 10,units = "in",dpi = 300)
+```
+
+```{r fig?_pt_status}
+## Load plots
+sig_pt_bar_plot <- readRDS("copy_number_signatures/plots/sig_pt_bar_plot.RDS")
+sig_pt_bar_plot <- sig_pt_bar_plot + theme(legend.position = "none")
+
+sig_pt_plot <- readRDS("copy_number_signatures/plots/sig_pt_plot.RDS")
+sig_pt_plot <- sig_pt_plot + theme(legend.position = "none")
+
+sig_pt_plot_strat_group <- readRDS("copy_number_signatures/plots/sig_pt_plot_strat_group.RDS")
+sig_pt_plot_strat_group <- sig_pt_plot_strat_group + theme(legend.position = "none")
+
+sig_pt_legend_a <- get_legend(
+  sig_pt_bar_plot + 
+    guides(fill = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+
+sig_pt_legend_b <- get_legend(
+  sig_pt_plot + 
+    guides(fil = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+
+## Figure s## compile
+fig7S <- plot_grid(plot_grid(sig_pt_bar_plot,sig_pt_plot,sig_pt_plot_strat_group,
+                            labels = c("A","B","C"),
+                            nrow = 3,
+                            rel_heights = c(1,0.5,1)),
+                  plot_grid(empty,sig_pt_legend_a,sig_pt_legend_b,
+                            nrow = 1,
+                            rel_widths = c(0.1,1,1)),
+                  rel_heights = c(1.5,0.1),
+                  nrow = 2)
+
+## Plot render
+ggsave2(filename = "plots/figure_7S_render.png",plot = fig7S,width = 8,height = 12,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_7S_render.pdf",plot = fig7S,width = 8,height = 12,units = "in",dpi = 300)
+```
+
+```{r fig?_tissue_diffs}
+## Load plots
+cna_tissue_rates <- readRDS("copy_number_analysis/sites_of_relapse/plots/cna_rates_tissue.RDS")
+cna_tissue_counts <- readRDS("copy_number_analysis/sites_of_relapse/plots/cna_count_tissue.RDS")
+cna_tissue_ith <- readRDS("copy_number_analysis/sites_of_relapse/plots/ith_tissue.RDS")
+cna_tissue_sigs <- readRDS("copy_number_analysis/sites_of_relapse/plots/signature_tissue.RDS")
+
+## Modify plots
+cna_tissue_rates <- cna_tissue_rates +
+                        theme(legend.position = "none",
+                              axis.text.x = element_text(angle = 90,hjust = 1,vjust = 0.5))
+
+cna_tissue_counts <- cna_tissue_counts + theme(legend.position = "none",
+                                               axis.ticks.x = element_blank(),
+                                               axis.title.x = element_blank(),
+                                               axis.text.x = element_blank())
+
+cna_tissue_ith <- cna_tissue_ith + theme(legend.position = "none",
+                                         axis.ticks.x = element_blank(),
+                                         axis.title.x = element_blank(),
+                                         axis.text.x = element_blank())
+
+cna_tissue_sigs <- cna_tissue_sigs + theme(legend.position = "none",
+                                           axis.ticks.x = element_blank(),
+                                           axis.title.x = element_blank(),
+                                           axis.text.x = element_blank()) 
+
+## Get legends
+tissue_legend_a <- get_legend(
+  cna_tissue_counts + 
+    guides(fill = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+tissue_legend_b <- get_legend(
+  cna_tissue_rates + 
+    guides(fill = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+
+## Supplemental - tissue 1
+tissue_supplemental1 <- plot_grid(plot_grid(plot_grid(cna_tissue_counts,labels = c("A",""),
+                              plot_grid(cna_tissue_rates,cna_tissue_ith,labels = c("B","C"),ncol = 1,rel_heights = c(0.8,0.2))),
+                                cna_tissue_sigs,nrow = 2,rel_heights = c(0.8,0.2)),
+                              plot_grid(tissue_legend_b,tissue_legend_a),nrow = 2,rel_heights = c(1,0.1))
+
+ggsave2(filename = "plots/tissue_supplemental1.png",plot = tissue_supplemental1,width = 10,height = 12,units = "in",dpi = 300)
+ggsave2(filename = "plots/tissue_supplemental1.pdf",plot = tissue_supplemental1,width = 10,height = 12,units = "in",dpi = 300)
+
+```
+
+```{r fig?_tissue_diffs_strat}
+## Load supplemental tissue plots
+cn_tissue_counts_strat <- readRDS("copy_number_analysis/sites_of_relapse/plots/cn_count_tissue.RDS")
+cn_tissue_counts_strat <- cn_tissue_counts_strat + theme(legend.position = "none",axis.title.x = element_blank(),
+                                                         axis.ticks.x = element_blank(),
+                                                         axis.text.x = element_blank())
+cn_tissue_sigs_strat <- readRDS("copy_number_analysis/sites_of_relapse/plots/cn_sigs_tissue.RDS")
+cn_tissue_sigs_strat <- cn_tissue_sigs_strat + theme(legend.position = "none",
+                                                     axis.ticks.x = element_blank(),
+                                                     axis.title.x = element_blank(),
+                                                     axis.text.x = element_blank())
+cn_tissue_ith_strat <- readRDS("copy_number_analysis/sites_of_relapse/plots/ith_tissue_strat.RDS")
+cn_tissue_ith_strat <- cn_tissue_ith_strat + theme(legend.position = "none",
+                                                   axis.ticks.x = element_blank(),
+                                                   axis.title.x = element_blank(),
+                                                   axis.text.x = element_blank())
+
+tissue_legend_strat <- get_legend(
+  cn_tissue_ith_strat + 
+    guides(color = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+
+## Supplemental - tissue 2
+tissue_supplemental2 <- plot_grid(plot_grid(cn_tissue_counts_strat,
+                    plot_grid(cn_tissue_sigs_strat,cn_tissue_ith_strat,nrow = 2,labels = c("B","C")),
+                    ncol = 2),
+          tissue_legend_strat,
+          labels = c("A",""),
+          nrow = 2,
+          rel_heights = c(1,0.1))
+
+ggsave2(filename = "plots/tissue_supplemental2.png",plot = tissue_supplemental2,width = 10,height = 12,units = "in",dpi = 300)
+ggsave2(filename = "plots/tissue_supplemental2.pdf",plot = tissue_supplemental2,width = 10,height = 12,units = "in",dpi = 300)
+```
+
+```{r fig?_focal_rate_compare}
+## Supplemental - TCGA-Britroc focal rate comparison 
+britroc_tcga_comp_raw <- readRDS("copy_number_analysis/focal_analysis/plots/britroc_tcga_comp_raw.RDS")
+britroc_tcga_comp_norm <- readRDS("copy_number_analysis/focal_analysis/plots/britroc_tcga_comp_norm.RDS")
+
+## Modify plot
+britroc_tcga_comp_raw <- britroc_tcga_comp_raw +
+                            labs(title = "") +
+                            theme(legend.position = "none")
+
+britroc_tcga_comp_norm <- britroc_tcga_comp_norm +
+                            labs(title = "") +
+                            theme(legend.position = "bottom")
+
+## Plot compile
+sup_plot_britroc_tcga_rates <- plot_grid(britroc_tcga_comp_raw,britroc_tcga_comp_norm,nrow = 2,labels = c("A","B"))
+
+## Plot render
+ggsave2(filename = "plots/supplemental_figure_tcga_britroc_rates.png",plot = sup_plot_britroc_tcga_rates,width = 8,height = 8,units = "in",dpi = 300)
+ggsave2(filename = "plots/supplemental_figure_tcga_britroc_rates.pdf",plot = sup_plot_britroc_tcga_rates,width = 8,height = 8,units = "in",dpi = 300)
+```
+
+```{r misc}
+sig_box_paired_wilcox <- readRDS("copy_number_signatures/plots/sig_box_paired_wilcox.RDS")
+sig_box_paired_wilcox <- sig_box_paired_wilcox +
+    labs(title = "",caption = "") + theme(legend.position = "none")
+```
+
+```{r session_info}
+sessionInfo()
+```

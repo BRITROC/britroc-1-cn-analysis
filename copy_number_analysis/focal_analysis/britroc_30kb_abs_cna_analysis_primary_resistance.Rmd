@@ -1,5 +1,5 @@
 ---
-title: "Analysis of primary resistant patients - BriTROC"
+title: "Combined copy number analysis - BriTROC"
 author: "Philip Smith"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -17,11 +17,11 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r load_libraries}
 # Load libraries
 suppressPackageStartupMessages(suppressWarnings(library(tidyverse)))
-#suppressPackageStartupMessages(suppressWarnings(library(kableExtra)))
-#suppressPackageStartupMessages(suppressWarnings(library(biomaRt)))
+suppressPackageStartupMessages(suppressWarnings(library(kableExtra)))
+suppressPackageStartupMessages(suppressWarnings(library(biomaRt)))
 #suppressPackageStartupMessages(suppressWarnings(library(Biobase)))
 #suppressPackageStartupMessages(suppressWarnings(library(QDNAseqmod)))
-#suppressPackageStartupMessages(suppressWarnings(library(cowplot)))
+suppressPackageStartupMessages(suppressWarnings(library(cowplot)))
 suppressPackageStartupMessages(suppressWarnings(library(ggsignif)))
 #suppressPackageStartupMessages(suppressWarnings(library(topGO)))
 #suppressPackageStartupMessages(suppressWarnings(library(org.Hs.eg.db)))
@@ -42,6 +42,27 @@ patient_sorted_samples <- factor(patient.meta$SAMPLE_ID[order(patient.meta$PATIE
 patient.data <- read.table("../../britroc_cohort_patient_data.tsv",header = TRUE,sep = "\t")
 
 primary_resist_pats <- read.table("../../britroc_primary_platinum_resistant_patient_list.tsv",header = T,sep = "\t")
+
+focal_genes_table <- read.table("data/focal_CNA_pseudo_bed.txt",header = T,sep = "\t")
+
+patient.meta <- patient.meta %>%
+                  mutate(group = case_when(group == "arx" ~ "diagnosis",
+                                           group == "rlps" ~ "relapse"))
+meta.data <- patient.meta
+```
+
+```{r biomart}
+ensembl <- useEnsembl(biomart = "ENSEMBL_MART_ENSEMBL", dataset = "hsapiens_gene_ensembl",GRCh = 37)
+protein_coding_genes <- getBM(attributes = c("chromosome_name","start_position","end_position","hgnc_symbol"),
+                                             filters = "biotype",
+                                             values = "protein_coding",
+                                             mart = ensembl,
+                                             useCache = FALSE)
+protein_coding_genes <- protein_coding_genes[protein_coding_genes$chromosome_name %in% seq.int(1,22,1),]
+protein_coding_genes <- protein_coding_genes[protein_coding_genes$hgnc_symbol != "",]
+kable(head(protein_coding_genes))%>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
 ```
 
 ```{r cn_data}
@@ -61,22 +82,239 @@ sig_bar <- as.data.frame(sig_quants) %>%
   pivot_longer(cols = -1,names_to="SAMPLE_ID") %>%
   left_join(y = patient.meta,by = "SAMPLE_ID") %>%
   #filter(paired == TRUE) %>%
-  dplyr::select(-c(ploidy,purity,TP53cn,expected_TP53_AF,TP53freq,use,notes,paired)) #%>%
-  # group_by(signature,group) %>%
-  # summarise(across(value,.fns = mean))
-  
-#sig_bar$SAMPLE_ID <- factor(sig_bar$SAMPLE_ID,levels = unique(sig_bar$SAMPLE_ID[order(sig_bar$value,sig_bar$signature,decreasing = T)]))
+  dplyr::select(-c(ploidy,purity,TP53cn,expected_TP53_AF,TP53freq,use,notes,paired))
+
 sig_bar$SAMPLE_ID <- factor(sig_bar$SAMPLE_ID,levels = sample_order)
 
 sig_bar$pt_status <- patient.data$pt_sensitivity_at_reg[match(sig_bar$PATIENT_ID,paste0("BRITROC-",patient.data$britroc_number))]
 sig_bar$prior_lines <- patient.data$pre_reg_chemo[match(sig_bar$PATIENT_ID,paste0("BRITROC-",patient.data$britroc_number))]
+sig_bar$platinum_resistance <- ifelse(sig_bar$PATIENT_ID %in% primary_resist_pats$PATIENT_ID,"primary resistant","non-primary resistant")
+head(sig_bar)
 ```
 
+```{r cna_rate}
+patient.meta$platinum_resistance <- ifelse(patient.meta$PATIENT_ID %in% primary_resist_pats$PATIENT_ID,
+                                           "primary resistant","non-primary resistant")
+pt_samples <- split(patient.meta,f = list(patient.meta$platinum_resistance,
+                                                                          patient.meta$group))
+
+primary_pt_rates <- do.call(rbind,lapply(pt_samples,FUN = function(x){
+  pt <- patient.meta$platinum_resistance[patient.meta$SAMPLE_ID == x$SAMPLE_ID[1]]
+  group <- patient.meta$group[patient.meta$SAMPLE_ID == x$SAMPLE_ID[1]]
+  #print(pt)
+  samples <- x$SAMPLE_ID
+  if(length(samples)>1){
+    cnas <- get_cna_rates(data = cna_calls[,colnames(cna_calls) %in% samples],
+                        genes = focal_genes_table$Gene.name)
+  } else {
+    next()
+  }
+  cnas$platinum_resistance <- rep(as.character(pt),times=nrow(cnas))
+  cnas$tumour <- rep(as.character(group),times=nrow(cnas))
+  return(cnas)
+}))
+primary_pt_rates
+
+primary_pt_rate_plot1 <- ggplot(primary_pt_rates) +
+  geom_col(aes(x = gene,y = rate,fill=platinum_resistance),position = "dodge") +
+  #scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  ylab(label = "rate (%)") +
+  facet_wrap(tumour ~ group,nrow=2,scales = "free_x") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90),legend.position = "none")
+
+primary_pt_rate_plot2 <- ggplot(primary_pt_rates[primary_pt_rates$tumour == "diagnosis",]) +
+  geom_col(aes(x = gene,y = rate,fill=platinum_resistance),position = "dodge") +
+  #scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  ylab(label = "rate (%)") +
+  facet_wrap(. ~ group,nrow=1,scales = "free_x") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90),legend.position = "none")
+
+ggplot(primary_pt_rates[primary_pt_rates$group == "amplification",]) +
+  geom_col(aes(x = platinum_resistance,y = rate,fill=platinum_resistance),position = "dodge") +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  ylab(label = "rate (%)") +
+  facet_wrap(tumour ~ gene) +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90),legend.position = "none")
+
+# ggplot(primary_pt_rates[primary_pt_rates$group == "deletion",]) +
+#   geom_col(aes(x = platinum_resistance,y = rate,fill=platinum_resistance),position = "dodge") +
+#   scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+#   ylab(label = "rate (%)") +
+#   facet_wrap(tumour ~ gene) + 
+#     theme(axis.title.x = element_blank(),axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90),legend.position = "none")
+
+ggsave(plot = primary_pt_rate_plot1,filename = "plots/primary_pt_rate_plot1.png",width = 6,height = 8,units = "in",dpi = 300)
+ggsave(plot = primary_pt_rate_plot1,filename = "plots/primary_pt_rate_plot1.pdf",width = 6,height = 8)
+
+saveRDS(object = primary_pt_rate_plot2,file = "plots/primary_pt_rate_plot2.RDS")
+ggsave(plot = primary_pt_rate_plot2,filename = "plots/primary_pt_rate_plot2.png",width = 8,height = 4,units = "in",dpi = 300)
+ggsave(plot = primary_pt_rate_plot2,filename = "plots/primary_pt_rate_plot2.pdf",width = 8,height = 4)
+primary_pt_rate_plot1
+primary_pt_rate_plot2
+```
+
+```{r cna_rate_primary_non_primary_1}
+fishers_gene_CNA(data = cna_calls,
+                     sub_a = patient.meta$SAMPLE_ID[patient.meta$platinum_resistance == "primary resistant"],
+                     sub_b = patient.meta$SAMPLE_ID[patient.meta$platinum_resistance == "non-primary resistant"],
+                     genes = focal_genes_table$Gene.name)
+```
+
+```{r cna_rate_primary_non_primary_2}
+fishers_gene_CNA(data = cna_calls,
+                     sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
+                                                         patient.meta$platinum_resistance == "primary resistant"],
+                     sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
+                                                         patient.meta$platinum_resistance == "non-primary resistant"],
+                     genes = focal_genes_table$Gene.name)
+```
+
+```{r cna_rate_primary_non_primary_3}
+fishers_gene_CNA(data = cna_calls,
+                     sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
+                                                         patient.meta$platinum_resistance == "primary resistant"],
+                     sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
+                                                         patient.meta$platinum_resistance == "non-primary resistant"],
+                     genes = focal_genes_table$Gene.name)
+```
+
+```{r cna_rate_diag_relapse}
+fishers_gene_CNA(data = cna_calls,
+                     sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
+                                                         patient.meta$platinum_resistance == "primary resistant"],
+                     sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
+                                                         patient.meta$platinum_resistance == "primary resistant"],
+                     genes = focal_genes_table$Gene.name)
+
+fishers_gene_CNA(data = cna_calls,
+                     sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
+                                                         patient.meta$platinum_resistance == "non-primary resistant"],
+                     sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
+                                                         patient.meta$platinum_resistance == "non-primary resistant"],
+                     genes = focal_genes_table$Gene.name)
+```
+
+### CNA copies
+
+```{r cna_copies}
+paired_amp_changes_all <- get_patient_changes(data = extracted,
+                                              genes = protein_coding_genes$hgnc_symbol,
+                                              patients = unique(patient.meta$PATIENT_ID[patient.meta$paired == TRUE])) %>%
+                       mutate(platinum_resistance = ifelse(PATIENT_ID %in% primary_resist_pats$PATIENT_ID,
+                                           "primary resistant","non-primary resistant"))
+
+paired_amp_changes <- paired_amp_changes_all %>%
+                        filter(gene %in% focal_genes_table$Gene.name)
+head(paired_amp_changes)
+```
+
+```{r copies_primary_resistance_1}
+cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$platinum_resistance == "non-primary resistant"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$platinum_resistance == "primary resistant"],
+                         p.adj = "fdr")
+```
+
+```{r copies_primary_resistance_2}
+cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$platinum_resistance == "non-primary resistant" & patient.meta$group == "diagnosis"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$platinum_resistance == "primary resistant" & patient.meta$group == "diagnosis"],
+                         p.adj = "fdr")
+```
+
+```{r copies_primary_resistance_3}
+cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$platinum_resistance == "non-primary resistant" & patient.meta$group == "relapse"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$platinum_resistance == "primary resistant" & patient.meta$group == "relapse"],
+                         p.adj = "fdr")
+```
+
+```{r copies_primary_resistance_4}
+cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$platinum_resistance == "primary resistant" & patient.meta$group == "diagnosis"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$platinum_resistance == "primary resistant" & patient.meta$group == "relapse"],
+                         p.adj = "fdr")
+```
+
+```{r copies_primary_resistance_5}
+cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$platinum_resistance == "non-primary resistant" & patient.meta$group == "diagnosis"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$platinum_resistance == "non-primary resistant" & patient.meta$group == "relapse"],
+                         p.adj = "fdr")
+```
+
+```{r cna_copies_plots}
+primary_pt_copies_plot1 <- ggplot(paired_amp_changes[paired_amp_changes$group == "diagnosis",]) +
+  geom_point(aes(x = platinum_resistance,y = value,color=platinum_resistance),position = position_dodge2(width = 0.4)) +
+  geom_violin(aes(x = platinum_resistance,y = value,fill=platinum_resistance),alpha=0.3,position = "dodge") +
+  #geom_signif(aes(x = platinum_resistance,y = value),comparison=list(c("primary resistant","non-primary resistant")),
+  #            test = "wilcox.test",vjust = 1.5) +
+  facet_wrap(. ~ gene,scales = "free_y",ncol = 3) +
+  theme_bw() +
+  theme(legend.position = "none")
+
+ggsave(plot = primary_pt_copies_plot1,filename = "plots/primary_pt_copies_plot1.png",width = 6,height = 8,units = "in",dpi = 300)
+ggsave(plot = primary_pt_copies_plot1,filename = "plots/primary_pt_copies_plot1.pdf",width = 6,height = 8)
+primary_pt_copies_plot1
+```
+
+```{r cna_norm_changes}
+norm_amp_changes_all <- paired_amp_changes_all %>%
+  group_by(PATIENT_ID,group,gene) %>%
+  summarise(value=median(value)) %>%
+  pivot_wider(values_from = value, names_from=group) %>%
+  mutate(change=relapse-diagnosis)
+
+norm_amp_changes <- norm_amp_changes_all %>%
+                      filter(gene %in% focal_genes_table$Gene.name)
+
+norm_amp_changes$platinum_resistant <- ifelse(norm_amp_changes$PATIENT_ID %in% primary_resist_pats$PATIENT_ID,
+                                           "primary resistant","non-primary resistant")
+
+primary_pt_change_plot1 <- ggplot(norm_amp_changes) +
+  geom_point(aes(x = platinum_resistant,y = change,color=platinum_resistant),position = position_dodge2(width = 0.4)) +
+  geom_violin(aes(x = platinum_resistant,y = change,fill=platinum_resistant),alpha=0.3,position = "dodge") +
+  #geom_signif(aes(x = platinum_resistant,y = change),comparison=list(c("primary resistant","non-primary resistant")),test = "wilcox.test",vjust = 1.5) +
+  facet_wrap(. ~ gene,scales = "free_y",ncol = 3) +
+  theme_bw() +
+  theme(legend.position = "none")
+
+ggsave(plot = primary_pt_change_plot1,filename = "plots/primary_pt_copies_plot1.png",width = 6,height = 8,units = "in",dpi = 300)
+ggsave(plot = primary_pt_change_plot1,filename = "plots/primary_pt_copies_plot1.pdf",width = 6,height = 8)
+primary_pt_change_plot1
+```
+
+```{r comb_plot1}
+plot_lg <- get_legend(
+    primary_pt_change_plot1 + 
+        guides(fill = guide_legend(nrow = 1)) +
+        theme(legend.position = "bottom")
+)
+
+primary_pt_copies_plot1 <- primary_pt_copies_plot1 + theme(axis.text.x = element_blank(),axis.title.x = element_blank())
+primary_pt_change_plot1 <- primary_pt_change_plot1 + theme(axis.text.x = element_blank(),axis.title.x = element_blank())
+
+primary_pt_comb <- plot_grid(primary_pt_rate_plot1,
+          plot_grid(primary_pt_copies_plot1,primary_pt_change_plot1,
+                    labels = c("B","C"),ncol = 2),
+          plot_lg,
+          labels = c("A","",""),
+          nrow = 3,rel_heights = c(0.4,0.6,0.05))
+
+ggsave(plot = primary_pt_comb,filename = "plots/primary_pt_comb.png",width = 6,height = 10,units = "in",dpi = 300)
+ggsave(plot = primary_pt_comb,filename = "plots/primary_pt_comb.pdf",width = 6,height = 10)
+primary_pt_comb
+```
+
+### Signatures
+
 ```{r sig_plot}
-sig_bar_plot <- ggplot(sig_bar) +
+sig_bar_plot_primary_pt <- ggplot(sig_bar) +
   geom_col(aes(SAMPLE_ID,value,fill=signature)) +
-  facet_wrap(. ~ group,nrow = 2,
-             labeller = labeller(group = c(arx="diagnosis",rlps="relapse")),scales = "free_x") +
+  facet_wrap(group ~ platinum_resistance,nrow =2,scales = "free_x") +
   scale_y_continuous(expand = c(0,0)) +
   scale_fill_manual(values = cbPalette) +
   ylab("exposure") +
@@ -84,18 +322,38 @@ sig_bar_plot <- ggplot(sig_bar) +
   theme_bw() +
   theme(axis.text.x = element_blank(),
         axis.ticks.x = element_blank(),
-        legend.position = "bottom")
-sig_bar_plot
+        legend.position = "bottom") +
+  guides(fill = guide_legend(nrow = 1))
+
+sig_bar_plot_primary_pt_diag <- ggplot(sig_bar[sig_bar$group == "diagnosis",]) +
+  geom_col(aes(SAMPLE_ID,value,fill=signature)) +
+  facet_wrap(. ~ platinum_resistance,nrow = 1,scales = "free_x") +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_fill_manual(values = cbPalette) +
+  ylab("exposure") +
+  xlab("sample") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position = "bottom") +
+  guides(fill = guide_legend(nrow = 1))
+
+saveRDS(object = sig_bar_plot_primary_pt,file = "plots/sig_bar_plot_primary_pt.RDS")
+ggsave(plot = sig_bar_plot_primary_pt,filename = "plots/sig_bar_plot_primary_pt.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = sig_bar_plot_primary_pt,filename = "plots/sig_bar_plot_primary_pt.pdf",width = 8,height = 6)
+sig_bar_plot_primary_pt
+
+saveRDS(object = sig_bar_plot_primary_pt_diag,file = "plots/sig_bar_plot_primary_pt_diag.RDS")
+ggsave(plot = sig_bar_plot_primary_pt_diag,filename = "plots/sig_bar_plot_primary_pt_diag.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = sig_bar_plot_primary_pt_diag,filename = "plots/sig_bar_plot_primary_pt_diag.pdf",width = 8,height = 6)
+sig_bar_plot_primary_pt_diag
 ```
 
 ```{r pt_status_im_list}
 sig_bar_filt <- sig_bar %>%
-                  filter(!is.na(pt_status) & !is.na(prior_lines)) %>%
-                  mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse"))
+                  filter(!is.na(pt_status) & !is.na(prior_lines))
 
-sig_bar_filt$platinum_resistance <- ifelse(sig_bar_filt$PATIENT_ID %in% primary_resist_pats$PATIENT_ID,"primary resistant","non-primary resistant")
-
-ggplot(data = sig_bar_filt) +
+sig_dist_primary_pt <- ggplot(data = sig_bar) +
     geom_jitter(aes(x = platinum_resistance,y = value),alpha=0.1) +
     geom_violin(aes(x = platinum_resistance,y = value,colour = platinum_resistance),
                 fill=NA) +
@@ -109,7 +367,31 @@ ggplot(data = sig_bar_filt) +
           axis.text.x = element_text(angle = 90,hjust = 1,vjust = 0.5),
           axis.title.x = element_blank())
 
-ggplot(data = sig_bar_filt) +
+saveRDS(object = sig_dist_primary_pt,file = "plots/sig_dist_primary_pt.RDS")
+ggsave(plot = sig_dist_primary_pt,filename = "plots/sig_dist_primary_pt.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = sig_dist_primary_pt,filename = "plots/sig_dist_primary_pt.pdf",width = 8,height = 6)
+sig_dist_primary_pt
+
+sig_dist_primary_pt_diag <- ggplot(data = sig_bar[sig_bar$group == "diagnosis",]) +
+    geom_jitter(aes(x = platinum_resistance,y = value),alpha=0.1) +
+    geom_violin(aes(x = platinum_resistance,y = value,colour = platinum_resistance),
+                fill=NA) +
+    geom_signif(aes(x = platinum_resistance,y = value),
+                test = "wilcox.test",comparisons = list(c("primary resistant","non-primary resistant")),
+                vjust = 1.8) +
+    ylab("exposure") +
+    facet_wrap(. ~ signature,nrow = 1) +
+    theme_bw() +
+    theme(legend.position = "bottom",
+          axis.text.x = element_text(angle = 90,hjust = 1,vjust = 0.5),
+          axis.title.x = element_blank())
+
+saveRDS(object = sig_dist_primary_pt_diag,file = "plots/sig_dist_primary_pt_diag.RDS")
+ggsave(plot = sig_dist_primary_pt_diag,filename = "plots/sig_dist_primary_pt_diag.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = sig_dist_primary_pt_diag,filename = "plots/sig_dist_primary_pt_diag.pdf",width = 8,height = 6)
+sig_dist_primary_pt_diag
+
+sig_dist_primary_pt_group_strat <- ggplot(data = sig_bar) +
     geom_jitter(aes(x = platinum_resistance,y = value),alpha=0.1) +
     geom_violin(aes(x = platinum_resistance,y = value,
                     color = platinum_resistance),fill=NA) +
@@ -123,8 +405,138 @@ ggplot(data = sig_bar_filt) +
     theme(legend.position = "right",
           axis.text.x = element_text(angle = 90,hjust = 1,vjust = 0.5),
           axis.title.x = element_blank())
+
+saveRDS(object = sig_dist_primary_pt_group_strat,file = "plots/sig_dist_primary_pt_group_strat.RDS")
+ggsave(plot = sig_dist_primary_pt_group_strat,filename = "plots/sig_dist_primary_pt_group_strat.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(plot = sig_dist_primary_pt_group_strat,filename = "plots/sig_dist_primary_pt_group_strat.pdf",width = 8,height = 6)
+sig_dist_primary_pt_group_strat
+```
+
+### CCNE1
+
+```{r CCNE1_sigs}
+ccne1_calls <- cna_calls[rownames(cna_calls) == "CCNE1",]
+get_cna_rates(ccne1_calls)
+
+ccne1_status <- as.data.frame(t(ccne1_calls)) %>%
+  rownames_to_column(var = "SAMPLE_ID") %>%
+  mutate(CCNE1 = case_when(CCNE1 == "N" ~ "neutral",
+                           CCNE1 == "AMP" ~ "amplified")) %>%
+  rename("CCNE1_status"="CCNE1")
+
+sig_bar$CCNE1_status <- ccne1_status$CCNE1_status[match(sig_bar$SAMPLE_ID,ccne1_status$SAMPLE_ID)]
+
+ccne1_stat_plot <- ggplot(data = sig_bar[sig_bar$group == "diagnosis",]) +
+    geom_jitter(aes(x = CCNE1_status,y = value),alpha=0.1) +
+    geom_violin(aes(x = CCNE1_status,y = value,
+                    color = CCNE1_status),fill=NA) +
+    geom_signif(aes(x = CCNE1_status,y = value),
+                test = "wilcox.test",comparisons = list(c("neutral","amplified")),
+                vjust = 1.3) +
+    ylab("exposure") +
+    facet_wrap(group ~ signature,nrow = 1) +
+    theme_bw() +
+    theme(legend.position = "none",
+          axis.text.x = element_text(angle = 90,hjust = 1,vjust = 0.5),
+          axis.title.x = element_blank())
+
+ccne1_cn <- as.data.frame(t(extracted[rownames(extracted) == "CCNE1",])) %>%
+              rownames_to_column(var = "SAMPLE_ID") %>%
+              mutate(CCNE1_adj = CCNE1 - patient.meta$ploidy[match(SAMPLE_ID,patient.meta$SAMPLE_ID)])
+
+sig_bar$CCNE1 <- ccne1_cn$CCNE1[match(sig_bar$SAMPLE_ID,ccne1_cn$SAMPLE_ID)]
+sig_bar$CCNE1_adj <- ccne1_cn$CCNE1_adj[match(sig_bar$SAMPLE_ID,ccne1_cn$SAMPLE_ID)]
+
+ccne1_cn_plot <- ggplot(data = sig_bar[sig_bar$group == "diagnosis",]) +
+    geom_point(aes(x = log1p(CCNE1),y = value),alpha=0.1) +
+    geom_smooth(aes(x = log1p(CCNE1),y = value),method = "lm") +
+    #geom_violin(aes(x = CCNE1_adj,y = value,
+    #                color = CCNE1_status),fill=NA) +
+    # geom_signif(aes(x = CCNE1_status,y = value),
+    #             test = "wilcox.test",comparisons = list(c("neutral","amplified")),
+    #             vjust = 1.3) +
+    ggpubr::stat_cor(aes(x = log1p(CCNE1),y = value)) +
+    ylab("exposure") +
+    facet_wrap(group ~ signature,nrow = 1,scales = "free_x") +
+    theme_bw() +
+    theme(legend.position = "bottom",
+          axis.text.x = element_text(angle = 90,hjust = 1,vjust = 0.5))
+
+ccne1_stat_plot
+ccne1_cn_plot
+```
+
+### kras
+
+```{r kras_sigs}
+kras_calls <- cna_calls[rownames(cna_calls) == "KRAS",]
+get_cna_rates(kras_calls)
+
+kras_status <- as.data.frame(t(kras_calls)) %>%
+  rownames_to_column(var = "SAMPLE_ID") %>%
+  mutate(KRAS = case_when(KRAS == "N" ~ "neutral",
+                          KRAS == "AMP" ~ "amplified")) %>%
+  rename("kras_status"="KRAS")
+
+sig_bar$kras_status <- kras_status$kras_status[match(sig_bar$SAMPLE_ID,kras_status$SAMPLE_ID)]
+
+kras_stat_plot <- ggplot(data = sig_bar[sig_bar$group == "diagnosis",]) +
+    geom_jitter(aes(x = kras_status,y = value),alpha=0.1) +
+    geom_violin(aes(x = kras_status,y = value,
+                    color = kras_status),fill=NA) +
+    geom_signif(aes(x = kras_status,y = value),
+                test = "wilcox.test",comparisons = list(c("neutral","amplified")),
+                vjust = 1.3) +
+    ylab("exposure") +
+    facet_wrap(group ~ signature,nrow = 1) +
+    theme_bw() +
+    theme(legend.position = "none",
+          axis.text.x = element_text(angle = 90,hjust = 1,vjust = 0.5),
+          axis.title.x = element_blank())
+
+kras_cn <- as.data.frame(t(extracted[rownames(extracted) == "KRAS",])) %>%
+              rownames_to_column(var = "SAMPLE_ID") %>%
+              mutate(KRAS_adj = KRAS - patient.meta$ploidy[match(SAMPLE_ID,patient.meta$SAMPLE_ID)])
+
+sig_bar$KRAS <- kras_cn$KRAS[match(sig_bar$SAMPLE_ID,kras_cn$SAMPLE_ID)]
+sig_bar$KRAS_adj <- kras_cn$KRAS_adj[match(sig_bar$SAMPLE_ID,kras_cn$SAMPLE_ID)]
+
+kras_cn_plot <- ggplot(data = sig_bar[sig_bar$group == "diagnosis",]) +
+    geom_point(aes(x = log1p(KRAS),y = value),alpha=0.1) +
+    geom_smooth(aes(x = log1p(KRAS),y = value),method = "lm") +
+    #geom_violin(aes(x = CCNE1_adj,y = value,
+    #                color = CCNE1_status),fill=NA) +
+    # geom_signif(aes(x = CCNE1_status,y = value),
+    #             test = "wilcox.test",comparisons = list(c("neutral","amplified")),
+    #             vjust = 1.3) +
+    ggpubr::stat_cor(aes(x = log1p(KRAS),y = value)) +
+    ylab("exposure") +
+    facet_wrap(group ~ signature,nrow = 1,scales = "free_x") +
+    theme_bw() +
+    theme(legend.position = "bottom",
+          axis.text.x = element_text(angle = 90,hjust = 1,vjust = 0.5))
+
+kras_stat_plot
+kras_cn_plot
+```
+
+### gene comb
+
+```{r brca2_sigs}
+gene_sig_comb_plot <- plot_grid(plot_grid(ccne1_stat_plot,ccne1_cn_plot,nrow = 2,labels = c("CCNE1","")),
+          plot_grid(kras_stat_plot,kras_cn_plot,nrow = 2,labels = c("KRAS","")),
+          nrow = 2)
+
+ggsave(plot = gene_sig_comb_plot,filename = "plots/gene_sig_comb_plot.png",width = 8,height = 8,units = "in",dpi = 300)
+ggsave(plot = gene_sig_comb_plot,filename = "plots/gene_sig_comb_plot.pdf",width = 8,height = 8)
+gene_sig_comb_plot
+```
+
+```{r fig_6_format}
+
 ```
 
 ```{r session_info}
 sessionInfo()
 ```
+

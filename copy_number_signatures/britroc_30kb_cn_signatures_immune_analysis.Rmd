@@ -134,7 +134,7 @@ Meta data for all samples with fitted absolute copy number profiles, as well as 
 ```{r read_meta}
 meta.data <- read.table("britroc_30kb_signature_data_meta.tsv",header = TRUE,sep = "\t")
 patient.data <- read.table("../britroc_cohort_patient_data.tsv",header = TRUE,sep = "\t")
-im_list <- c(1,2,32,43,48,54,72,86,111,125,135,144,147,177,186,201,219,229,234,244,261)
+primary_resist_pats <- read.table("../britroc_primary_platinum_resistant_patient_list.tsv",header = T,sep = "\t")
 ```
 
 ### Load sig data
@@ -161,7 +161,7 @@ immune.data_cd3_cd20 <- immune.data_cd3_cd20_raw %>%
     mutate(image_id = paste(ID,row_number(),sep = "_")) %>%
     arrange(ID) %>%
     #select(ID,image_id,Image_Tag,9:ncol(.)) %>%
-    select(ID,image_id,Image_Tag,12:ncol(.)) %>%
+    dplyr::select(ID,image_id,Image_Tag,12:ncol(.)) %>%
     pivot_longer(cols = c(4,7),names_to = "tissue",values_to = "tissue_area") %>%
     mutate(tissue = case_when(str_split(tissue,pattern = "_",simplify = T)[,1] == "Tumour" ~ "tumour",
                               str_split(tissue,pattern = "_",simplify = T)[,1] == "Stroma" ~ "stroma")) %>%
@@ -190,7 +190,7 @@ immune.data_cd8_foxp3 <- immune.data_cd8_foxp3_raw %>%
     mutate(image_id = paste(ID,row_number(),sep = "_")) %>%
     arrange(ID) %>%
     #select(ID,image_id,9:ncol(.)) %>%
-    select(ID,image_id,Image_Tag,12:ncol(.)) %>%
+    dplyr::select(ID,image_id,Image_Tag,12:ncol(.)) %>%
     pivot_longer(cols = c(4,7),names_to = "tissue",values_to = "tissue_area") %>%
     mutate(tissue = case_when(str_split(tissue,pattern = "_",simplify = T)[,1] == "Tumour" ~ "tumour",
                               str_split(tissue,pattern = "_",simplify = T)[,1] == "Stroma" ~ "stroma")) %>%
@@ -237,9 +237,10 @@ immune.data <- rbind(immune.data_cd3_cd20,immune.data_cd8_foxp3)
 #                                cells=(.$cells[.$marker == "CD3"] + .$cells[.$marker == "CD8"]))))
 immune.data <- immune.data %>%
                 mutate(normalised_cells = cells/tissue_area) %>%
-                filter(ID %in% overlapping_samples) %>%
+                #filter(ID %in% overlapping_samples) %>%
                 filter(!is.na(normalised_cells)) %>%
-                select(-cells,-tissue_area)
+                dplyr::select(-cells,-tissue_area) %>%
+                filter(marker %in% c("CD3","CD8"))
 
 head(immune.data)
 ```
@@ -268,12 +269,13 @@ immune.data.wide <- immune.data %>%
 
 pairs_plot <- GGally::ggpairs(immune.data.wide,
                               aes(color=tissue),
-                              columns = 4:7) +
+                              upper = list(continuous = wrap("cor", method = "spearman")),
+                              columns = 4:5) +
               theme_bw()
 
-# saveRDS(object = pairs_plot,file = "plots/immune_marker_pairs_plot.RDS")
-# ggsave(pairs_plot,filename = "plots/immune_marker_pairs_plot.png",width = 8,height = 6,units = "in",dpi = 300)
-# ggsave(pairs_plot,filename = "plots/immune_marker_pairs_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
+saveRDS(object = pairs_plot,file = "plots/immune_marker_pairs_plot.RDS")
+ggsave(pairs_plot,filename = "plots/immune_marker_pairs_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+ggsave(pairs_plot,filename = "plots/immune_marker_pairs_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
 pairs_plot
 ```
 
@@ -379,7 +381,7 @@ sig_immune_cor_s <- ggplot(sig_immune[sig_immune$tissue == "stroma",]) +
              label.x.npc = 0.4,
              label.y.npc = 0.82,
              p.digits = 2,
-             method = "spearman") +
+             method = "kendall") +
     labs(title = "stroma") +
     xlab("log1p(cells / \u00b5m \u00b2)") +
     theme_bw() +
@@ -390,8 +392,8 @@ sig_immune_cor_s <- ggplot(sig_immune[sig_immune$tissue == "stroma",]) +
 sig_immune_cor <- plot_grid(sig_immune_cor_t,sig_immune_cor_s,nrow = 2,labels = c("A","B"))
 
 saveRDS(object = sig_immune_cor,file = "plots/sig_immune_cor.RDS")
-ggsave(sig_immune_cor,filename = "plots/sig_immune_cor.png",width = 8,height = 10,units = "in",dpi = 300)
-ggsave(sig_immune_cor,filename = "plots/sig_immune_cor.pdf",width = 8,height = 10,units = "in",dpi = 300)
+ggsave(sig_immune_cor,filename = "plots/sig_immune_cor.png",width = 8,height = 8,units = "in",dpi = 300)
+ggsave(sig_immune_cor,filename = "plots/sig_immune_cor.pdf",width = 8,height = 8,units = "in",dpi = 300)
 sig_immune_cor
 ```
 
@@ -422,15 +424,10 @@ head(sig_immune)
 set.seed(seed = 9990)
 ```
 
-```{r drop_markers}
-sig_immune_subset <- sig_immune %>%
-                      filter(marker %in% c("CD8","CD3"))
-```
-
 ```{r patient_sampling}
 ## Gather patient-sample table from long data
-patient_groups <- sig_immune_subset %>%
-  select(ID,patient_id) %>%
+patient_groups <- sig_immune %>%
+  dplyr::select(ID,patient_id) %>%
   distinct() %>%
   arrange(patient_id)
 
@@ -443,8 +440,15 @@ patient_groups_sampled <- patient_groups %>%
 ## Check sample counts per patient
 table(patient_groups_sampled$patient_id)
 
-sig_immune_subset <- sig_immune_subset %>%
+sig_immune_subset <- sig_immune %>%
                       filter(ID %in% patient_groups_sampled$ID)
+head(sig_immune_subset)
+```
+
+```{r add_clin_feats}
+sig_immune_subset <- sig_immune_subset %>%
+                      mutate(age = patient.data$age[match(patient_id,paste0("BRITROC-",patient.data$britroc_number))]) %>%
+                      mutate(stage = as.factor(patient.data$tumour_stage_at_diagnosis[match(patient_id,paste0("BRITROC-",patient.data$britroc_number))]))
 head(sig_immune_subset)
 ```
 
@@ -454,7 +458,7 @@ sig_immune_subset$exposure_dichot <- ifelse(sig_immune_subset$exposure > 0,1,0) 
 
 ```{r exposure_logisticPCA}
 sig_dichot_wide <- sig_immune_subset %>%
-                    select(-exposure) %>%
+                    dplyr::select(-exposure) %>%
                     pivot_wider(names_from = signature,values_from = exposure_dichot)
 
 head(sig_dichot_wide[,9:ncol(sig_dichot_wide)])
@@ -477,7 +481,7 @@ plot(logiPCA, type = "scores")
 
 ```{r ALR}
 sig_wide_alr <- sig_immune_subset %>%
-                    select(-exposure_dichot) %>%
+                    dplyr::select(-exposure_dichot) %>%
                     pivot_wider(names_from = signature,values_from = exposure)
 acomp()
 compositions::alr(sig_wide[,9:ncol(sig_wide)])
@@ -486,7 +490,7 @@ temp0 = sig_wide[,9:ncol(sig_wide)]
 
 ```{r ILR}
 sig_wide_ilr <- sig_immune_subset %>%
-                    select(-exposure_dichot) %>%
+                    dplyr::select(-exposure_dichot) %>%
                     pivot_wider(names_from = signature,values_from = exposure)
 
 factor(apply(temp1==0,1,function(x)paste0(as.numeric(x),collapse=""))) 
@@ -510,7 +514,7 @@ x <- sig_immune_subset_list[[3]]
 head(x)
 
 x %>%
-  select(-exposure) %>%
+  dplyr::select(-exposure) %>%
   pivot_wider(names_from = "signature",values_from = "exposure_dichot")
 
 x[x$patient_id == "BRITROC-55",] # two images from one sample/patient from two tissue types
