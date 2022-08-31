@@ -339,7 +339,7 @@ sig_group_strat_pt
 
 ```{r pt_status_im_list}
 sig_bar_filt$pt_status_new <- ifelse(gsub(sig_bar_filt$PATIENT_ID,
-                                          pattern = "BRITROC-",replacement = "") %in% im_list,"im_list",as.character(sig_bar_filt$pt_status))
+                                          pattern = "BRITROC-",replacement = "") %in% im_list$PATIENT_ID,"im_list",as.character(sig_bar_filt$pt_status))
 
 
 ggplot(data = sig_bar_filt) +

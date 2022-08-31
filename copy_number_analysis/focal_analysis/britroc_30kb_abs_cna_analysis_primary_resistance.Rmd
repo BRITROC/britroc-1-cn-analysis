@@ -275,8 +275,8 @@ norm_amp_changes_all <- paired_amp_changes_all %>%
 norm_amp_changes <- norm_amp_changes_all %>%
                       filter(gene %in% focal_genes_table$Gene.name)
 
-norm_amp_changes$platinum_resistant <- ifelse(norm_amp_changes$PATIENT_ID %in% primary_resist_pats$PATIENT_ID,
-                                           "primary resistant","non-primary resistant")
+norm_amp_changes$platinum_resistant <- factor(ifelse(norm_amp_changes$PATIENT_ID %in% primary_resist_pats$PATIENT_ID,
+                                           "primary resistant","non-primary resistant"),levels = c("primary resistant","non-primary resistant"))
 
 primary_pt_change_plot1 <- ggplot(norm_amp_changes) +
   geom_point(aes(x = platinum_resistant,y = change,color=platinum_resistant),position = position_dodge2(width = 0.4)) +

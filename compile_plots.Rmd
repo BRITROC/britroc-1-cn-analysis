@@ -44,7 +44,7 @@ reg_surv_plot <- reg_surv_plot +
 cohort_legend  <- get_legend(
     cohort_plot + 
         guides(fill = guide_legend(nrow = 2)) +
-        theme(legend.position = "bottom",legend.margin = margin())
+        theme(legend.position = "bottom",legend.direction = "vertical")
 )
 
 reg_surv_legend <- get_legend(
@@ -61,14 +61,14 @@ fig1 <- plot_grid(flow_chart,
                             ncol = 2),
                   plot_grid(cohort_legend,
                             reg_surv_legend,
-                            rel_widths = c(0.7,0.3),
+                            rel_widths = c(0.6,0.4),
                             ncol = 2),
                   labels = c("A","",""),
-                  nrow = 3,rel_heights = c(0.45,0.45,0.05))
+                  nrow = 3,rel_heights = c(0.4,0.4,0.2),align = "hv")
 
 ## Figure 1 render
-ggsave2(filename = "plots/figure_1_render.png",plot = fig1,width = 9,height = 8,units = "in",dpi = 600)
-ggsave2(filename = "plots/figure_1_render.pdf",plot = fig1,width = 9,height = 8,units = "in",dpi = 600)
+ggsave2(filename = "plots/figure_1_render.png",plot = fig1,width = 9,height = 10,units = "in",dpi = 600)
+ggsave2(filename = "plots/figure_1_render.pdf",plot = fig1,width = 9,height = 10,units = "in",dpi = 600)
 fig1
 ```
 
@@ -329,9 +329,12 @@ tissue_legend_b <- get_legend(
 
 ## Supplemental - tissue 1
 tissue_supplemental1 <- plot_grid(plot_grid(plot_grid(cna_tissue_counts,labels = c("A",""),
-                              plot_grid(cna_tissue_rates,cna_tissue_ith,labels = c("B","C"),ncol = 1,rel_heights = c(0.8,0.2))),
-                                cna_tissue_sigs,nrow = 2,rel_heights = c(0.8,0.2)),
-                              plot_grid(tissue_legend_b,tissue_legend_a),nrow = 2,rel_heights = c(1,0.1))
+                              plot_grid(cna_tissue_rates,cna_tissue_ith,labels = c("B","C"),
+                                        ncol = 1,
+                                        rel_heights = c(0.8,0.2))),
+                                cna_tissue_sigs,labels = c("","D"),
+                              nrow = 2,rel_heights = c(0.8,0.2)),
+                              plot_grid(tissue_legend_b,tissue_legend_a),nrow = 2,labels = c("",""),rel_heights = c(1,0.1))
 
 ggsave2(filename = "plots/tissue_supplemental1.png",plot = tissue_supplemental1,width = 10,height = 12,units = "in",dpi = 300)
 ggsave2(filename = "plots/tissue_supplemental1.pdf",plot = tissue_supplemental1,width = 10,height = 12,units = "in",dpi = 300)
