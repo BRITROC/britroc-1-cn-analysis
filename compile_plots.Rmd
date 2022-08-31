@@ -144,8 +144,12 @@ fig4
 ## Load plots
 signature_paired_line <- readRDS("copy_number_signatures/plots/paired_line_plot.RDS")
 signature_stacked_alt <- readRDS("copy_number_signatures/plots/signatures_stacked_bar_alt.RDS")
-radar_plot <- ggdraw() + draw_image(magick::image_read_pdf("copy_number_signatures/plots/compile_radar.pdf",
-                                                      density = 600))
+
+# radar_plot <- ggdraw() + draw_image(magick::image_read_pdf("copy_number_signatures/plots/compile_radar.pdf",
+#                                                       density = 600))
+radar_plot <- readRDS("plots/arx_relapse_radar_partialILR_beta.RDS")
+## TEMP
+beta_bar_plot <- readRDS("plots/arx_relapse_bar_partialILR_beta.RDS")
 
 ## Modify plots
 signature_paired_line <- signature_paired_line + theme(legend.position = "none")
@@ -153,13 +157,13 @@ signature_stacked_alt <- signature_stacked_alt + theme(legend.position = "none")
 
 ## Get legends
 sig_legend_a <- get_legend(
-    signature_stacked_all + 
+    signature_stacked_alt + 
         guides(fill = guide_legend(nrow = 1)) +
         theme(legend.position = "bottom")
 )
 
 sig_legend_b <- get_legend(
-    sig_box_wilcox + 
+    signature_paired_line + 
         guides(fill = guide_legend(nrow = 1)) +
         theme(legend.position = "bottom")
 )
@@ -174,10 +178,24 @@ fig5 <- plot_grid(plot_grid(signature_paired_line,
                   labels = c("A","")),nrow = 2,
                   plot_grid(sig_legend_a,sig_legend_b,ncol = 2,labels = c("","")),rel_heights = c(1,0.1))
 
+## TEMP
+fig5_alt <- plot_grid(plot_grid(signature_paired_line,
+                  plot_grid(signature_stacked_alt,
+                            beta_bar_plot,
+                            ncol = 2,labels = c("B","C")),
+                  nrow = 2,
+                  rel_heights = c(0.4,0.6,0.4),
+                  labels = c("A","")),nrow = 2,
+                  plot_grid(sig_legend_a,sig_legend_b,ncol = 2,labels = c("","")),rel_heights = c(1,0.1))
+
 ## Figure 5 render
 ggsave2(filename = "plots/figure_5_render.png",plot = fig5,width = 9,height = 10,units = "in",dpi = 300)
 ggsave2(filename = "plots/figure_5_render.pdf",plot = fig5,width = 9,height = 10,units = "in",dpi = 300)
 fig5
+
+ggsave2(filename = "plots/figure_5_alt_render.png",plot = fig5_alt,width = 9,height = 9,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_5_alt_render.pdf",plot = fig5_alt,width = 9,height = 9,units = "in",dpi = 300)
+fig5_alt
 ```
 
 ```{r fig_6_patient_level}

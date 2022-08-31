@@ -117,7 +117,7 @@ primary_pt_rates <- do.call(rbind,lapply(pt_samples,FUN = function(x){
   cnas$tumour <- rep(as.character(group),times=nrow(cnas))
   return(cnas)
 }))
-primary_pt_rates
+primary_pt_rates$platinum_resistance <- factor(primary_pt_rates$platinum_resistance,levels = c("primary resistant","non-primary resistant"))
 
 primary_pt_rate_plot1 <- ggplot(primary_pt_rates) +
   geom_col(aes(x = gene,y = rate,fill=platinum_resistance),position = "dodge") +
@@ -209,6 +209,8 @@ paired_amp_changes_all <- get_patient_changes(data = extracted,
                                               patients = unique(patient.meta$PATIENT_ID[patient.meta$paired == TRUE])) %>%
                        mutate(platinum_resistance = ifelse(PATIENT_ID %in% primary_resist_pats$PATIENT_ID,
                                            "primary resistant","non-primary resistant"))
+
+paired_amp_changes_all$platinum_resistance <- factor(paired_amp_changes_all$platinum_resistance,levels = c("primary resistant","non-primary resistant"))
 
 paired_amp_changes <- paired_amp_changes_all %>%
                         filter(gene %in% focal_genes_table$Gene.name)
