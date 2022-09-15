@@ -12,7 +12,12 @@ prior_lines_1_colour_setting <- "#ffffcc"
 prior_lines_2_colour_setting <- "#c2e699"
 prior_lines_3_colour_setting <- "#78c679"
 prior_lines_4_colour_setting <- "#238443"
-  
+prior_lines_5_colour_setting <- "#006837"
+stage_1_colour_setting <- "#fef0d9"
+stage_2_colour_setting <- "#fdcc8a"
+stage_3_colour_setting <- "#fc8d59"
+stage_4_colour_setting <- "#d7301f"
+
 colour_palettes <- list(arx_rlps=c(arx=primary_colour_setting,
                                    rlps=relapse_colour_setting),
                         diagnosis_relapse=c(diagnosis=primary_colour_setting,
@@ -36,6 +41,11 @@ colour_palettes <- list(arx_rlps=c(arx=primary_colour_setting,
                         prior_lines=c("1"=prior_lines_1_colour_setting,
                                       "2"=prior_lines_2_colour_setting,
                                       "3"=prior_lines_3_colour_setting,
-                                      "4"=prior_lines_4_colour_setting))
+                                      "4"=prior_lines_4_colour_setting,
+                                      "5+"=prior_lines_5_colour_setting),
+                        stage=c("1"=stage_1_colour_setting,
+                                "2"=stage_2_colour_setting,
+                                "3"=stage_3_colour_setting,
+                                "4"=stage_4_colour_setting))
 
 rm(list = ls()[grep("*_colour_setting",ls())])

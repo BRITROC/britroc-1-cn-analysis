@@ -43,44 +43,47 @@ reg_surv_plot <- reg_surv_plot +
 ## Get legends
 cohort_legend  <- get_legend(
     cohort_plot + 
-        guides(fill = guide_legend(nrow = 2)) +
-        theme(legend.position = "bottom",legend.direction = "vertical")
+        guides(color = guide_legend(nrow = 2)) +
+        theme(legend.position = "bottom",
+              legend.direction = "vertical")
 )
 
 reg_surv_legend <- get_legend(
     reg_surv_plot + 
         #guides(fill = guide_legend(nrow = 1)) +
-        theme(legend.position = "bottom")
+        theme(legend.position = "bottom",
+              legend.direction = "vertical",
+              legend.justification = c(0,0.5))
 )
 
 ## Figure 1 compile
 fig1 <- plot_grid(flow_chart,
                   plot_grid(cohort_plot,reg_surv_plot,
                             labels = c("B","C"),
-                            rel_widths = c(0.7,0.3),
+                            rel_widths = c(0.6,0.4),
                             ncol = 2),
                   plot_grid(cohort_legend,
                             reg_surv_legend,
                             rel_widths = c(0.6,0.4),
-                            ncol = 2),
+                            ncol = 2,align = "v",axis = "t"),
                   labels = c("A","",""),
-                  nrow = 3,rel_heights = c(0.4,0.4,0.2),align = "hv")
+                  nrow = 3,rel_heights = c(0.45,0.45,0.1),align = "hv")
 
 ## Figure 1 render
-ggsave2(filename = "plots/figure_1_render.png",plot = fig1,width = 9,height = 10,units = "in",dpi = 600)
-ggsave2(filename = "plots/figure_1_render.pdf",plot = fig1,width = 9,height = 10,units = "in",dpi = 600)
+ggsave2(filename = "plots/figure_1_render.png",plot = fig1,width = 9,height = 10,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_1_render.pdf",plot = fig1,width = 9,height = 10,units = "in",dpi = 300)
 fig1
 ```
 
 ```{r fig2}
 ## Figure 2
-# rendered elsewhere
+# rendered in SNV analysis
 ```
 
 ```{r fig3}
 ## Load plots
 #substraction_plot <- readRDS("copy_number_analysis/broad_analysis/plots/genome_paired_substractionPlot.RDS") ## issues with PositionNudgeRepel error
-substraction_plot <- ggdraw() + draw_image(magick::image_read_pdf("copy_number_analysis/broad_analysis/plots/genome_paired_substractionPlot.pdf",density = 600))
+substraction_plot <- ggdraw() + draw_image(magick::image_read_pdf("copy_number_analysis/broad_analysis/plots/genome_paired_substractionPlot.pdf",density = 300))
 focal_rates_clinic <- readRDS("copy_number_analysis/focal_analysis/plots/amp_del_gene_plot_CNA.RDS")
 
 ## Modify plots
@@ -131,7 +134,7 @@ fig4 <- plot_grid(signature_stacked_all,
                   sig_group_strat_pt,
                   plot_grid(sig_legend_a,sig_legend_b,ncol = 2,labels = c("","")),
                   nrow = 4,
-                  rel_heights = c(1,0.5,0.5,0.1),
+                  rel_heights = c(0.5,0.5,0.9,0.1),
                   labels = c("A","B","C"))
 
 ## Figure 4 render
@@ -148,8 +151,6 @@ signature_stacked_alt <- readRDS("copy_number_signatures/plots/signatures_stacke
 # radar_plot <- ggdraw() + draw_image(magick::image_read_pdf("copy_number_signatures/plots/compile_radar.pdf",
 #                                                       density = 600))
 radar_plot <- readRDS("plots/arx_relapse_radar_partialILR_beta.RDS")
-## TEMP
-beta_bar_plot <- readRDS("plots/arx_relapse_bar_partialILR_beta.RDS")
 
 ## Modify plots
 signature_paired_line <- signature_paired_line + theme(legend.position = "none")
@@ -176,30 +177,17 @@ fig5 <- plot_grid(plot_grid(signature_paired_line,
                   nrow = 2,
                   rel_heights = c(0.4,0.6,0.4),
                   labels = c("A","")),nrow = 2,
-                  plot_grid(sig_legend_a,sig_legend_b,ncol = 2,labels = c("","")),rel_heights = c(1,0.1))
+                  plot_grid(sig_legend_a,sig_legend_b,ncol = 2,labels = c("",""),scale = c(1,1.5)),
+                  rel_heights = c(1,0.1))
 
-## TEMP
-fig5_alt <- plot_grid(plot_grid(signature_paired_line,
-                  plot_grid(signature_stacked_alt,
-                            beta_bar_plot,
-                            ncol = 2,labels = c("B","C")),
-                  nrow = 2,
-                  rel_heights = c(0.4,0.6,0.4),
-                  labels = c("A","")),nrow = 2,
-                  plot_grid(sig_legend_a,sig_legend_b,ncol = 2,labels = c("","")),rel_heights = c(1,0.1))
 
 ## Figure 5 render
 ggsave2(filename = "plots/figure_5_render.png",plot = fig5,width = 9,height = 10,units = "in",dpi = 300)
 ggsave2(filename = "plots/figure_5_render.pdf",plot = fig5,width = 9,height = 10,units = "in",dpi = 300)
 fig5
-
-ggsave2(filename = "plots/figure_5_alt_render.png",plot = fig5_alt,width = 9,height = 9,units = "in",dpi = 300)
-ggsave2(filename = "plots/figure_5_alt_render.pdf",plot = fig5_alt,width = 9,height = 9,units = "in",dpi = 300)
-fig5_alt
 ```
 
 ```{r fig_6_patient_level}
-
 # DOES NOT CURRENTLY RENDER DUE TO CORRELATION PLOT REQUIREMENTS
 
 ## Load plots
@@ -221,8 +209,9 @@ sig_bar_plot_primary_pt_diag <- readRDS("copy_number_analysis/focal_analysis/plo
 sig_dist_primary_pt_diag <- readRDS("copy_number_analysis/focal_analysis/plots/sig_dist_primary_pt_diag.RDS")
 cn_focal_rate_primary_pt_diag <- readRDS("copy_number_analysis/focal_analysis/plots/primary_pt_rate_plot2.RDS")
 sig_primary_beta_results <- ggdraw() +
-                              draw_image(magick::image_read("copy_number_signatures/plots/TEMP_primary_pt_sig_logR_partial_ILR_diagnosis_beta_values.png",
-                                                      density = 600))
+                              draw_image(magick::image_read_pdf("../BriTROC-1-paired_analysis/results/partialILRmodelling_FE_other_regression/primary_platinum_resistant/betas_primaryplatinumsensitivity_partialILRnocor_partialILRnocor.pdf",density = 300))
+sig_primary_radar <- readRDS("plots/primary_resist_radar_partialILR_beta.RDS")
+sig_primary_radar <- sig_primary_radar + theme(legend.position = "none")
 
 ## Modify plots
 sig_bar_plot_primary_pt_diag <- sig_bar_plot_primary_pt_diag + theme(legend.position = "none")
@@ -245,7 +234,8 @@ sig_pt_primary_legend_b <- get_legend(
 fig7 <- plot_grid(plot_grid(cn_focal_rate_primary_pt_diag,
                             sig_bar_plot_primary_pt_diag,
                             sig_dist_primary_pt_diag,
-                            plot_grid(sig_primary_beta_results,empty,
+                            plot_grid(sig_primary_beta_results,
+                                      sig_primary_radar,
                                       ncol = 2,labels = c("D","E")),
                     labels = c("A","B","C",""),
                     nrow = 4,

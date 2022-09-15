@@ -14,6 +14,13 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+## General method
+
+Modelling tumour immune environments from copy number signature
+To adequately model the interaction between tumour immune environment and chromosomal instability, measured by immunohistochemistry markers and copy number signatures, respectively. Utilising the copy number signatures as a predictor variable, we implemented a [generalised/linear mixed model] which allows for the incorporation of compositional nature of copy number signature exposures and the multiple correlated images generated per sample in the IHC data in order to assess if the tumour immune environment can be predicted from copy number signatures. We also included several clinical covariates such as tissue type, age, stage, and lines of therapy as covariates to estimate the effects of these features on the response variable.
+
+Copy number signatures were transformed from a relative compositional state using a [binarisation/ALR/ILR/binarisation-logisticPCA], similarly to the partial ILR transformation utilised in the signature comparison model described previously, where this chosen transformation results in the best predictive performance. The model was constructed in R using the [lme4/lmerTest] package and model performance was tested between a model with transformed copy number signatures compared to a null model without including the transformed copy number signatures assessed using a [Likelihood-ratio/anova] test.
+
 ## Load libraries
 
 ```{r library_load, warning=FALSE}
@@ -354,6 +361,33 @@ head(sig_immune,n = 10)
 #write.table(sig_immune,file = "data/britroc_immune_data.tsv",quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
+### Drop outlier
+
+```{r outliers}
+outlier_table <- sig_immune[sig_immune$tissue == "tumour" & sig_immune$marker == "CD3" & sig_immune$signature == "s1",]
+outlier_table$ID[outlier_table$normalised_cells == max(outlier_table$normalised_cells)]
+
+outlier_table <- sig_immune[sig_immune$tissue == "stroma" & sig_immune$marker == "CD8" & sig_immune$signature == "s1",]
+outlier_table$ID[outlier_table$normalised_cells == max(outlier_table$normalised_cells)]
+
+outlier_table <- sig_immune[sig_immune$tissue == "stroma" & sig_immune$marker == "CD3" & sig_immune$signature == "s1",]
+outlier_table$ID[outlier_table$normalised_cells == max(outlier_table$normalised_cells)]
+
+ggplot(sig_immune) +
+  geom_histogram(aes(log1p(normalised_cells))) +
+  facet_grid(rows = vars(tissue),cols = vars(marker)) +
+  theme_bw()
+
+ggplot(sig_immune[!sig_immune$ID %in% c("IM_84","IM_348"),]) +
+  geom_histogram(aes(log1p(normalised_cells))) +
+  facet_grid(rows = vars(tissue),cols = vars(marker)) +
+  theme_bw()
+
+plot(hist(outlier_table$normalised_cells))
+
+## Exclusion of IM_84 & IM_348 as primary outliers
+sig_immune <- sig_immune[!sig_immune$ID %in% c("IM_84","IM_348"),]
+```
 ### Plot sig/immune corr
 
 ```{r sig_immune_plot,fig.width=12}
@@ -362,11 +396,11 @@ sig_immune_cor_t <- ggplot(sig_immune[sig_immune$tissue == "tumour",]) +
     geom_smooth(aes(log1p(normalised_cells),exposure),method = "lm",se=F) +
     scale_y_continuous(limits = c(0,1)) +
     facet_wrap(marker ~ signature,scales = "free_x",ncol = 7) +
-    stat_cor(aes(log1p(normalised_cells),exposure),label.sep = "\n",
+    stat_cor(aes(log1p(normalised_cells),exposure,label = ..r.label..),label.sep = "\n",
              r.digits = 2,
              size = 2.5,
              label.x.npc = 0.4,
-             label.y.npc = 0.82,
+             label.y.npc = 0.9,
              p.digits = 2,
              method = "spearman") +
     labs(title = "tumour") +
@@ -381,11 +415,11 @@ sig_immune_cor_s <- ggplot(sig_immune[sig_immune$tissue == "stroma",]) +
     geom_smooth(aes(log1p(normalised_cells),exposure),method = "lm",se=F) +
     scale_y_continuous(limits = c(0,1)) +
     facet_wrap(marker ~ signature,scales = "free_x",ncol = 7) +
-    stat_cor(aes(log1p(normalised_cells),exposure),label.sep = "\n",
+    stat_cor(aes(log1p(normalised_cells),exposure,label = ..r.label..),label.sep = "\n",
              r.digits = 2,
              size = 2.5,
              label.x.npc = 0.4,
-             label.y.npc = 0.82,
+             label.y.npc = 0.9,
              p.digits = 2,
              method = "kendall") +
     labs(title = "stroma") +
@@ -411,6 +445,32 @@ sig_immune <- droplevels(sig_immune)
 head(sig_immune)
 ```
 
+```{r sig_immune_neoadj}
+neo_adj_pats <- read.table("../britroc_neoadjuvant_chemotherapy_patients.txt",header = T,sep = "\t")
+neo_adj_pats$fk_britroc_number <- paste0("BRITROC-",neo_adj_pats$fk_britroc_number)
+
+sig_immune$treatment <- ifelse(sig_immune$ID %in% patient.meta$SAMPLE_ID[patient.meta$PATIENT_ID %in% neo_adj_pats$fk_britroc_number],"neo_adjuvant","chemo_naive")
+
+
+sig_immune_cor_s <- ggplot(sig_immune[sig_immune$tissue == "stroma",]) +
+    geom_point(aes(log1p(normalised_cells),exposure,color=signature)) +
+    geom_smooth(aes(log1p(normalised_cells),exposure),method = "lm",se=F) +
+    scale_y_continuous(limits = c(0,1)) +
+    facet_wrap(marker ~ signature,scales = "free_x",ncol = 7) +
+    stat_cor(aes(log1p(normalised_cells),exposure),label.sep = "\n",
+             r.digits = 2,
+             size = 2.5,
+             label.x.npc = 0.4,
+             label.y.npc = 0.82,
+             p.digits = 2,
+             method = "kendall") +
+    labs(title = "stroma") +
+    xlab("log1p(cells / \u00b5m \u00b2)") +
+    theme_bw() +
+    theme(legend.position = "none",
+          axis.text.x = element_blank(),
+          axis.ticks.x = element_blank())
+```
 ## model immune
 
 Model steps

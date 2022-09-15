@@ -189,7 +189,7 @@ paste0("Patients missing: ",paste0(which(!seq.int(1,276,1) %in% unique(survival_
 paste0("Duplicated patient rows: ",length(which(any(duplicated(survival_data$britroc_number)))))
 
 ## Final table
-#write.table(x = survival_data,file = "britroc_cohort_patient_data.tsv",quote = F,sep = "\t",row.names = F,col.names = T)
+write.table(x = survival_data,file = "britroc_cohort_patient_data.tsv",quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r summary_plot}
@@ -227,7 +227,6 @@ year_labs[year_labs == 0] <- "Reg. date"
 sum_plot <- ggplot() +
               geom_hline(data = plot_data,aes(yintercept = britroc_number),color = "grey95") +
               geom_point(data = plot_data,aes(x = as.numeric(time),y = britroc_number,shape = status,color = event)) +
-              geom_vline(xintercept = 0) +
               scale_shape_manual(values = c(15,0)) +
               geom_point(data = plot_data[plot_data$event == "diag",],aes(x = as.numeric(time),y = britroc_number,color = event),shape = 15) +
               scale_color_manual(values = c("deeppink2","#2171b5"),labels = c("diagnosis","last follow up")) +
@@ -235,7 +234,8 @@ sum_plot <- ggplot() +
               geom_linerange(data = plot_chemo_lines,
                              aes(y = britroc_number,xmin = as.numeric(line_start),xmax = as.numeric(line_end),color = chemotherapy_line),
                              size = 1,alpha = 0.8) +
-              scale_color_brewer(name = "chemotherapy line",palette = "Oranges") +
+              geom_vline(xintercept = 0) +
+              scale_color_manual(values = colour_palettes$prior_lines) +
               ylab("Patient (grouped by platinum sensitivity)") +
               xlab("Years") +
               labs(title = "BriTROC cohort clinical timeline") +
@@ -256,7 +256,7 @@ ggsave(filename = "plots/cohort_summary_plot.pdf",plot = sum_plot,device = "pdf"
 ```
 
 ```{r os_pt_status_surv}
-## Surivival from date of registration stratified by pt_status
+## Survival from date of registration stratified by pt_status
 survival_data <- survival_data %>%
                     rename("platinum_status"="pt_sensitivity_at_reg")
     
