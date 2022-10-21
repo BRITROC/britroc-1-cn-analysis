@@ -28,7 +28,7 @@ empty <- ggplot() +
 ```{r fig1}
 ## Load plot
 ## Temp flow chart load
-flow_chart <- ggdraw() + draw_image(magick::image_read("plots/temp_Fig1A_flow_diagram.png",density = 600))
+flow_chart <- ggdraw() + draw_image(magick::image_read_pdf("plots/BriTROC-1_manuscript2_figure_1_v2-cropped.pdf",density = 600))
 cohort_plot <- readRDS("plots/cohort_plot.RDS")
 reg_surv_plot <- readRDS("plots/reg_surv_plot.RDS")
 
@@ -258,6 +258,9 @@ fig7
 
 ```{r fig_pt_status}
 ## Load plots
+## figure legend Figure XX. Copy number signatures stratified by platinum-based treatment sensitivity 
+# A - Copy number signature spectrum of copy number profiles from diagnosis and relapse HGSC tumours across all samples, stratified by response to platinum-based chemotherapeutics (n = 30, n = 94, n = 36, and n = 101, diagnosis resistant, diagnosis sensitive, relapse resistant, and relapse sensitive, respectively). B - Boxplot demonstrating copy number signature distributions in unpaired copy number between resistant and sensitive response to platinum-based chemotherapeutics. C - Boxplot demonstrating copy number signature distributions in unpaired copy number between resistant and sensitive response to platinum-based chemotherapeutics, stratified by diagnosis and relapse tumours.
+
 sig_pt_bar_plot <- readRDS("copy_number_signatures/plots/sig_pt_bar_plot.RDS")
 sig_pt_bar_plot <- sig_pt_bar_plot + theme(legend.position = "none")
 
@@ -351,11 +354,11 @@ tissue_supplemental1
 
 ```{r fig_tissue_diffs_strat}
 ## Load supplemental tissue plots
-cn_tissue_counts_strat <- readRDS("copy_number_analysis/sites_of_relapse/plots/cn_count_tissue.RDS")
+cn_tissue_counts_strat <- readRDS("copy_number_analysis/sites_of_relapse/plots/cna_count_tissue.RDS")
 cn_tissue_counts_strat <- cn_tissue_counts_strat + theme(legend.position = "none",axis.title.x = element_blank(),
                                                          axis.ticks.x = element_blank(),
                                                          axis.text.x = element_blank())
-cn_tissue_sigs_strat <- readRDS("copy_number_analysis/sites_of_relapse/plots/cn_sigs_tissue.RDS")
+cn_tissue_sigs_strat <- readRDS("copy_number_analysis/sites_of_relapse/plots/signature_tissue.RDS")
 cn_tissue_sigs_strat <- cn_tissue_sigs_strat + theme(legend.position = "none",
                                                      axis.ticks.x = element_blank(),
                                                      axis.title.x = element_blank(),
@@ -431,7 +434,8 @@ plot.list <- lapply(pdf.list,FUN = function(x){
 })
 
 ## Plot compile
-ternary_all <- plot_grid(plotlist = plot.list,nrow = 7,ncol = 5)
+ternary_all <- plot_grid(plot_grid(plotlist = plot.list,nrow = 7,ncol = 5),
+                sig_legend_b,nrow = 2,rel_heights = c(0.9,0.1))
 
 ## Plot render
 ggsave2(filename = "plots/supplemental_figure_ternary_sig_plots_all.png",plot = ternary_all,width = 8,height = 12,units = "in",dpi = 300)

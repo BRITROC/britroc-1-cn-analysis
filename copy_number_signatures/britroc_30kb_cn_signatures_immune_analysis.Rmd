@@ -396,13 +396,13 @@ sig_immune_cor_t <- ggplot(sig_immune[sig_immune$tissue == "tumour",]) +
     geom_smooth(aes(log1p(normalised_cells),exposure),method = "lm",se=F) +
     scale_y_continuous(limits = c(0,1)) +
     facet_wrap(marker ~ signature,scales = "free_x",ncol = 7) +
-    stat_cor(aes(log1p(normalised_cells),exposure,label = ..r.label..),label.sep = "\n",
+    stat_cor(aes(log1p(normalised_cells),exposure),label.sep = "\n",
              r.digits = 2,
              size = 2.5,
              label.x.npc = 0.4,
              label.y.npc = 0.9,
              p.digits = 2,
-             method = "spearman") +
+             method = "kendall") +
     labs(title = "tumour") +
     xlab("log1p(cells / \u00b5m \u00b2)") +
     theme_bw() +
@@ -415,7 +415,7 @@ sig_immune_cor_s <- ggplot(sig_immune[sig_immune$tissue == "stroma",]) +
     geom_smooth(aes(log1p(normalised_cells),exposure),method = "lm",se=F) +
     scale_y_continuous(limits = c(0,1)) +
     facet_wrap(marker ~ signature,scales = "free_x",ncol = 7) +
-    stat_cor(aes(log1p(normalised_cells),exposure,label = ..r.label..),label.sep = "\n",
+    stat_cor(aes(log1p(normalised_cells),exposure),label.sep = "\n",
              r.digits = 2,
              size = 2.5,
              label.x.npc = 0.4,

@@ -702,7 +702,6 @@ plotSegments <- function(object = NULL,
 }
 
 get_patient_vig <- function(diff_matrix = NULL,clinical_data=NULL,pat.name = NULL,SMOOTHING_FACTOR=0.12){
-    ## Add thomas function here
     pat.num <- gsub(pattern = "BRITROC-",replacement = "",x = pat.name)
     ann_table <- data.frame(
         y=c(5,4,3,2),
@@ -713,6 +712,32 @@ get_patient_vig <- function(diff_matrix = NULL,clinical_data=NULL,pat.name = NUL
                 paste0("platinum status: ",patient_data$pt_sensitivity_at_reg[patient_data$britroc_number == pat.num]),
                 paste0("prior lines: ",patient_data$pre_reg_chemo[patient_data$britroc_number == pat.num]))
     )
+    
+    if(file.exists(paste0("data/rds_files/BriTROC-1_patient_event_history_patient_",pat.num,".rds"))){
+      clincPlot <- readRDS(paste0("data/rds_files/BriTROC-1_patient_event_history_patient_",pat.num,".rds"))
+      clincPlot$theme <- ggplot2::theme_bw()
+      clincPlot <- clincPlot +
+                            guides(fill=guide_legend(title="drug")) +
+                            theme(legend.position = "bottom",
+                                  axis.title.y = element_blank(),
+                                  axis.text.y = element_blank(),
+                                  axis.ticks.y = element_blank(),
+                                  plot.title = element_blank())
+    } else {
+      clincPlot <- ggplot() +
+        geom_text(aes(x=1,y=1,label="clinical timeline unavailable")) +
+        labs(title = " ") +
+        xlab(" ") +
+        theme_bw() +
+        theme(legend.position = "bottom",
+              axis.title.y = element_blank(),
+              axis.text.y = element_blank(),
+              axis.ticks.y = element_blank(),
+              plot.title = element_blank(),
+              axis.title.x = element_blank(),
+              axis.ticks.x = element_blank(),
+              axis.text.x = element_blank())
+    }  
     annotations_plot <- ggplot() +
         geom_rect(aes(xmin=1, xmax=1.2, ymin=-Inf, ymax=Inf),
                   fill="grey90",
@@ -730,11 +755,6 @@ get_patient_vig <- function(diff_matrix = NULL,clinical_data=NULL,pat.name = NUL
     empty <- ggplot() +
         theme_bw() +
         theme(panel.border = element_blank())
-    
-    clincPlot <- ggplot() +
-        geom_text(aes(x=1,y=1,label="CLINICAL TIMELINE PLACEHOLDER")) +
-        labs(title = " ") +
-        theme_bw()
     
     if(is.null(pat.name)){
         stop("no patient name given")
@@ -865,25 +885,14 @@ pat_vig_65
 ```
 
 ```{r plot_vigs_2}
-pat_vig_37 <- get_patient_vig(diff_matrix = diff_matrix,pat.name = "BRITROC-37")
-pat_vig_37
-
-ggsave(filename = "plots/testvignette_plots.pdf",plot = pat_vig_37,width = 8, height = 11.3136)
-```
-
-```{r plot_vigs_3}
-pat_vig_36 <- get_patient_vig(diff_matrix = diff_matrix,pat.name = "BRITROC-36")
-pat_vig_36
-```
-
-```{r plot_vigs_4}
-pat_vig_242 <- get_patient_vig(diff_matrix = diff_matrix,pat.name = "BRITROC-242")
-pat_vig_242
+pat_vig_32 <- get_patient_vig(diff_matrix = diff_matrix,pat.name = "BRITROC-32")
+pat_vig_32
 ```
 
 ```{r plot_vigs_5}
 pat_vig_246 <- get_patient_vig(diff_matrix = diff_matrix,pat.name = "BRITROC-246")
 pat_vig_246
+ggsave(filename = "plots/patient_vignette_example.pdf",plot = pat_vig_246,width = 8, height = 11.3136)
 ```
 
 Plot all patient vignettes

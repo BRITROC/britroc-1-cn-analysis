@@ -84,8 +84,6 @@ rlps_samples_paired <- meta.data$SAMPLE_ID[meta.data$group == "rlps" & meta.data
 ```
 
 ## Analysis
-https://www.sciencedirect.com/science/article/pii/S1535610818301119
-https://www.sciencedirect.com/science/article/pii/S1535610818301119
 
 ### Extracting segment values for protein-coding genes
 
@@ -316,7 +314,7 @@ seg_paired_long <- pivot_longer(data = paired_segs,cols = 2:3,names_to = "group"
   filter(!is.na(platinum_treatment))
 
 segs_paired <- ggplot(seg_paired_long) +
-  geom_jitter(aes(group,segments,colour=group)) +
+  geom_jitter(aes(group,segments)) +
   geom_violin(aes(group,segments,fill=group),alpha = 0.4) +
   scale_y_continuous(limits = c(NA,510)) +
   geom_signif(aes(group,segments),
@@ -324,7 +322,6 @@ segs_paired <- ggplot(seg_paired_long) +
               test = "wilcox.test",
               test.args = list(paired = TRUE)) +
   scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
-  scale_colour_manual(values = colour_palettes$diagnosis_relapse) +
   theme_bw()
 segs_paired
 ggsave(plot = segs_paired,filename = "plots/seg_counts_paired.png",width = 5,height = 7,units = "in",dpi = 300)
@@ -333,7 +330,7 @@ ggsave(plot = segs_paired,filename = "plots/seg_counts_paired.pdf",width = 5,hei
 
 ```{r plot_segs_pt}
 segs_paired_pt <- ggplot(seg_paired_long) +
-  geom_jitter(aes(group,segments,colour=group)) +
+  geom_jitter(aes(group,segments)) +
   geom_violin(aes(group,segments,fill=group),alpha = 0.4) +
   scale_y_continuous(limits = c(NA,510)) +
   geom_signif(aes(group,segments),
@@ -341,7 +338,6 @@ segs_paired_pt <- ggplot(seg_paired_long) +
               test = "wilcox.test",
               test.args = list(paired = TRUE)) +
   scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
-  scale_colour_manual(values = colour_palettes$diagnosis_relapse) +
   facet_grid(cols = vars(platinum_treatment)) +
   theme_bw() +
   theme(legend.position = "bottom")
@@ -358,7 +354,7 @@ seg.kenall <- cor.test(paired_segs$diagnosis,paired_segs$relapse,method = "kenda
 seg_Corr <- ggplot(paired_segs) +
         geom_point(aes(diagnosis,relapse)) +
         geom_smooth(aes(diagnosis,relapse),method = "lm") +
-        xlab("primary tumour") +
+        xlab("diagnosis tumour") +
         ylab("relapse tumour") +
         theme_bw() + annotate(geom = "text",x = 375,y=10,label=paste0("kendall tau:",round(seg.kenall$estimate,digits = 3)))
 seg_Corr

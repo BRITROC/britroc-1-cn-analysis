@@ -199,6 +199,13 @@ britroc_tcga_comp_raw
 
 Alterations in these genes, although called at lower frequencies, are still called at proportional rates to previous reports, where the most common alterations are consistent between the different data sets.
 
+figure legend - TCGA
+
+Figure XX Amplification and deletion rates between cohorts (TCGA) 
+A - Amplification and deletion rates as a percentage of total samples between the BriTROC and the TCGA ovarian serous adenocarcinoma sample set for the sixteen clinically relevant or frequently altered genes listed in supplementary table P6. Rates demonstrate a difference in the total number of focal amplifications and deletions for most genes. 
+B - Amplification and deletion rates as described for panel A with a normalisation applied to normalise each rate the highest alteration rate present. The plot demonstrates that though rates are different, the rate at which focal amplifications and deletions are called in the BriTROC cohort are at the same proportions to those seen in TCGA.
+
+
 ```{r tcga_gene_rates_norm}
 total_amp_rates_norm <- total_amp_rates
 total_amp_rates_norm <- total_amp_rates_norm %>%
@@ -239,7 +246,7 @@ p3 <- plot_cna_rates(data = get_cna_rates(data = cna_calls[,colnames(cna_calls) 
 save_plot(filename = "plots/CNA_rates_all_clinrelgenes.png",plot = p1)
 save_plot(filename = "plots/CNA_rates_primary_clinrelgenes.png",plot = p2)
 save_plot(filename = "plots/CNA_rates_relapse_clinrelgenes.png",plot = p3)
-all_rates <- plot_grid(p1 + labs(title = ""),p2 + labs(title = ""),p3 + labs(title = ""),labels = c("A","B","C"))
+all_rates <- plot_grid(p2 + labs(title = ""),p3 + labs(title = ""),labels = c("A","B"))
 ggsave2(filename = "plots/CNA_all_rates.png",plot = all_rates,width = 8,height = 6,units = "in",dpi = 300)
 ggsave2(filename = "plots/CNA_all_rates.pdf",plot = all_rates,width = 8,height = 6,units = "in",dpi = 300)
 all_rates
