@@ -1,0 +1,580 @@
+---
+title: "BriTROC 30kb pan-cancer copy number signature analysis"
+author: "Philip Smith"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+---
+
+## Intial setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Load libraries
+
+```{r library_load, warning=FALSE}
+# Load required libraries with suppressed start-up text
+suppressMessages(library(tidyverse))
+suppressMessages(library(QDNAseqmod))
+suppressMessages(library(CINSignatureQuantification))
+suppressMessages(library(ggsignif))
+```
+
+### Source functions
+
+```{r source_scripts}
+# Load main functions
+#source("data/britroc_30kb_functions.R")
+source("../colour_palettes.R")
+```
+
+### Load meta data and filter
+
+```{r meta.data}
+# Load abs cn meta data and add arx/rlps annotation based on sample name prefix
+meta.data <- read.table("../absolute_POST_down_sampling/britroc_30kb_ds_abs_fits.tsv",header = T,sep = "\t")
+meta.data$group <- ifelse(grepl("^IM_*", x = meta.data$SAMPLE_ID),"diagnosis","relapse")
+
+# Vector of post-normalisation samples selected to use and vectors of which are arx or rlps
+included_samples <- as.character(meta.data$SAMPLE_ID[meta.data$use == "TRUE"])
+
+# Factor of samples in patient order for exposure plots etc
+patient_sorted_samples <- factor(meta.data$SAMPLE_ID[order(meta.data$PATIENT_ID)],
+                                 levels = unique(meta.data$SAMPLE_ID[order(meta.data$PATIENT_ID)]))
+
+patient.meta <- read.table("britroc_30kb_signature_data_meta.tsv",header = T,sep = "\t")
+patient.data <- read.table("../britroc_cohort_patient_data.tsv",header = T,sep = "\t")
+
+primary_resist_pats <- read.table("../britroc_primary_platinum_resistant_patient_list.tsv",header = T,sep = "\t")
+```
+
+## sample information
+### Loading absCN data
+
+```{r read_rds}
+# Load post-normalise BriTROC absCN profiles and filter to included samples
+cn_data <- readRDS("../absolute_POST_down_sampling/britroc_30kb_ds_absCopyNumber.rds")
+cn_data <- cn_data[,colnames(cn_data) %in% included_samples]
+```
+
+### quantify signatures
+
+```{r quant.sigs}
+panCanSigs <- quantifyCNSignatures(object = cn_data,experimentName = "britroc-pan-cancer",method = "drews",cores = 6,build = "hg19")
+panCanSigs
+```
+```{r getfeats}
+panCanSigsfeats <- panCanSigs@featData
+names(panCanSigsfeats)
+```
+
+```{r getSampComp}
+panCanSigsSampComp <- getSampleByComponent(panCanSigs)
+head(panCanSigsSampComp)
+```
+
+```{r getquant.sigs}
+panCanSigsAct <- t(getActivities(panCanSigs))
+head(t(panCanSigsAct))
+```
+
+
+```{r feat_dists}
+samp_comp_long <- as.data.frame(panCanSigsSampComp) %>%
+  rownames_to_column(var="sample") %>%
+  pivot_longer(cols = 2:ncol(.)) %>%
+  mutate(feat = gsub(pattern = "[0-9]+|[1-9][0-9]$",replacement = "",perl = T,x = name)) %>%
+  mutate(feat = gsub(pattern = "bpMB",replacement = "bp10MB",x = feat)) %>%
+  mutate(cohort = rep("britroc-pancancer",times= length(feat))) %>%
+  mutate(group = patient.meta$group[match(sample,patient.meta$SAMPLE_ID)]) %>%
+  mutate(group = case_when(group == "arx" ~ "diagnosis", group == "rlps" ~ "relapse"))
+
+samp_comp_long$name <- factor(samp_comp_long$name,levels = rev(stringr::str_sort(unique(samp_comp_long$name),numeric = T,decreasing = T)))
+head(samp_comp_long)
+```
+
+```{r feat_dist_plot}
+ggplot(samp_comp_long,aes(x = value)) +
+  geom_density(aes(color=group)) +
+  facet_wrap(. ~ name,scales = "free") +
+  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank())
+
+feat_plot <- ggplot(samp_comp_long) +
+  geom_jitter(aes(x = group,y = value),alpha = 0.2) +
+  geom_violin(aes(x = group,y = value,fill = group),alpha = 0.5) +
+  facet_wrap(. ~ name,scales = "free_y") +
+  geom_signif(aes(x = group,y = value),
+              comparisons = list(c("diagnosis","relapse")),
+              test = "wilcox.test",vjust = 1.2) +
+  xlab("") +
+  ylab("") +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  theme_bw() +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(hjust = 0.5,vjust = 1))
+
+#saveRDS(object = feat_plot,file = "plots/feat_plot.RDS")
+#ggsave(feat_plot,filename = "plots/feat_plot.png",width = 8,height = 8,units = "in",dpi = 300)
+#ggsave(feat_plot,filename = "plots/feat_plot.pdf",width = 8,height = 8,units = "in",dpi = 300)
+```
+######## OLD CODE ########
+
+## Signature proportions
+
+```{r patient_ordering}
+t.sig_quants <- t(panCanSigsAct)
+sample_order <- rownames(t.sig_quants[order(t.sig_quants[,1],t.sig_quants[,2],t.sig_quants[,3],
+                                            t.sig_quants[,4],t.sig_quants[,5],t.sig_quants[,6],decreasing = T),])
+```
+
+### Bar plot
+
+```{r bar_plot}
+sig_bar <- as.data.frame(panCanSigsAct) %>%
+  rownames_to_column(var = "signature") %>%
+  pivot_longer(cols = -1,names_to="SAMPLE_ID") %>%
+  left_join(y = patient.meta,by = "SAMPLE_ID") %>%
+  #filter(paired == TRUE) %>%
+  dplyr::select(-c(ploidy,purity,TP53cn,expected_TP53_AF,TP53freq,use,notes,paired)) %>%
+  mutate(group = case_when(group == "arx" ~ "diagnosis", group == "rlps" ~ "relapse")) %>%
+  mutate(signature = factor(signature,levels = paste0("CX",seq.int(1,17,1)))) #%>%
+  # group_by(signature,group) %>%
+  # summarise(across(value,.fns = mean))
+  
+#sig_bar$SAMPLE_ID <- factor(sig_bar$SAMPLE_ID,levels = unique(sig_bar$SAMPLE_ID[order(sig_bar$value,sig_bar$signature,decreasing = T)]))
+sig_bar$SAMPLE_ID <- factor(sig_bar$SAMPLE_ID,levels = sample_order)
+
+sig_bar_plot <- ggplot(sig_bar) +
+  geom_col(aes(SAMPLE_ID,value,fill=signature)) +
+  facet_wrap(. ~ group,nrow = 2,scales = "free_x") +
+  scale_y_continuous(expand = c(0,0)) +
+  #scale_fill_manual(values = cbPalette) +
+  ylab("exposure") +
+  xlab("sample") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position = "bottom")
+
+#saveRDS(object = sig_bar_plot,file = "plots/signatures_allSamples_stacked_bar.RDS")
+#ggsave(sig_bar_plot,filename = "plots/signatures_allSamples_stacked_bar.png",width = 8,height = 6,units = "in",dpi = 300)
+#ggsave(sig_bar_plot,filename = "plots/signatures_allSamples_stacked_bar.pdf",width = 8,height = 6,units = "in",dpi = 300)
+sig_bar_plot
+```
+
+```{r bar_plot_paired_data}
+sig_bar_paired <- as.data.frame(panCanSigsAct) %>%
+  rownames_to_column(var = "signature") %>%
+  pivot_longer(cols = -1,names_to="SAMPLE_ID") %>%
+  left_join(y = patient.meta,by = "SAMPLE_ID") %>%
+  filter(paired == TRUE) %>%
+  dplyr::select(-c(ploidy,purity,TP53cn,expected_TP53_AF,TP53freq,use,notes,paired)) %>%
+  group_by(PATIENT_ID,signature,group) %>%
+  summarise(across(value,.fns = median)) %>%
+  # renormalise data to one after taking median
+  ungroup() %>%
+  group_by(PATIENT_ID,group) %>%
+  mutate(value = value / sum(value)) %>%
+  mutate(group = case_when(group == "arx" ~ "diagnosis", group == "rlps" ~ "relapse")) %>%
+  mutate(signature = factor(signature,levels = paste0("CX",seq.int(1,17,1))))
+
+# sig_bar_paired$PATIENT_ID <- factor(sig_bar_paired$PATIENT_ID,
+#                              levels = unique(sig_bar_paired$PATIENT_ID[order(sig_bar_paired$value,sig_bar_paired$signature,decreasing = T)]))
+
+pat_ordering <- pivot_wider(sig_bar_paired[sig_bar_paired$group == "diagnosis",],id_cols = "PATIENT_ID",names_from = "signature",values_from = "value") %>%
+                  column_to_rownames("PATIENT_ID")
+patient_order <- rownames(pat_ordering[order(pat_ordering[,1],pat_ordering[,2],pat_ordering[,3],
+                                             pat_ordering[,4],pat_ordering[,5],pat_ordering[,6],decreasing = T),])
+
+sig_bar_paired$PATIENT_ID <- factor(sig_bar_paired$PATIENT_ID,
+                             levels = patient_order)
+```
+
+```{r bar_plot_paired_plots}
+sig_bar_plot_paired <- ggplot(sig_bar_paired) +
+  geom_col(aes(PATIENT_ID,value,fill=signature)) +
+  facet_wrap(. ~ group,nrow = 2) +
+  scale_y_continuous(expand = c(0,0)) +
+  #scale_fill_manual(values = cbPalette) +
+  ylab("exposure") +
+  xlab("patient") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position = "bottom")
+
+#saveRDS(object = sig_bar_plot_paired,file = "plots/signatures_stacked_bar.RDS")
+#ggsave(sig_bar_plot_paired,filename = "plots/signatures_stacked_bar.png",width = 8,height = 6,units = "in",dpi = 300)
+#ggsave(sig_bar_plot_paired,filename = "plots/signatures_stacked_bar.pdf",width = 8,height = 6,units = "in",dpi = 300)
+sig_bar_plot_paired
+
+sig_bar_paired_alt <- sig_bar_paired %>%
+                        mutate(value = ifelse(group == "diagnosis",-value,value))
+
+sig_bar_paired_alt$PATIENT_ID <- factor(sig_bar_paired_alt$PATIENT_ID,levels = rev(levels(sig_bar_paired_alt$PATIENT_ID)))
+
+sig_bar_plot_paired_alt <- ggplot(sig_bar_paired_alt) +
+  geom_col(aes(PATIENT_ID,value,fill=signature),position = position_stack(reverse = TRUE)) +
+  #facet_wrap(. ~ group,nrow = 2,labeller = labeller(group = c(arx="diagnosis",rlps="relapse"))) +
+  geom_hline(yintercept = 0) +
+  #scale_fill_manual(values = cbPalette) +
+  scale_y_continuous(labels = c(1.0,0.5,0.0,0.5,1.0),expand = c(0,0)) +
+  ylab("exposure") +
+  xlab("patient") +
+  theme_bw() +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        legend.position = "right") +
+  annotate(geom = "text",x = 48.4,y = c(-0.85,0.88),label = c("diagnosis","relapse")) +
+  coord_flip(clip = "off",xlim = c(1,47)) +
+  theme(plot.margin = unit(c(1,1,1,1),units = "line"))
+
+#saveRDS(object = sig_bar_plot_paired_alt,file = "plots/signatures_stacked_bar_alt.RDS")
+#ggsave(sig_bar_plot_paired_alt,filename = "plots/signatures_stacked_bar_alt.png",width = 6,height = 8,units = "in",dpi = 300)
+#ggsave(sig_bar_plot_paired_alt,filename = "plots/signatures_stacked_bar_alt.pdf",width = 6,height = 8,units = "in",dpi = 300)
+sig_bar_plot_paired_alt
+```
+
+### Pt status and prior lines
+
+```{r pt_status_sig}
+sig_bar$pt_status <- patient.data$pt_sensitivity_at_reg[match(sig_bar$PATIENT_ID,paste0("BRITROC-",patient.data$britroc_number))]
+sig_bar$prior_lines <- patient.data$pre_reg_chemo[match(sig_bar$PATIENT_ID,paste0("BRITROC-",patient.data$britroc_number))]
+
+sig_bar_filt <- sig_bar %>%
+                  filter(!is.na(pt_status) & !is.na(prior_lines))
+                  
+sig_pt_bar_plot <- ggplot(sig_bar_filt) +
+  geom_col(aes(SAMPLE_ID,value,fill=signature)) +
+  facet_wrap(group ~ pt_status,
+             scales = "free_x") +
+  scale_y_continuous(expand = c(0,0)) +
+  #scale_fill_manual(values = cbPalette) +
+  ylab("exposure") +
+  xlab("sample") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position = "bottom")
+
+sig_pt_plot <- ggplot(data = sig_bar_filt) +
+    geom_boxplot(aes(x = pt_status,y = value,fill=pt_status)) +
+    geom_signif(aes(x = pt_status,y = value),
+                test = "wilcox.test",comparisons = list(c("resistant","sensitive")),vjust = 1.3) +
+    facet_wrap(. ~ signature,scales = "free_x",nrow = 1) +
+    scale_fill_manual(values = colour_palettes$resist_sensitive) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+sig_pt_plot_strat_group <- ggplot(data = sig_bar_filt) +
+    geom_boxplot(aes(x = pt_status,y = value,fill=pt_status)) +
+    geom_signif(aes(x = pt_status,y = value),
+                test = "wilcox.test",comparisons = list(c("resistant","sensitive")),vjust = 1.3) +
+    facet_wrap(group ~ signature,scales = "free_x",nrow = 2) +
+    scale_fill_manual(values = colour_palettes$resist_sensitive) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+sig_group_strat_pt <- ggplot(data = sig_bar_filt) +
+    geom_boxplot(aes(x = group,y = value,fill=group)) +
+    geom_signif(aes(x = group,y = value),
+                test = "wilcox.test",comparisons = list(c("diagnosis","relapse")),vjust = 1.3) +
+    facet_wrap(pt_status ~ signature,scales = "free_x",nrow = 2) +
+    scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+#saveRDS(object = sig_pt_bar_plot,file = "plots/sig_pt_bar_plot.RDS")
+#ggsave(sig_pt_bar_plot,filename = "plots/sig_pt_bar_plot.png",width = 9,height = 6,units = "in",dpi = 300)
+#ggsave(sig_pt_bar_plot,filename = "plots/sig_pt_bar_plot.pdf",width = 9,height = 6,units = "in",dpi = 300)
+sig_pt_bar_plot
+
+#saveRDS(object = sig_pt_plot,file = "plots/sig_pt_plot.RDS")
+#ggsave(sig_pt_plot,filename = "plots/sig_pt_plot.png",width = 9,height = 6,units = "in",dpi = 300)
+#ggsave(sig_pt_plot,filename = "plots/sig_pt_plot.pdf",width = 9,height = 6,units = "in",dpi = 300)
+sig_pt_plot
+
+#saveRDS(object = sig_pt_plot_strat_group,file = "plots/sig_pt_plot_strat_group.RDS")
+#ggsave(sig_pt_plot_strat_group,filename = "plots/sig_pt_plot_strat_group.png",width = 9,height = 6,units = "in",dpi = 300)
+#ggsave(sig_pt_plot_strat_group,filename = "plots/sig_pt_plot_strat_group.pdf",width = 9,height = 6,units = "in",dpi = 300)
+sig_pt_plot_strat_group
+
+#saveRDS(object = sig_group_strat_pt,file = "plots/sig_group_strat_pt.RDS")
+#ggsave(sig_group_strat_pt,filename = "plots/sig_group_strat_pt.png",width = 9,height = 6,units = "in",dpi = 300)
+#ggsave(sig_group_strat_pt,filename = "plots/sig_group_strat_pt.pdf",width = 9,height = 6,units = "in",dpi = 300)
+sig_group_strat_pt
+```
+
+```{r prior_lines_sig}
+ggplot(sig_bar_filt[sig_bar_filt$prior_lines < 5,]) +
+  geom_col(aes(SAMPLE_ID,value,fill=signature)) +
+  facet_wrap(group ~ prior_lines,
+             scales = "free_x") +
+  scale_y_continuous(expand = c(0,0)) +
+  #scale_fill_manual(values = cbPalette) +
+  ylab("exposure") +
+  xlab("sample") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position = "bottom")
+
+ggplot(data = sig_bar_filt[sig_bar_filt$prior_lines < 5,]) +
+    geom_boxplot(aes(x = as.factor(prior_lines),y = value,fill=as.factor(prior_lines))) +
+    # geom_signif(aes(x = as.factor(prior_lines),y = value),
+    #             test = "wilcox.test",comparisons = list(c("1","2")),vjust = 1.2) +
+    facet_wrap(. ~ signature,scales = "free_x",nrow = 2) +
+    scale_fill_manual(values = colour_palettes$prior_lines) +
+    theme_bw()
+
+ggplot(data = sig_bar_filt[sig_bar_filt$prior_lines < 5,]) +
+    geom_boxplot(aes(x = as.factor(prior_lines),y = value,fill=as.factor(prior_lines))) +
+    facet_grid(rows = vars(group),cols = vars(signature),scales = "free_x") +
+    scale_fill_manual(values = colour_palettes$prior_lines) +
+    theme_bw()
+
+ggplot(data = sig_bar_filt[sig_bar_filt$prior_lines < 5,]) +
+    geom_boxplot(aes(x = group,y = value,fill=group)) +
+    geom_signif(aes(x = group,y = value),
+                test = "wilcox.test",comparisons = list(c("diagnosis","relapse")),vjust = 1.2) +
+    facet_grid(rows = vars(as.factor(prior_lines)),cols = vars(signature),scales = "free_x") +
+    scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+    theme_bw()
+```
+
+### All samples
+
+```{r sig_box_plot}
+sig_box_plot <- function(sig_quants = NULL,test="t.test",plot_title = NULL,paired=FALSE){
+    if(is.null(sig_quants)){
+        stop("No signature exposure quants provided")
+    }
+    x <- sig_quants
+    if(paired){
+        sig_box_data <- base::merge(x = rownames_to_column(
+            as.data.frame(t(x)),var = "Sample"),
+            y = patient.meta[patient.meta$SAMPLE_ID %in% colnames(x),c("PATIENT_ID","SAMPLE_ID","group")],
+            by.x = "Sample",
+            by.y = "SAMPLE_ID")
+        sig_box_data_long <- pivot_longer(data = sig_box_data,cols = c(2:18),names_to = "Signature") %>%
+            mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse")) %>%
+            group_by(PATIENT_ID,Signature,group) %>%
+            summarise(across(.cols = value,.fns = median)) %>%
+            mutate(Signature = factor(Signature,levels = paste0("CX",seq.int(1,17,1))))
+    } else {
+        sig_box_data <- base::merge(x = rownames_to_column(
+            as.data.frame(t(x)),var = "Sample"),
+            y = patient.meta[patient.meta$SAMPLE_ID %in% colnames(x),c("SAMPLE_ID","group")],
+            by.x = "Sample",
+            by.y = "SAMPLE_ID")
+        sig_box_data_long <- pivot_longer(data = sig_box_data,cols = c(2:18),names_to = "Signature") %>%
+            mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse")) %>%
+            mutate(Signature = factor(Signature,levels = paste0("CX",seq.int(1,17,1))))
+    }
+    if(paired){
+        if(test == "t.test"){
+            test.p <- c()
+            for(i in unique(sig_box_data_long$Signature)){
+                p <- t.test(x = sig_box_data_long$value[sig_box_data_long$group == "diagnosis" & sig_box_data_long$Signature == i],
+                            y = sig_box_data_long$value[sig_box_data_long$group == "relapse" & sig_box_data_long$Signature == i],paired = TRUE)$p.value
+                test.p <- append(test.p,p)
+            }
+        } else if(test == "wilcox.test"){
+            test.p <- c()
+            for(i in unique(sig_box_data_long$Signature)){
+                p <- wilcox.test(x = sig_box_data_long$value[sig_box_data_long$group == "diagnosis" & sig_box_data_long$Signature == i],
+                                 y = sig_box_data_long$value[sig_box_data_long$group == "relapse" & sig_box_data_long$Signature == i],paired = TRUE)$p.value
+                test.p <- append(test.p,p)
+            }
+        } else {
+            stop("unknown statistical test provided - t.test or wilcox.test")
+        }
+    } else {
+        if(test == "t.test"){
+            test.p <- c()
+            for(i in unique(sig_box_data_long$Signature)){
+                p <- t.test(x = sig_box_data_long$value[sig_box_data_long$group == "diagnosis" & sig_box_data_long$Signature == i],
+                            y = sig_box_data_long$value[sig_box_data_long$group == "relapse" & sig_box_data_long$Signature == i])$p.value
+                test.p <- append(test.p,p)
+            }
+        } else if(test == "wilcox.test"){
+            test.p <- c()
+            for(i in unique(sig_box_data_long$Signature)){
+                p <- wilcox.test(x = sig_box_data_long$value[sig_box_data_long$group == "diagnosis" & sig_box_data_long$Signature == i],
+                                 y = sig_box_data_long$value[sig_box_data_long$group == "relapse" & sig_box_data_long$Signature == i])$p.value
+                test.p <- append(test.p,p)
+            }
+        } else {
+            stop("unknown statistical test provided - t.test or wilcox.test")
+        }
+    }
+    if(is.null(plot_title)){
+        plot_title <- "Signature exposures by signature between groups"
+    }
+    ggplot(data = sig_box_data_long) +
+        geom_jitter(aes(x = Signature,y = value,color=group),
+                    alpha=0.3,position = position_jitterdodge(jitter.width = 0.2)) +
+        geom_boxplot(aes(x = Signature,y = value,fill=group),outlier.colour = NA) +
+        # geom_signif(aes(x = Signature,y = value),
+        #             annotations = ifelse(test.p < 0.01,formatC(test.p,format = "e",digits = 2),signif(test.p,digits = 2)),
+        #                                  xmin = seq.int(0.5,6.5,1)+0.2,
+        #                                  xmax = seq.int(1.5,7.5,1)-0.2,
+        #                                  y_position = 0.9) +
+        labs(title = plot_title) +
+        scale_y_continuous(name = "Exposure",limits = c(0,1)) +
+        scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+        scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+        theme_bw()
+}
+
+sig_box_wilcox <- sig_box_plot(sig_quants = panCanSigsAct,
+             plot_title = "Signature exposures between tumour groups (all-mann.whitney)",
+             test = "wilcox.test")
+sig_box_wilcox
+
+#saveRDS(object = sig_box_wilcox,file = "plots/sig_box_wilcox.RDS")
+#ggsave(sig_bar_plot,filename = "plots/sig_box_wilcox.png",width = 8,height = 6,units = "in",dpi = 300)
+#ggsave(sig_bar_plot,filename = "plots/sig_box_wilcox.pdf",width = 8,height = 6,units = "in",dpi = 300)
+```
+
+### Paired samples
+
+```{r sig_box_plot_pair}
+sig_box_paired_wilcox <- sig_box_plot(sig_quants = panCanSigsAct[,colnames(panCanSigsAct) %in% patient.meta$SAMPLE_ID[patient.meta$paired == TRUE]],
+             test = "wilcox.test",paired = TRUE,
+             plot_title = "Signature exposures between tumour groups (paired-wilcoxon)")
+sig_box_paired_wilcox
+
+#saveRDS(object = sig_box_paired_wilcox,file = "plots/sig_box_paired_wilcox.RDS")
+#ggsave(sig_bar_plot,filename = "plots/sig_box_paired_wilcox.png",width = 8,height = 6,units = "in",dpi = 300)
+#ggsave(sig_bar_plot,filename = "plots/sig_box_paired_wilcox.pdf",width = 8,height = 6,units = "in",dpi = 300)
+```
+
+```{r sig_paired_line_plot}
+paired_line <- sig_box_paired_wilcox$data
+paired_line_plot <- ggplot(paired_line) +
+  geom_line(aes(group,value,group=PATIENT_ID),alpha=0.3) +
+  geom_point(aes(group,value,color=group)) +
+  facet_wrap(. ~ Signature,nrow = 1) +
+  scale_y_continuous(limits = c(0,1)) +
+  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+  xlab("signature") +
+  ylab("exposure") +
+  theme_bw() +
+  theme(legend.position = "bottom",axis.text.x = element_blank(),axis.ticks.x = element_blank())
+
+#saveRDS(object = paired_line_plot,file = "plots/paired_line_plot.RDS")
+#ggsave(paired_line_plot,filename = "plots/paired_line_plot.png",width = 8,height = 6,units = "in",dpi = 300)
+#ggsave(paired_line_plot,filename = "plots/paired_line_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
+paired_line_plot
+```
+
+### Primary pt
+
+```{r primary_pt}
+sig_bar_prPt <- as.data.frame(panCanSigsAct) %>%
+  rownames_to_column(var = "signature") %>%
+  pivot_longer(cols = -1,names_to="SAMPLE_ID") %>%
+  left_join(y = patient.meta,by = "SAMPLE_ID") %>%
+  #filter(paired == TRUE) %>%
+  dplyr::select(-c(ploidy,purity,TP53cn,expected_TP53_AF,TP53freq,use,notes,paired)) %>%
+    mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse")) %>%
+    mutate(signature = factor(signature,levels = paste0("CX",seq.int(1,17,1))))
+
+sig_bar_prPt$SAMPLE_ID <- factor(sig_bar_prPt$SAMPLE_ID,levels = sample_order)
+
+sig_bar_prPt$pt_status <- patient.data$pt_sensitivity_at_reg[match(sig_bar_prPt$PATIENT_ID,paste0("BRITROC-",patient.data$britroc_number))]
+sig_bar_prPt$prior_lines <- patient.data$pre_reg_chemo[match(sig_bar_prPt$PATIENT_ID,paste0("BRITROC-",patient.data$britroc_number))]
+sig_bar_prPt$platinum_resistance <- factor(ifelse(sig_bar_prPt$PATIENT_ID %in% primary_resist_pats$PATIENT_ID,"primary resistant","non-primary resistant"),
+                                      levels = c("primary resistant","non-primary resistant"))
+```
+
+```{r primary_pt_plot}
+sig_bar_plot_primary_pt <- ggplot(sig_bar_prPt) +
+  geom_col(aes(SAMPLE_ID,value,fill=signature)) +
+  facet_wrap(group ~ platinum_resistance,nrow =2,scales = "free_x") +
+  scale_y_continuous(expand = c(0,0)) +
+  #scale_fill_manual(values = cbPalette) +
+  ylab("exposure") +
+  xlab("sample") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position = "bottom") +
+  guides(fill = guide_legend(nrow = 1))
+sig_bar_plot_primary_pt
+
+sig_bar_plot_primary_pt_diag <- ggplot(sig_bar_prPt[sig_bar_prPt$group == "diagnosis",]) +
+  geom_col(aes(SAMPLE_ID,value,fill=signature)) +
+  facet_wrap(. ~ platinum_resistance,nrow = 1,scales = "free_x") +
+  scale_y_continuous(expand = c(0,0)) +
+  #scale_fill_manual(values = cbPalette) +
+  ylab("exposure") +
+  xlab("sample") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position = "bottom") +
+  guides(fill = guide_legend(nrow = 1))
+sig_bar_plot_primary_pt_diag
+```
+
+```{r primary_pt_plot2}
+sig_dist_primary_pt <- ggplot(data = sig_bar_prPt) +
+    geom_jitter(aes(x = platinum_resistance,y = value),alpha=0.1) +
+    geom_violin(aes(x = platinum_resistance,y = value,colour = platinum_resistance),
+                fill=NA) +
+    geom_signif(aes(x = platinum_resistance,y = value),
+                test = "wilcox.test",comparisons = list(c("primary resistant","non-primary resistant")),
+                vjust = 1.8) +
+    ylab("exposure") +
+    facet_wrap(. ~ signature,nrow = 1) +
+    theme_bw() +
+    theme(legend.position = "bottom",
+          axis.text.x = element_text(angle = 90,hjust = 1,vjust = 0.5),
+          axis.title.x = element_blank())
+sig_dist_primary_pt
+
+sig_dist_primary_pt_diag <- ggplot(data = sig_bar_prPt[sig_bar_prPt$group == "diagnosis",]) +
+    geom_jitter(aes(x = platinum_resistance,y = value),alpha=0.1) +
+    geom_violin(aes(x = platinum_resistance,y = value,colour = platinum_resistance),
+                fill=NA) +
+    geom_signif(aes(x = platinum_resistance,y = value),
+                test = "wilcox.test",comparisons = list(c("primary resistant","non-primary resistant")),
+                vjust = 1.8) +
+    ylab("exposure") +
+    facet_wrap(. ~ signature,nrow = 1) +
+    theme_bw() +
+    theme(legend.position = "bottom",
+          axis.text.x = element_text(angle = 90,hjust = 1,vjust = 0.5),
+          axis.title.x = element_blank())
+sig_dist_primary_pt_diag
+
+sig_dist_primary_pt_group_strat <- ggplot(data = sig_bar_prPt) +
+    geom_jitter(aes(x = platinum_resistance,y = value),alpha=0.1) +
+    geom_violin(aes(x = platinum_resistance,y = value,
+                    color = platinum_resistance),fill=NA) +
+    geom_signif(aes(x = platinum_resistance,y = value),
+                test = "wilcox.test",comparisons = list(c("primary resistant","non-primary resistant")),
+                vjust = 1.3,
+                y_position = c(0.85,0.75,0.95)) +
+    ylab("exposure") +
+    facet_wrap(group ~ signature,nrow = 2) +
+    theme_bw() +
+    theme(legend.position = "right",
+          axis.text.x = element_text(angle = 90,hjust = 1,vjust = 0.5),
+          axis.title.x = element_blank())
+sig_dist_primary_pt_group_strat
+```
+
+```{r session_info}
+sessionInfo()
+```
