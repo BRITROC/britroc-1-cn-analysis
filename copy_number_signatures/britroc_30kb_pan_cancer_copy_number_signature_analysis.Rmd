@@ -97,13 +97,14 @@ samp_comp_long$name <- factor(samp_comp_long$name,levels = rev(stringr::str_sort
 head(samp_comp_long)
 ```
 
-```{r feat_dist_plot}
+```{r feat_dist_plot, fig.align='center'}
 ggplot(samp_comp_long,aes(x = value)) +
   geom_density(aes(color=group)) +
   facet_wrap(. ~ name,scales = "free") +
   scale_color_manual(values = colour_palettes$diagnosis_relapse) +
   theme_bw() +
-  theme(axis.text.x = element_blank(),
+  theme(legend.position = "bottom",
+        axis.text.x = element_blank(),
         axis.title.x = element_blank(),
         axis.ticks.x = element_blank())
 
@@ -120,12 +121,11 @@ feat_plot <- ggplot(samp_comp_long) +
   theme_bw() +
   theme(legend.position = "bottom",
         axis.text.x = element_text(hjust = 0.5,vjust = 1))
-
+feat_plot
 #saveRDS(object = feat_plot,file = "plots/feat_plot.RDS")
 #ggsave(feat_plot,filename = "plots/feat_plot.png",width = 8,height = 8,units = "in",dpi = 300)
 #ggsave(feat_plot,filename = "plots/feat_plot.pdf",width = 8,height = 8,units = "in",dpi = 300)
 ```
-######## OLD CODE ########
 
 ## Signature proportions
 
@@ -539,7 +539,7 @@ sig_dist_primary_pt <- ggplot(data = sig_bar_prPt) +
     facet_wrap(. ~ signature,nrow = 1) +
     theme_bw() +
     theme(legend.position = "bottom",
-          axis.text.x = element_text(angle = 90,hjust = 1,vjust = 0.5),
+          axis.text.x = element_blank(),
           axis.title.x = element_blank())
 sig_dist_primary_pt
 
@@ -554,7 +554,7 @@ sig_dist_primary_pt_diag <- ggplot(data = sig_bar_prPt[sig_bar_prPt$group == "di
     facet_wrap(. ~ signature,nrow = 1) +
     theme_bw() +
     theme(legend.position = "bottom",
-          axis.text.x = element_text(angle = 90,hjust = 1,vjust = 0.5),
+          axis.text.x = element_blank(),
           axis.title.x = element_blank())
 sig_dist_primary_pt_diag
 
@@ -569,8 +569,8 @@ sig_dist_primary_pt_group_strat <- ggplot(data = sig_bar_prPt) +
     ylab("exposure") +
     facet_wrap(group ~ signature,nrow = 2) +
     theme_bw() +
-    theme(legend.position = "right",
-          axis.text.x = element_text(angle = 90,hjust = 1,vjust = 0.5),
+    theme(legend.position = "bottom",
+          axis.text.x = element_blank(),
           axis.title.x = element_blank())
 sig_dist_primary_pt_group_strat
 ```
