@@ -27,6 +27,12 @@ library(survminer)
 source("colour_palettes.R")
 ```
 
+```{r setup_dir}
+if(!dir.exists("plots/")){
+  dir.create("plots/")
+}
+```
+
 ```{r db_open}
 ## Retrieve clinical database login details
 clin_config <- config::get("clinDB")

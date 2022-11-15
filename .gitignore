@@ -1,7 +1,6 @@
 !.gitignore
 
 # exclusions
-absolute_*/
 *.tsv
 *.csv
 *.txt
@@ -57,6 +56,7 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+.nfs
 
 # pkgdown site
 docs/
@@ -71,3 +71,11 @@ copy_number_analysis/sites_of_relapse/data/20220606_britroc_tissue_groups_MR_IM.
 EGA/Authorised_submitters_list.docx
 EGA/Authorised_submitters_list_IM.docx
 EGA/Authorised_submitters_list_signed.docx
+sample_subsetting.Rmd
+sample_subsetting.Rmd
+absolute_POST_down_sampling/downsampled_bams/archived_or_stored_see_workflow
+absolute_PRE_down_sampling/abcel_vs_gridsearch_fits_correlations.Rmd
+
+# Inclusion exceptions
+!metadata_formatting/*
+!absolute_POST_down_sampling/britroc_30kb_ds_abs_fits.tsv
