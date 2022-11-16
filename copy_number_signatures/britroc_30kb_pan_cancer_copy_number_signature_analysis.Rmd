@@ -575,6 +575,53 @@ sig_dist_primary_pt_group_strat <- ggplot(data = sig_bar_prPt) +
 sig_dist_primary_pt_group_strat
 ```
 
+```{r pred_pt_data}
+pt_pred <- data.frame(pt_prediction = clinPredictionPlatinum(panCanSigs))
+
+sig_bar_prPt$pt_pred <- pt_pred$pt_prediction[match(sig_bar_prPt$SAMPLE_ID,rownames(pt_pred))]
+
+pred_pt_data <- sig_bar_prPt %>%
+    filter(signature == "CX1") %>%
+    select(-signature,-value) %>%
+    mutate(platinum_status = ifelse(platinum_resistance == "primary resistant",
+                                    as.character(platinum_resistance),
+                                    as.character(pt_status)))
+
+head(pred_pt_data)
+```
+
+```{r pred_pt_plot}
+cplt <- colour_palettes$resist_sensitive
+names(cplt) <- c("Predicted resistant","Predicted sensitive")
+
+ggplot(pred_pt_data) +
+    geom_bar(aes(platinum_status,fill=pt_pred)) +
+    #facet_wrap(. ~ group) +
+    scale_fill_manual(values = cplt,name="Predicted response") +
+    theme_bw() +
+    theme(axis.text.y = element_blank(),
+          axis.ticks.y = element_blank())
+```
+```{r sig_ratios}
+sigratios <- as.data.frame(getActivities(panCanSigs)) %>%
+    rownames_to_column(var = "SAMPLE_ID") %>%
+    mutate(C2C3 = CX3/CX2)
+
+pred_pt_data_sigs <- pred_pt_data %>%
+    left_join(.,y = sigratios,by = "SAMPLE_ID")
+head(pred_pt_data_sigs)
+```
+
+```{r sig_ratio_plots}
+ggplot(pred_pt_data_sigs) +
+    geom_point(aes(CX2,CX3,colour=platinum_status)) +
+    theme_bw()
+
+ggplot(pred_pt_data_sigs) +
+    geom_violin(aes(platinum_status,log2(C2C3),fill=platinum_status)) +
+    theme_bw()
+```
+
 ```{r session_info}
 sessionInfo()
 ```
