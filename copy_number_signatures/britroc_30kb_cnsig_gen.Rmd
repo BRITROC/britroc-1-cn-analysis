@@ -21,13 +21,13 @@ knitr::opts_chunk$set(echo = TRUE)
 suppressMessages(library(QDNAseqmod))
 suppressMessages(library(tidyverse))
 suppressMessages(library(kableExtra))
-suppressMessages(library(ggplot2))
+#suppressMessages(library(ggplot2))
 suppressMessages(library(reshape2))
-suppressMessages(library(Biobase))
+#suppressMessages(library(Biobase))
 suppressMessages(library(cowplot))
-suppressMessages(library(RColorBrewer))
-suppressMessages(library(plotly))
-suppressMessages(library(flexmix))
+#suppressMessages(library(RColorBrewer))
+#suppressMessages(library(plotly))
+#suppressMessages(library(flexmix))
 ```
 
 ### Source functions

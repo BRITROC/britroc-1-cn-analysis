@@ -1,24 +1,5 @@
 !.gitignore
 
-# exclusions
-*.tsv
-*.csv
-*.txt
-*.png
-*.rds
-*.html
-*.pdf
-*.pptx
-config.yml
-copy_number_analysis/focal_analysis/gistic/
-copy_number_analysis/medicc2/results/input_files/*
-copy_number_analysis/medicc2/results/medicc2_output/*
-copy_number_analysis/old/
-workflow_scripts/
-pre_TP53_fix_data_archive/
-fixation_comparison/
-jobsubmit*
-
 # Session Data files
 .RData
 .RDataTmp
@@ -56,7 +37,9 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
-.nfs
+
+# Systems files
+.nfs*
 
 # pkgdown site
 docs/
@@ -66,6 +49,30 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# exclusions
+*.tsv
+*.csv
+*.txt
+*.png
+*.rds
+*.Rdata
+*.html
+*.pdf
+*.pptx
+config.yml
+copy_number_analysis/focal_analysis/gistic/
+copy_number_analysis/medicc2/results/input_files/*
+copy_number_analysis/medicc2/results/medicc2_output/*
+copy_number_analysis/old/
+copy_number_signatures/OLD/
+workflow_scripts/
+pre_TP53_fix_data_archive/
+fixation_comparison/
+jobsubmit*
+slurm*
+sbatch*
+plots/
 discussion_temp.docx
 copy_number_analysis/sites_of_relapse/data/20220606_britroc_tissue_groups_MR_IM.xlsx
 EGA/Authorised_submitters_list.docx
@@ -75,7 +82,13 @@ sample_subsetting.Rmd
 sample_subsetting.Rmd
 absolute_POST_down_sampling/downsampled_bams/archived_or_stored_see_workflow
 absolute_PRE_down_sampling/abcel_vs_gridsearch_fits_correlations.Rmd
+copy_number_signatures/britroc_30kb_signature_data.Rdata
 
 # Inclusion exceptions
 !metadata_formatting/*
 !absolute_POST_down_sampling/britroc_30kb_ds_abs_fits.tsv
+!copy_number_signatures/data/*
+
+# Additional temp exclusions
+copy_number_signatures/data/component_parameters.rds
+

@@ -1,0 +1,26 @@
+name: britroc
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - r-ggnewscale
+  - r-config
+  - r-tidyverse
+  - r-rmarkdown
+  - r-zoo
+  - r-survminer
+  - r-survival
+  - r-devtools
+  - r-rpostgres
+  - r-base
+  - r-kableextra
+  - bioconductor-qdnaseq
+  - r-devtools
+  - bioconductor-genomicranges
+  - bioconductor-impute
+  - r-flexmix
+  - r-nmf
+  - bioconductor-yapsa
+prefix: /Users/smith10/resources/miniconda3/envs/britroc
+
