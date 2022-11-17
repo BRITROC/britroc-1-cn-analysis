@@ -82,7 +82,6 @@ sample_subsetting.Rmd
 sample_subsetting.Rmd
 absolute_POST_down_sampling/downsampled_bams/archived_or_stored_see_workflow
 absolute_PRE_down_sampling/abcel_vs_gridsearch_fits_correlations.Rmd
-copy_number_signatures/britroc_30kb_signature_data.Rdata
 
 # Inclusion exceptions
 !metadata_formatting/*

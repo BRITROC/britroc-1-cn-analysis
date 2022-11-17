@@ -1,3 +1,4 @@
 copy_number_signatures/data/component_parameters.rds
 absolute_POST_down_sampling/britroc_30kb_ds_absCopyNumber.rds
 absolute_PRE_down_sampling/prenorm_downsampled_fitsbritroc_30kb_ds_absCopyNumber.rds
+absolute_PRE_down_sampling/abcel_absoluteCN_30kbps_refitted.rds
