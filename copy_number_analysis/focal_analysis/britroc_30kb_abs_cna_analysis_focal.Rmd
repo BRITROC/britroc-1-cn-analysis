@@ -38,6 +38,14 @@ source("data/focal_cna_analysis_funcs.R")
 source("../../colour_palettes.R")
 ```
 
+### Set up directory
+
+```{r setup_dir}
+if(!dir.exists("plots/")){
+  dir.create("plots/")
+}
+```
+
 ## Load data
 
 ### Read meta data

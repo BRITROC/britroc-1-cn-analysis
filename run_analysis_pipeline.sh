@@ -11,5 +11,7 @@ echo -e "Pre-signature QC"
 echo -e "generate signatures"
 #Rscript -e "rmarkdown::render('copy_number_signatures/britroc_30kb_cnsig_gen.Rmd')"
 echo -e "OV signature analysis"
-Rscript -e "rmarkdown::render('copy_number_signatures/britroc_30kb_copy_number_signature_analysis.Rmd')"
+#Rscript -e "rmarkdown::render('copy_number_signatures/britroc_30kb_copy_number_signature_analysis.Rmd')"
+echo -e "Focal copy number analysis"
+Rscript -e "rmarkdown::render('copy_number_analysis/focal_analysis/britroc_30kb_abs_cna_analysis_focal.Rmd')"
 

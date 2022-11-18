@@ -22,5 +22,8 @@ dependencies:
   - r-flexmix
   - r-nmf
   - bioconductor-yapsa
+  - bioconductor-org.hs.eg.db
+  - bioconductor-reactomepa
+  - bioconductor-topgo
 prefix: /Users/smith10/resources/miniconda3/envs/britroc
 

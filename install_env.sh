@@ -56,4 +56,5 @@ Rscript -e 'devtools::install_github(repo = "markowetzlab/QDNAseqmod",quiet=TRUE
 #R_LIB_PATH=$(Rscript resources/libpath.R)
 #Rscript config/package_load.R
 echo -e "[${script}] Conda env ready and all packages installed!"
-echo -e "Activate with `conda activate ${ENV}"
+echo -e "[${script}] Activate with 'conda activate ${ENV}'"
+

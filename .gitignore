@@ -56,6 +56,7 @@ rsconnect/
 *.txt
 *.png
 *.rds
+*.RDS
 *.Rdata
 *.html
 *.pdf
@@ -81,12 +82,16 @@ EGA/Authorised_submitters_list_signed.docx
 sample_subsetting.Rmd
 sample_subsetting.Rmd
 absolute_POST_down_sampling/downsampled_bams/archived_or_stored_see_workflow
-absolute_PRE_down_sampling/abcel_vs_gridsearch_fits_correlations.Rmd
 
 # Inclusion exceptions
 !metadata_formatting/*
 !absolute_POST_down_sampling/britroc_30kb_ds_abs_fits.tsv
-!copy_number_signatures/data/*
+!copy_number_analysis/focal_analysis/data/focal_CNA_pseudo_bed.txt
+!copy_number_analysis/focal_analysis/data/hg19_cytobands.tsv
+!copy_number_analysis/focal_analysis/data/TCGA_gene_CNA_rates.txt
+!copy_number_analysis/broad_analysis/data/hg19_cytobands.tsv
+!copy_number_analysis/broad_analysis/data/NCG_cancerdrivers_annotation_supporting_evidence.tsv
+!copy_number_analysis/focal_analysis/data/TCGA_gene_CNA_rates.txt
 
 # Additional temp exclusions
 copy_number_signatures/data/component_parameters.rds
