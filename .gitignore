@@ -85,14 +85,13 @@ absolute_POST_down_sampling/downsampled_bams/archived_or_stored_see_workflow
 
 # Inclusion exceptions
 !metadata_formatting/*
+!absolute_PRE_down_sampling/fit_QC_predownsample_withsmooth.tsv
 !absolute_POST_down_sampling/britroc_30kb_ds_abs_fits.tsv
 !copy_number_analysis/focal_analysis/data/focal_CNA_pseudo_bed.txt
 !copy_number_analysis/focal_analysis/data/hg19_cytobands.tsv
 !copy_number_analysis/focal_analysis/data/TCGA_gene_CNA_rates.txt
 !copy_number_analysis/broad_analysis/data/hg19_cytobands.tsv
 !copy_number_analysis/broad_analysis/data/NCG_cancerdrivers_annotation_supporting_evidence.tsv
-!copy_number_analysis/focal_analysis/data/TCGA_gene_CNA_rates.txt
 
 # Additional temp exclusions
-copy_number_signatures/data/component_parameters.rds
 

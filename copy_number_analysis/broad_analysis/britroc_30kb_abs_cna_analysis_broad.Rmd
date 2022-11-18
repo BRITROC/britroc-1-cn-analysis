@@ -34,6 +34,14 @@ source("data/britroc_broad_cn_funcs.R")
 source("../../colour_palettes.R")
 ```
 
+### Set up directory
+
+```{r setup_dir}
+if(!dir.exists("plots/")){
+  dir.create("plots/")
+}
+```
+
 ## Load data
 
 ### Read meta data
@@ -525,7 +533,7 @@ lapply(split(ploidy_change_table[ploidy_change_table$direction == "increase",],
 table(ploidy_change_table$ploidy_change[ploidy_change_table$group == "relapse"])
 
 write.table(x = ploidy_change_table,
-            file = "data/unique(ploidy_change_table$PATIENT_ID).tsv",
+            file = "data/ploidy_change_pats.tsv",
             quote = F,row.names = F,col.names = T,sep = "\t")
 ```
 
