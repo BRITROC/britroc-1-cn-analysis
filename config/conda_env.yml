@@ -25,5 +25,6 @@ dependencies:
   - bioconductor-org.hs.eg.db
   - bioconductor-reactomepa
   - bioconductor-topgo
+  - r-fmsb
 prefix: /Users/smith10/resources/miniconda3/envs/britroc
 

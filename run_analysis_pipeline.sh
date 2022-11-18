@@ -19,5 +19,6 @@ echo -e "Broad copy number analysis"
 echo -e "Ploidy change QC"
 #Rscript -e "rmarkdown::render('copy_number_analysis/broad_analysis/ploidy_change_patients_scoring.Rmd')"
 echo -e "Heterogeneity analysis"
-Rscript -e "rmarkdown::render('copy_number_analysis/heterogeneity/britroc_30kb_heterogeneity_analysis.Rmd')"
-
+#Rscript -e "rmarkdown::render('copy_number_analysis/heterogeneity/britroc_30kb_heterogeneity_analysis.Rmd')"
+echo -e "sites of relapse analysis"
+Rscript -e "rmarkdown::render('copy_number_analysis/sites_of_relapse/britroc_30kb_sites_of_relapse.Rmd')"
