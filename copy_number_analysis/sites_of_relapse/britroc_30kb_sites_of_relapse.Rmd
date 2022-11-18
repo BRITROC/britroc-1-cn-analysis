@@ -30,6 +30,19 @@ suppressPackageStartupMessages(suppressWarnings(library(ggsignif)))
 suppressPackageStartupMessages(suppressWarnings(library(fmsb)))
 ```
 
+### Set up directory
+
+```{r setup_dir}
+if(!dir.exists("data/")){
+  dir.create("data/")
+}
+
+if(!dir.exists("plots/")){
+  dir.create("plots/")
+}
+
+```
+
 ```{r funcs}
 source("../focal_analysis/data/focal_cna_analysis_funcs.R")
 source("../../colour_palettes.R")
