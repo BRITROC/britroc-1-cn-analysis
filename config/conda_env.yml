@@ -26,5 +26,6 @@ dependencies:
   - bioconductor-reactomepa
   - bioconductor-topgo
   - r-fmsb
+  - r-umap
 prefix: /Users/smith10/resources/miniconda3/envs/britroc
 
