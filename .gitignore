@@ -85,6 +85,7 @@ absolute_POST_down_sampling/downsampled_bams/archived_or_stored_see_workflow
 
 # Inclusion exceptions
 !metadata_formatting/*
+!britroc_neoadjuvant_chemotherapy_patients.txt
 !absolute_PRE_down_sampling/fit_QC_predownsample_withsmooth.tsv
 !absolute_POST_down_sampling/britroc_30kb_ds_abs_fits.tsv
 !copy_number_analysis/focal_analysis/data/focal_CNA_pseudo_bed.txt

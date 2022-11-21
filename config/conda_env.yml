@@ -27,5 +27,7 @@ dependencies:
   - bioconductor-topgo
   - r-fmsb
   - r-umap
+  - r-lmertest
+  - r-compositions
 prefix: /Users/smith10/resources/miniconda3/envs/britroc
 
