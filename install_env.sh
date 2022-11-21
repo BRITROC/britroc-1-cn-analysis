@@ -51,6 +51,8 @@ conda activate ${ENV}
 # Install modified QDNAseq pkg using devtools
 echo -e "[${script}] Installing modified QDNAseq package"
 Rscript -e 'devtools::install_github(repo = "markowetzlab/QDNAseqmod",quiet=TRUE,upgrade=FALSE)'
+echo -e "[${script}] Installing CINSignatureQuantification package"
+Rscript -e 'devtools::install_github(repo = "markowetzlab/cinsignaturequantification",ref="dev",quiet=TRUE,upgrade=FALSE)'
 # test all packages run and are available
 #echo -e "[${script}] Testing package installation"
 #R_LIB_PATH=$(Rscript resources/libpath.R)
