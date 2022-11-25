@@ -17,11 +17,11 @@ knitr::opts_chunk$set(echo = TRUE)
 ### Load libraries
 
 ```{r library_load, warning=FALSE}
-# Load required libraries with suppressed start-up text
-suppressMessages(library(tidyverse))
-suppressMessages(library(QDNAseqmod))
-suppressMessages(library(CINSignatureQuantification))
-suppressMessages(library(ggsignif))
+# Load required libraries
+library(tidyverse)
+library(QDNAseqmod)
+library(CINSignatureQuantification)
+library(ggsignif)
 ```
 
 ### Source functions
