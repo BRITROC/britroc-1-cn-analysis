@@ -20,6 +20,34 @@ fi
 #	exit	
 #fi
 
+if ! [ -x "$(command -v wget)" ]; then
+        echo -e "[${script}] Error: wget is not installed or is not available on PATH"
+        exit 1
+fi
+
+if ! [ -x "$(command -v unzip)" ]; then
+        echo -e "[${script}] Error: unzip is not installed or is not available on PATH"
+        exit 1
+fi
+
+# Download additional files
+echo -e "[${script}] Downloading additional data"
+wget -qc https://zenodo.org/record/7573784/files/britroc_1_additional_data.zip
+unzip -qq britroc_1_additional_data.zip
+
+# Organising additional files
+echo -e "[${script}] Moving additional data"
+mv zenodo/component_parameters.rds copy_number_signatures/data/
+mv zenodo/britroc_30kb_ds_absCopyNumber.rds absolute_POST_down_sampling/
+mv zenodo/britroc_smoothed_copyNumbersSegmented.rds absolute_PRE_down_sampling/
+mv zenodo/abcel_absoluteCN_30kbps_refitted.rds absolute_PRE_down_sampling/
+mv zenodo/prenorm_downsampled_fitsbritroc_30kb_ds_absCopyNumber.rds absolute_PRE_down_sampling/
+mv zenodo/clonality_results/ absolute_PRE_down_sampling/
+# File clean up
+echo -e "[${script}] Cleaning up additional data"
+#rm -rf zenodo/
+#rm britroc_1_additional_data.zip
+
 # Check provided conda directory
 if [ "$#" -lt 1 ]; then
 	echo -e "[${script}] Error - conda/miniconda directory missing"
