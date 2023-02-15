@@ -377,8 +377,11 @@ prior_line_plot1 <- ggplot(prior_rates[prior_rates$prior_lines %in% c("1","2","3
   geom_col(aes(x = gene,y = rate,fill=tumour),position = "dodge") +
   scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
   ylab(label = "rate (%)") +
-  facet_wrap(group ~ prior_lines,nrow=2,scales = "free_x") + 
-    theme(axis.title.x = element_blank(),axis.text.x = element_text(vjust = 0.5,angle = 90),legend.position = "none")
+  facet_wrap(group ~ prior_lines,nrow=2,scales = "free_x") +
+    theme_bw() +
+    theme(axis.title.x = element_blank(),
+          axis.text.x = element_text(vjust = 0.5,angle = 90),
+          legend.position = "none")
 
 #prior_lines_cna_focal_plot <- plot_grid(prior_line_plot1,prior_line_plot2,nrow = 2)
 ggsave2(filename = "plots/prior_lines_cna_focal_plot.png",plot = prior_line_plot1,width = 8,height = 8,units = "in",dpi = 300)
@@ -465,12 +468,17 @@ prior_paired_line_plot1 <- ggplot(prior_paired_rates) +
   geom_col(aes(x = gene,y = rate,fill=tumour),position = "dodge") +
   scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
   ylab(label = "rate (%)") +
-  facet_wrap(prior_paired_lines ~ group,nrow=2,scales = "free_x") + 
-    theme(axis.title.x = element_blank(),axis.text.x = element_text(vjust = 0.5,angle = 90),legend.position = "none")
+  facet_wrap(prior_paired_lines ~ group,nrow=2,scales = "free_x") +
+    theme_bw() +
+    theme(axis.title.x = element_blank(),
+          axis.text.x = element_text(vjust = 0.5,angle = 90),
+          legend.position = "none")
 
 #prior_paired_lines_cna_focal_plot <- plot_grid(prior_paired_line_plot1,prior_paired_line_plot2,nrow = 2)
-ggsave2(filename = "plots/prior_paired_lines_cna_focal_paired_plot.png",plot = prior_paired_line_plot1,width = 8,height = 8,units = "in",dpi = 300)
-ggsave2(filename = "plots/prior_paired_lines_cna_focal_paired_plot.pdf",plot = prior_paired_line_plot1,width = 8,height = 8,units = "in",dpi = 300)
+ggsave2(filename = "plots/prior_paired_lines_cna_focal_paired_plot.png",
+        plot = prior_paired_line_plot1,width = 8,height = 8,units = "in",dpi = 300)
+ggsave2(filename = "plots/prior_paired_lines_cna_focal_paired_plot.pdf",
+        plot = prior_paired_line_plot1,width = 8,height = 8,units = "in",dpi = 300)
 prior_paired_line_plot1
 ```
 
@@ -517,13 +525,24 @@ kable(cna_differences_paired_prior2$deletion[order(cna_differences_paired_prior2
 ```
 
 ```{r prior_plot_comb}
-prior_lines_cna_focal_plot <- plot_grid(prior_line_plot1,prior_paired_line_plot1,nrow = 2,labels = c("A","B"))
+prior_lines_cna_focal_legend <- get_legend(
+  prior_line_plot1 + 
+    guides(fill = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+
+prior_lines_cna_focal_plot <- plot_grid(prior_line_plot1,
+                                        prior_paired_line_plot1,
+                                        prior_lines_cna_focal_legend,
+                                        nrow = 3,labels = c("A","B",""),
+                    rel_heights = c(1,1,0.1))
+
 ggsave2(plot = prior_lines_cna_focal_plot,
         filename = "plots/prior_paired_lines_combined_plot.png",
-        height = 8,width = 10,units = "in",dpi = 300)
+        height = 8,width = 8,units = "in",dpi = 300)
 ggsave2(plot = prior_lines_cna_focal_plot,
         filename = "plots/prior_paired_lines_combined_plot.pdf",
-        height = 8,width = 10,units = "in",dpi = 300)
+        height = 8,width = 8,units = "in",dpi = 300)
 
 prior_lines_cna_focal_plot
 ```

@@ -521,3 +521,335 @@ cnv_event_means <- function(data=x){
   plim <- layer_scales(p)$y$get_limits()[2] - layer_scales(p)$y$get_limits()[2]*0.05
   p + geom_text(data = data.frame(name=groups,label=paste0("p = ",signif(pvals,digits = 3))),aes(y = plim,x = 2.3,label = label))
 }
+
+get_paired_genome_diffs <- function(data,method="mean",arx_samples=NULL,rlps_samples=NULL){
+    samples <- colnames(data)
+    sub_meta <- meta.data[meta.data$SAMPLE_ID %in% samples,]
+    sample_by_pat_list <- split(sub_meta$SAMPLE_ID,f=as.factor(sub_meta$PATIENT_ID),drop = T)
+    
+    arxdiffs <- do.call(cbind,lapply(names(sample_by_pat_list),FUN = function(x){
+        pat_name <- x
+        abs_samples <- sub_meta$SAMPLE_ID[sub_meta$PATIENT_ID %in% x]
+        abs_subset <- data[,colnames(data) %in% abs_samples]
+        arx_samps <- colnames(abs_subset)[colnames(abs_subset) %in% arx_samples]
+        abs_arx <- abs_subset[,colnames(abs_subset) %in% arx_samps]
+        abs_arx_bins <- assayDataElement(abs_arx,elt = "segmented")
+        if(method == "mean"){
+            arx_bin <- rowMeans(abs_arx_bins,na.rm = T)
+        } else if(method == "median"){
+            arx_bin <- rowMedians(abs_arx_bins,na.rm = T)
+        } else {
+            stop("unknown method")
+        }
+        return(arx_bin)
+    }))
+    
+    rlpsdiffs <- do.call(cbind,lapply(names(sample_by_pat_list),FUN = function(x){
+        pat_name <- x
+        abs_samples <- sub_meta$SAMPLE_ID[sub_meta$PATIENT_ID %in% x]
+        abs_subset <- data[,colnames(data) %in% abs_samples]
+        rlps_samps <- colnames(abs_subset)[colnames(abs_subset) %in% rlps_samples]
+        abs_rlps <- abs_subset[,colnames(abs_subset) %in% rlps_samps]
+        abs_rlps_bins <- assayDataElement(abs_rlps,elt = "segmented")
+        
+        if(method == "mean"){
+            rlps_bin <- rowMeans(abs_rlps_bins,na.rm = T)
+        } else if(method == "median"){
+            rlps_bin <- rowMedians(abs_rlps_bins,na.rm = T)
+        } else {
+            stop("unknown method")
+        }
+        return(rlps_bin)
+    }))
+    arxdiffs <- data.frame(arxdiffs)
+    colnames(arxdiffs) <- paste0(names(sample_by_pat_list),"_arx")
+    
+    rlpsdiffs <- data.frame(rlpsdiffs) 
+    colnames(rlpsdiffs) <- paste0(names(sample_by_pat_list),"_rlps")
+    
+    diffs <- cbind(arxdiffs,rlpsdiffs)
+    rownames(diffs) <- rownames(data)
+    return(diffs)
+}
+
+getcoordinates <- function(chr, pos, chrom.len) {
+    posflat <- pos
+    offset <- 0
+    for (contig_ix in 1:nrow(chrom.len)) {
+        on_contig <- chr == chrom.len$Group.1[contig_ix]
+        posflat[on_contig] <- pos[on_contig] + offset
+        offset <- offset + chrom.len$x.max[contig_ix]
+    }
+    posflat
+}
+
+plotSegments <- function(object = NULL,
+                         sample = NULL,
+                         cn.max = 8) {
+    samp.name <- ifelse(is.numeric(sample), samp[sample], sample)
+    
+    segTab <- object
+    segTab$chromosome <- factor(segTab$chromosome, levels = stringr::str_sort(unique(segTab$chromosome), numeric = T))
+    
+    ylim <- c(-cn.max, cn.max)
+    
+    seg.n <- nrow(segTab)
+    #ob.pl <- getSamplefeatures(object = object)$ploidy
+    
+    chrom.len <- data.frame(Group.1 = unique(segTab$chromosome))
+    chrom.len$x.max <-
+        stats::aggregate(segTab$end,
+                         by = list(segTab$chromosome),
+                         FUN = max)$x
+    chrom.len$x.min <-
+        stats::aggregate(segTab$start,
+                         by = list(segTab$chromosome),
+                         FUN = min)$x
+    chrom.len$Group.1 <-
+        factor(chrom.len$Group.1, levels = stringr::str_sort(unique(chrom.len$Group.1), numeric = T))
+    chrom.len <- chrom.len[order(chrom.len$Group.1), ]
+    
+    segTab$startf <- getcoordinates(
+        chr = segTab$chromosome,
+        pos = segTab$start,
+        chrom.len = chrom.len)
+    
+    segTab$endf <- getcoordinates(
+        chr = segTab$chromosome,
+        pos = segTab$end,
+        chrom.len = chrom.len)
+    
+    chrom.len$flatm <- getcoordinates(chr = chrom.len$Group.1,
+                                      pos = chrom.len$x.min,
+                                      chrom.len = chrom.len)
+    chrom.len$flats <- getcoordinates(
+        chr = chrom.len$Group.1,
+        pos = chrom.len$x.max / 2,
+        chrom.len = chrom.len)
+    
+    chrom.len$flate <- getcoordinates(chr = chrom.len$Group.1,
+                                      pos = chrom.len$x.max,
+                                      chrom.len = chrom.len)
+    
+    #title <- samp.name
+    rect.col <- ifelse(seq_along(chrom.len$Group.1) %% 2 == 0, "white", "grey90")
+    
+    graphics::par(mar = c(3, 4, 1, 1))
+    graphics::plot(
+        NA,
+        xlab = "",
+        ylab = "copy number change",
+        xlim = c(min(chrom.len$flatm), max(chrom.len$flate)),
+        ylim = ylim,
+        xaxs = "i",
+        xaxt = "n",
+        yaxp = c(ylim[1], ylim[2], ylim[2] - ylim[1]),
+        yaxs = "i",
+        yaxt = "n",
+        las = 1
+    )
+    graphics::rect(
+        xleft = chrom.len$flatm,
+        xright = chrom.len$flate,
+        ybottom = -100,
+        ytop = 100,
+        col = rect.col,
+        border = NA
+    )
+    graphics::axis(2,
+                   at = c(seq.int(-cn.max,cn.max,2)),
+                   labels = c(seq.int(-cn.max,cn.max,2)))
+    graphics::axis(1,
+                   at = chrom.len$flats,
+                   labels = chrom.len$Group.1)
+    graphics::box()
+    #graphics::mtext(side = 3,line = 2,at = -0.07,adj = 0,cex = 1.2,title)
+    graphics::abline(h = seq.int(-cn.max - 1,cn.max - 1, 1),
+                     lty = "dashed",
+                     col = "gray50")
+    graphics::segments(x0 = segTab$startf,
+                       y0 = segTab$segVal,
+                       x1 = segTab$endf,
+                       y1 = segTab$segVal,
+                       lwd = 3,
+                       col = "blue")
+}
+
+get_patient_vig <- function(diff_matrix = NULL,clinical_data=NULL,pat.name = NULL,SMOOTHING_FACTOR=0.12){
+    if(is.null(pat.name)){
+        stop("no patient name given")
+    }
+    pat.num <- gsub(pattern = "BRITROC-",replacement = "",x = pat.name)
+    ann_table <- data.frame(
+        y=c(5,4,3,2),
+        label=c(paste0("age: ",patient_data$age[patient_data$britroc_number == pat.num]),
+                paste0("stage: ",
+                       toupper(paste0(patient_data$tumour_stage_at_diagnosis[patient_data$britroc_number == pat.num],
+                                      ifelse(is.na(patient_data$tumour_substage_at_diagnosis[patient_data$britroc_number == pat.num]),
+                                             "",patient_data$tumour_substage_at_diagnosis[patient_data$britroc_number == pat.num])))),
+                paste0("platinum status: ",patient_data$pt_sensitivity_at_reg[patient_data$britroc_number == pat.num]),
+                paste0("prior lines: ",patient_data$pre_reg_chemo[patient_data$britroc_number == pat.num]))
+    )
+    
+    if(file.exists(paste0("data/rds_files/BriTROC-1_patient_event_history_patient_",pat.num,".rds"))){
+        clincPlot <- readRDS(paste0("data/rds_files/BriTROC-1_patient_event_history_patient_",pat.num,".rds"))
+        clincPlot$theme <- ggplot2::theme_bw()
+        clincPlot <- clincPlot +
+            guides(fill=guide_legend(title="drug")) +
+            theme(legend.position = "bottom",
+                  axis.title.y = element_blank(),
+                  axis.text.y = element_blank(),
+                  axis.ticks.y = element_blank(),
+                  plot.title = element_blank())
+    } else {
+        clincPlot <- ggplot() +
+            geom_text(aes(x=1,y=1,label="clinical timeline unavailable")) +
+            labs(title = " ") +
+            xlab(" ") +
+            theme_bw() +
+            theme(legend.position = "bottom",
+                  axis.title.y = element_blank(),
+                  axis.text.y = element_blank(),
+                  axis.ticks.y = element_blank(),
+                  plot.title = element_blank(),
+                  axis.title.x = element_blank(),
+                  axis.ticks.x = element_blank(),
+                  axis.text.x = element_blank())
+    }  
+    annotations_plot <- ggplot() +
+        geom_rect(aes(xmin=1, xmax=1.2, ymin=-Inf, ymax=Inf),
+                  fill="grey90",
+                  colour="grey95") +
+        scale_x_continuous(expand = c(0,0)) +
+        scale_y_continuous(limits = c(1.8,5.2)) +
+        labs(title = pat.name) +
+        theme_minimal() +
+        theme(panel.grid = element_blank(),
+              axis.title = element_blank(),
+              axis.text = element_blank()) +
+        annotate(geom="text",x = 1.01,y = ann_table$y,
+                 label=ann_table$label,hjust = 0)
+    
+    empty <- ggplot() +
+        theme_bw() +
+        theme(panel.border = element_blank())
+    
+    diff_matrix_pat <- as.data.frame(diff_matrix[,pat.name]) %>%
+        `colnames<-` (c("segVal")) %>%
+        rownames_to_column(var = "loc") %>%
+        mutate(chromosome = str_split(loc,pattern = ":|-",n = 3,simplify = T)[,1]) %>%
+        mutate(start = str_split(loc,pattern = ":|-",n = 3,simplify = T)[,2]) %>%
+        mutate(end = str_split(loc,pattern = ":|-",n = 3,simplify = T)[,3]) %>%
+        mutate(sample = rep(pat.name,times=nrow(.))) %>%
+        dplyr::select(chromosome,start,end,segVal,sample) %>%
+        group_by(chromosome,sample) %>%
+        mutate(seg_diff = abs(segVal - lag(segVal))) %>%
+        mutate(chng = ifelse(seg_diff > SMOOTHING_FACTOR,"TRUE","FALSE")) %>%
+        mutate(chng = as.logical(ifelse(is.na(chng),"TRUE",chng))) %>%
+        mutate(comb = cumsum(chng)) %>%
+        group_by(chromosome,sample,comb) %>%
+        dplyr::select(-chng) %>%
+        mutate(across(.cols = c(start,end),as.numeric)) %>%
+        summarise(across(start,min),across(end,max),across(segVal,median)) %>%
+        dplyr::select(chromosome,start,end,segVal,sample) %>%
+        mutate(chromosome = factor(chromosome,levels=c(1:22,"X","Y"))) %>%
+        arrange(sample,chromosome,start)
+    
+    seg_plots <- function(object = diff_matrix_pat, sample = pat.name) {
+        plotSegments(object = object, sample = sample)
+    }
+    seg_plot <- ggdraw(seg_plots)
+    
+    gene_p1 <- ggplot(norm_paired_changes[norm_paired_changes$PATIENT_ID == pat.name,]) +
+        geom_col(aes(gene, change)) +
+        #geom_text(aes(gene, change,label=gene), position=position_dodge(width=0.9), vjust=-0.25) +
+        ylab("copy number change") +
+        theme_bw() + theme(axis.title.x = element_blank(),
+                           axis.ticks.x = element_blank(),
+                           axis.text.x = element_text(size = 4.3,
+                                                      hjust = 0.5,
+                                                      vjust = 1))
+    
+    ith_p2 <- ggplot() +
+        geom_jitter(data = ith[ith$patient != pat.name,],
+                    aes(group, ith, colour = group),
+                    alpha = 0.4,
+                    position = position_dodge2(width = 0.4)) +
+        scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+        geom_point(data = ith[ith$patient == pat.name,],
+                   aes(group, ith),
+                   colour = "red") +
+        geom_label_repel(data = ith[ith$patient == pat.name,],
+                         aes(group,ith,label=sample),point.padding = 0.5,
+                         label.padding = 0.2,
+                         force = 2,
+                         size = 2.5,
+                         box.padding = 0.1) +
+        ylab("ITH") +
+        theme_bw() + theme(legend.position = "none",
+                           axis.title.x = element_blank(),
+                           axis.text.x.bottom = element_blank(),
+                           axis.ticks.x = element_blank(),
+                           axis.text.x = element_text(
+                               angle = 45,
+                               hjust = 1,
+                               vjust = 0.5))
+    
+    sig_p3 <- ggplot() +
+        geom_jitter(data = signature.table[signature.table$PATIENT_ID != pat.name,],
+                    aes(group, exposure, colour = group),
+                    alpha = 0.4,
+                    position = position_dodge2(width = 0.4)) +
+        scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+        geom_point(data = signature.table[signature.table$PATIENT_ID == pat.name,],
+                   aes(group, exposure),
+                   colour = "red") +
+        geom_label_repel(data = signature.table[signature.table$PATIENT_ID == pat.name,],
+                         aes(group,exposure,label=SAMPLE_ID),point.padding = 0.5,
+                         label.padding = 0.2,
+                         force = 2,
+                         size = 2.5,
+                         box.padding = 0.1) +
+        ylab("signature exposure") +
+        facet_wrap(. ~ signature, nrow = 1) +
+        theme_bw() + theme(legend.position = "none",
+                           axis.text.x.bottom = element_blank(),
+                           axis.title.x = element_blank(),
+                           axis.ticks.x = element_blank(),
+                           axis.text.x = element_text(
+                               angle = 45,
+                               hjust = 1,
+                               vjust = 0.5))
+    
+    sig_p4_legend <- ggplot() +
+        geom_jitter(data = signature.table[signature.table$PATIENT_ID != pat.name,],
+                    aes(group, exposure, colour = group)) +
+        scale_color_manual(values = c(colour_palettes$diagnosis_relapse,c("patient sample"="red"))) +
+        theme_bw()
+    
+    leg_box <- get_legend(
+        sig_p4_legend + 
+            #guides(fill = guide_legend(nrow = 1)) +
+            theme(legend.position = "bottom"))
+    
+    pat_vig <- plot_grid(
+        plot_grid(plot_grid(annotations_plot,empty,
+                            nrow = 2,
+                            align = "hv",
+                            rel_heights = c(0.7,0.3)),
+                  clincPlot,
+                  ncol = 2,
+                  rel_widths = c(0.3,0.7)),
+        seg_plot,
+        plot_grid(gene_p1,ith_p2,
+                  ncol = 2,
+                  align = "hv",
+                  rel_widths = c(0.7,0.3)),
+        sig_p3,
+        leg_box,
+        nrow = 5,
+        rel_heights = c(0.5, 0.5, 0.25, 0.25,0.05),
+        axis = "r",
+        align = "hv")
+    return(pat_vig)
+}

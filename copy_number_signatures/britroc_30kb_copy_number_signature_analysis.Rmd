@@ -398,6 +398,7 @@ ggplot(data = sig_bar_filt[sig_bar_filt$prior_lines < 5,]) +
 sig_box_wilcox <- sig_box_plot(sig_quants = sig_quants,
              plot_title = "Signature exposures between tumour groups (all-mann.whitney)",
              test = "wilcox.test")
+
 sig_box_wilcox
 
 saveRDS(object = sig_box_wilcox,file = "plots/sig_box_wilcox.RDS")
