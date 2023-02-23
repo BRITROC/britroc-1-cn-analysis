@@ -1,5 +1,5 @@
 ---
-title: "Combined copy number analysis - BriTROC"
+title: "primary platinum resistance copy number analysis - BriTROC"
 author: "Philip Smith"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 

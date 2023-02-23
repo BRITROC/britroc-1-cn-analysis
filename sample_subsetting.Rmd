@@ -254,3 +254,5 @@ write.table(x = combined_table_patients,
 ```{r sessioninfo}
 sessionInfo()
 ```
+
+#### END

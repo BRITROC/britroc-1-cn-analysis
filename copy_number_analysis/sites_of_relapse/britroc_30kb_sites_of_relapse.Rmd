@@ -161,7 +161,7 @@ annotation_summary_plot <- ggplot(annotation_summary) +
   scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
   xlab("") +
   theme_bw() +
-  theme(axis.text.x = element_text(angle = 90,vjust = 0.5))
+  theme(axis.text.x = element_text(angle = 90,vjust = 0.5,hjust = 1))
 
 annotation_summary_group_plot <- ggplot(annotation_summary_group) + 
   geom_col(aes(group,count,fill=tissue)) +

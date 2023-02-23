@@ -329,9 +329,6 @@ fig7
 
 ```{r fig_pt_status}
 ## Load plots
-## figure legend Figure XX. Copy number signatures stratified by platinum-based treatment sensitivity 
-# A - Copy number signature spectrum of copy number profiles from diagnosis and relapse HGSC tumours across all samples, stratified by response to platinum-based chemotherapeutics (n = 30, n = 94, n = 36, and n = 101, diagnosis resistant, diagnosis sensitive, relapse resistant, and relapse sensitive, respectively). B - Boxplot demonstrating copy number signature distributions in unpaired copy number between resistant and sensitive response to platinum-based chemotherapeutics. C - Boxplot demonstrating copy number signature distributions in unpaired copy number between resistant and sensitive response to platinum-based chemotherapeutics, stratified by diagnosis and relapse tumours.
-
 sig_pt_bar_plot <- readRDS("copy_number_signatures/plots/sig_pt_bar_plot.RDS")
 sig_pt_bar_plot <- sig_pt_bar_plot + theme(legend.position = "none")
 
