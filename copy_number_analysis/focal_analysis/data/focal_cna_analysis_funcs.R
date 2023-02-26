@@ -98,7 +98,7 @@ count_del_focal <- function(data = NULL){
 plot_cna_rates <- function(data=NULL,title="A plot"){
   p <- ggplot(data) +
     geom_col(data = data,aes(x=gene,y=rate,fill=group),position = "dodge") +
-    scale_fill_manual(values = colour_palettes$amplification_deletion) +
+    scale_fill_manual(values = colour_palettes$amplification_deletion[c(2,4)]) +
     ylab(label = "Rate (%)") +
     labs(title = title) +
     theme_bw() + 
@@ -852,4 +852,12 @@ get_patient_vig <- function(diff_matrix = NULL,clinical_data=NULL,pat.name = NUL
         axis = "r",
         align = "hv")
     return(pat_vig)
+}
+
+## Get named vector of ploidy values
+get_named_ploidy <- function(data = NULL){
+  pl <- pData(data)$ploidy
+  names <- pData(data)$name
+  names(pl) <- names
+  pl
 }

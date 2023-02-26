@@ -243,10 +243,17 @@ p2 <- plot_cna_rates(data = get_cna_rates(data = cna_calls[,colnames(cna_calls) 
 p3 <- plot_cna_rates(data = get_cna_rates(data = cna_calls[,colnames(cna_calls) %in% meta.data$SAMPLE_ID[meta.data$group == "rlps"]],
                                           genes = focal_genes_table$Gene.name),title = "relapse")
 
+p2 <- p2 + labs(title = "diagnosis") + theme(legend.position = "none")
+p3 <- p3 + labs(title = "relapse") + theme(legend.position = "none")
+all_rates_leg <- get_legend(
+  p2 + guides(fill = guide_legend(title = "type",nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+
 save_plot(filename = "plots/CNA_rates_all_clinrelgenes.png",plot = p1)
 save_plot(filename = "plots/CNA_rates_primary_clinrelgenes.png",plot = p2)
 save_plot(filename = "plots/CNA_rates_relapse_clinrelgenes.png",plot = p3)
-all_rates <- plot_grid(p2 + labs(title = ""),p3 + labs(title = ""),labels = c("A","B"))
+all_rates <- plot_grid(plot_grid(p2 + labs(title = ""),p3 + labs(title = ""),labels = c("A","B")),all_rates_leg,nrow = 2,rel_heights = c(0.8,0.2))
 ggsave2(filename = "plots/CNA_all_rates.png",plot = all_rates,width = 8,height = 6,units = "in",dpi = 300)
 ggsave2(filename = "plots/CNA_all_rates.pdf",plot = all_rates,width = 8,height = 6,units = "in",dpi = 300)
 all_rates
@@ -319,11 +326,11 @@ cna_differences <- fishers_gene_CNA(data = cna_calls,
                      sub_b = meta.data$SAMPLE_ID[meta.data$group == "rlps"],
                      genes = focal_genes_table$Gene.name)
 
-kable(cna_differences$amplification[order(cna_differences$amplification$p.value) & cna_differences$amplification$p.value < 0.05,]) %>%
+kable(cna_differences$amplification[order(cna_differences$amplification$p.value),]) %>%
   kable_styling() %>%
   scroll_box(height = "200px")
 
-kable(cna_differences$deletion[order(cna_differences$deletion$p.value) & cna_differences$deletion$p.value < 0.05,]) %>%
+kable(cna_differences$deletion[order(cna_differences$deletion$p.value),]) %>%
   kable_styling() %>%
   scroll_box(height = "200px")
 ```
@@ -336,11 +343,11 @@ cna_differences_paired <- fishers_gene_CNA(data = cna_calls,
                             sub_b = meta.data$SAMPLE_ID[meta.data$group == "rlps" & meta.data$paired == "TRUE"],
                             genes = focal_genes_table$Gene.name)
 
-kable(cna_differences_paired$amplification[order(cna_differences_paired$amplification$p.value) & cna_differences_paired$amplification$p.value < 0.05,]) %>%
+kable(cna_differences_paired$amplification[order(cna_differences_paired$amplification$p.value),]) %>%
   kable_styling() %>%
   scroll_box(height = "200px")
 
-kable(cna_differences_paired$deletion[order(cna_differences_paired$deletion$p.value) & cna_differences_paired$deletion$p.value < 0.05,]) %>%
+kable(cna_differences_paired$deletion[order(cna_differences_paired$deletion$p.value),]) %>%
   kable_styling() %>%
   scroll_box(height = "200px")
 ```
