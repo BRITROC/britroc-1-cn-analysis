@@ -308,11 +308,14 @@ sig_pt_plot_strat_group <- ggplot(data = sig_bar_filt) +
     theme(legend.position = "bottom")
 
 sig_group_strat_pt <- ggplot(data = sig_bar_filt) +
+    geom_jitter(aes(x = group,y = value,color=group),
+                    alpha=0.3,position = position_jitterdodge(jitter.width = 0.3)) +
     geom_boxplot(aes(x = group,y = value,fill=group)) +
     geom_signif(aes(x = group,y = value),
                 test = "wilcox.test",comparisons = list(c("diagnosis","relapse")),vjust = 1.3) +
     facet_wrap(pt_status ~ signature,scales = "free_x",nrow = 2) +
     scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+    scale_colour_manual(values = colour_palettes$diagnosis_relapse) +
     theme_bw() +
     theme(legend.position = "bottom")
 

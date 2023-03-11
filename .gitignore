@@ -12,8 +12,9 @@ absolute_*/
 *.pptx
 config.yml
 copy_number_analysis/focal_analysis/gistic/
-copy_number_analysis/medicc2/results/input_files/*
-copy_number_analysis/medicc2/results/medicc2_output/*
+copy_number_analysis/medicc2/data/input_files/*
+copy_number_analysis/medicc2/data/input_files/*
+copy_number_analysis/medicc2/data/medicc2_output/*
 copy_number_analysis/old/
 workflow_scripts/
 pre_TP53_fix_data_archive/

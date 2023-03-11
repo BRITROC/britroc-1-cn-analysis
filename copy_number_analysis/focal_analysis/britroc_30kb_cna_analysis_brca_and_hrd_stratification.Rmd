@@ -22,6 +22,7 @@ suppressPackageStartupMessages(suppressWarnings(library(biomaRt)))
 suppressPackageStartupMessages(suppressWarnings(library(Biobase)))
 suppressPackageStartupMessages(suppressWarnings(library(QDNAseqmod)))
 suppressPackageStartupMessages(suppressWarnings(library(cowplot)))
+suppressPackageStartupMessages(suppressWarnings(library(compositions)))
 suppressPackageStartupMessages(suppressWarnings(library(ggsignif)))
 #suppressPackageStartupMessages(suppressWarnings(library(topGO)))
 #suppressPackageStartupMessages(suppressWarnings(library(org.Hs.eg.db)))
@@ -84,6 +85,8 @@ combinedBRCA <- rbind(germlineBRCA,somaticBRCA) %>%
                     mutate(across(everything(), ~ifelse(.=="", FALSE, as.character(.)))) %>%
                     mutate(BRCA_carrier = rep(TRUE,times=nrow(.)))
     
+write.table(combinedBRCA[c(1,ncol(combinedBRCA))],"../../britroc_brca_patients_list.tsv",
+            quote = F,sep = "\t",row.names = FALSE,col.names = TRUE)
 head(combinedBRCA)
 ```
 
@@ -265,6 +268,8 @@ brca_cna_rates_plot_comb <- plot_grid(brca_cna_rates_plot,
           nrow = 3,
           rel_heights = c(0.6,0.3,0.1))
 
+saveRDS(object = brca_cna_rates_plot,file = "plots/brca_cna_rates_plot.rds")
+
 ggsave(plot = brca_cna_rates_plot_comb,filename = "plots/brca_cna_rates_plot_comb.png",width = 6,height = 8,units = "in",dpi = 300)
 ggsave(plot = brca_cna_rates_plot_comb,filename = "plots/brca_cna_rates_plot_comb.pdf",width = 6,height = 8)
 brca_cna_rates_plot_comb
@@ -322,6 +327,8 @@ cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.na
                          p.adj = "fdr")
 ```
 
+#### Paired copies
+
 ```{r cna_copies_plots}
 ggplot(paired_amp_changes) +
     geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),position = position_dodge2(width = 0.4)) +
@@ -330,8 +337,20 @@ ggplot(paired_amp_changes) +
     scale_colour_manual(values = colour_palettes$brca_carriers) +
     geom_signif(aes(x = BRCA_carrier,y = value),comparison=list(c("BRCA","non-BRCA")),
                test = "wilcox.test",vjust = 1.5) +
+    facet_wrap(. ~ gene,scales = "free_y",ncol = 3) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+ggplot(paired_amp_changes) +
+    geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),position = position_dodge2(width = 0.4)) +
+    geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),alpha=0.3,position = "dodge") +
+    scale_fill_manual(values = colour_palettes$brca_carriers) +
+    scale_colour_manual(values = colour_palettes$brca_carriers) +
+    geom_signif(aes(x = BRCA_carrier,y = value),comparison=list(c("BRCA","non-BRCA")),
+               test = "wilcox.test",vjust = 1.5) +
     facet_wrap(group ~ gene,scales = "free_y",ncol = 3) +
-    theme_bw()
+    theme_bw() +
+    theme(legend.position = "bottom")
 ```
 
 ```{r cna_norm_changes}
@@ -356,7 +375,8 @@ ggplot(norm_amp_changes) +
         comparison=list(c("BRCA","non-BRCA")),
         test = "wilcox.test",vjust = 1.5) +
     facet_wrap(. ~ gene,scales = "free_y",ncol = 3) +
-    theme_bw()
+    theme_bw() +
+    theme(legend.position = "bottom")
 ```
 
 ### Signatures
@@ -401,11 +421,15 @@ brca_sig_bar_relapse_plot <- ggplot(sig_bar[sig_bar$group == "relapse",]) +
         legend.position = "none") +
   guides(fill = guide_legend(nrow = 1))
 
+
+saveRDS(object = brca_sig_bar_plot,file = "plots/brca_sig_bar_plot.rds")
+
+brca_sig_bar_plot
 brca_sig_bar_diagnosis_plot
 brca_sig_bar_relapse_plot
 ```
 
-```{r brca_status}
+```{r brca_sig_status}
 brca_sig_dist_plot <- ggplot(data = sig_bar) +
     geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),
                position = position_dodge2(width = 0.4)) +
@@ -496,6 +520,8 @@ brca_sig_dist_brca_carrier_plot <- ggplot(data = sig_bar) +
           axis.ticks.x = element_blank(),
           axis.title.x = element_blank())
 
+saveRDS(object = brca_sig_dist_grouped_plot,file = "plots/brca_sig_dist_grouped_plot.rds")
+
 brca_sig_dist_brca_carrier_plot
 brca_sig_dist_grouped_plot
 ```
@@ -549,6 +575,87 @@ ggsave(plot = brca_sig_comb_plot,filename = "plots/brca_sig_comb_plot.pdf",width
 brca_sig_comb_plot
 ```
 
+```{r pca_sigs}
+sigPca_noTrans <- prcomp(t(sig_quants),scale. = TRUE,center = TRUE)
+
+sigPca_noTransDplyr <- as.data.frame(sigPca_noTrans$x) %>%
+                        rownames_to_column(var = "SAMPLE_ID") %>%
+                        mutate('BRCA status' = sig_bar$BRCA_carrier[match(SAMPLE_ID,sig_bar$SAMPLE_ID)])
+
+ggplot(sigPca_noTransDplyr) +
+  geom_point(aes(PC1,PC2,colour=`BRCA status`)) +
+  scale_colour_manual(values = colour_palettes$brca_carriers) +
+  theme_bw()
+
+ggplot(sigPca_noTransDplyr) +
+  geom_point(aes(PC2,PC3,colour=`BRCA status`)) +
+  scale_colour_manual(values = colour_palettes$brca_carriers) +
+  theme_bw()
+
+ggplot(sigPca_noTransDplyr) +
+  geom_point(aes(PC3,PC4,colour=`BRCA status`)) +
+  scale_colour_manual(values = colour_palettes$brca_carriers) +
+  theme_bw()
+```
+
+```{r pca_sigs_ALR}
+sig_quants_ALR <- sig_quants
+# Impute zeros
+sig_quants_ALR[sig_quants_ALR == 0] <- 0.001
+# ALR transformation
+sig_quants_ALR <- alr(t(sig_quants_ALR))
+
+sigPca_ALR <- prcomp(sig_quants_ALR,scale. = TRUE,center = TRUE)
+
+sigPca_ALRDplyr <- as.data.frame(sigPca_ALR$x) %>%
+                        rownames_to_column(var = "SAMPLE_ID") %>%
+                        mutate('BRCA status' = sig_bar$BRCA_carrier[match(SAMPLE_ID,sig_bar$SAMPLE_ID)])
+
+ggplot(sigPca_ALRDplyr) +
+  geom_point(aes(PC1,PC2,colour=`BRCA status`)) +
+  scale_colour_manual(values = colour_palettes$brca_carriers) +
+  theme_bw()
+
+ggplot(sigPca_ALRDplyr) +
+  geom_point(aes(PC2,PC3,colour=`BRCA status`)) +
+  scale_colour_manual(values = colour_palettes$brca_carriers) +
+  theme_bw()
+
+ggplot(sigPca_ALRDplyr) +
+  geom_point(aes(PC3,PC4,colour=`BRCA status`)) +
+  scale_colour_manual(values = colour_palettes$brca_carriers) +
+  theme_bw()
+```
+
+```{r pca_sigs_ILR}
+sig_quants_ILR <- sig_quants
+# Impute zeros
+sig_quants_ILR[sig_quants_ILR == 0] <- 0.001
+# ILR transformation
+sig_quants_ILR <- ilr(t(sig_quants_ILR))
+
+sigPca_ILR <- prcomp(sig_quants_ILR,scale. = TRUE,center = TRUE)
+
+sigPca_ILRDplyr <- as.data.frame(sigPca_ILR$x) %>%
+                        rownames_to_column(var = "SAMPLE_ID") %>%
+                        mutate('BRCA status' = sig_bar$BRCA_carrier[match(SAMPLE_ID,sig_bar$SAMPLE_ID)])
+
+ggplot(sigPca_ILRDplyr) +
+  geom_point(aes(PC1,PC2,colour=`BRCA status`)) +
+  scale_colour_manual(values = colour_palettes$brca_carriers) +
+  theme_bw()
+
+ggplot(sigPca_ILRDplyr) +
+  geom_point(aes(PC2,PC3,colour=`BRCA status`)) +
+  scale_colour_manual(values = colour_palettes$brca_carriers) +
+  theme_bw()
+
+ggplot(sigPca_ILRDplyr) +
+  geom_point(aes(PC3,PC4,colour=`BRCA status`)) +
+  scale_colour_manual(values = colour_palettes$brca_carriers) +
+  theme_bw()
+```
+
 ### event progression
 
 ```{r segment_changes}
@@ -574,6 +681,8 @@ cn_segs_events <- cn_seg_sub %>%
   mutate(PATIENT_ID = sig_bar$PATIENT_ID[match(sample,sig_bar$SAMPLE_ID)]) %>%
   mutate(group = sig_bar$group[match(sample,sig_bar$SAMPLE_ID)]) %>%
   mutate(BRCA_carrier = sig_bar$BRCA_carrier[match(sample,sig_bar$SAMPLE_ID)])
+
+head(cn_segs_events)
 ```
 
 ```{r event_plots}
@@ -604,6 +713,7 @@ paired_cn_segs_events <- cn_segs_events %>%
   pivot_wider(id_cols = c("PATIENT_ID","direction","BRCA_carrier"),names_from = group,values_from = n) %>%
   mutate(change = relapse - diagnosis) %>%
   dplyr::select(PATIENT_ID,BRCA_carrier,change)
+
 head(paired_cn_segs_events)
 ```
 
@@ -634,6 +744,124 @@ brca_cn_event_comb_plot <- plot_grid(cn_event_plots,paired_cn_event_plots,
 ggsave(plot = brca_cn_event_comb_plot,filename = "plots/brca_cn_event_comb_plot.png",width = 6,height = 6,units = "in",dpi = 300)
 ggsave(plot = brca_cn_event_comb_plot,filename = "plots/brca_cn_event_comb_plot.pdf",width = 6,height = 6)
 brca_cn_event_comb_plot
+```
+
+```{r segs_sigs}
+cn_segs_sigs <- cn_segs_events %>%
+                    left_join(.,sig_bar,c("sample"="SAMPLE_ID","group","BRCA_carrier")) %>%
+                    dplyr::select(-PATIENT_ID.y)
+
+head(cn_segs_sigs)
+```
+
+```{r segs_sigs_plot}
+ggplot(cn_segs_sigs) +
+    geom_point(aes(n,value,colour=direction),alpha=0.3) +
+    geom_smooth(aes(n,value,colour=direction),method = "lm") +
+    facet_wrap(group ~ signature,ncol = 7) +
+    scale_y_continuous(limits = c(0,1)) +
+    scale_colour_manual(values = colour_palettes$amp_del[c(1,3)]) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+```
+
+```{r seg_weighted}
+cn_seg_weighted_pre <- cn_seg_sub %>%
+    filter(!sample %in% ploidy_change_samples) %>%
+    group_by(sample,chromosome) %>%
+    mutate(seg_count = n()) %>%
+    filter(seg_count > 1) %>%
+    ungroup() %>%
+    mutate(seg_len = end - start) %>%
+    mutate(seg_bin = as.factor(ntile(seg_len,n = 5)))
+
+seg_bin_names <- cn_seg_weighted_pre %>%
+    group_by(seg_bin) %>%
+    summarise(across(seg_len,c(min=min,max=max))) %>%
+    mutate(across(c("seg_len_min","seg_len_max"),~ round(.x/1000000,digits = 1))) %>%
+    mutate(bin = paste0(seg_len_min," - ",seg_len_max," Mb")) %>%
+    dplyr::select(seg_bin,bin) %>%
+    deframe()
+    
+cn_seg_weighted <- cn_seg_weighted_pre %>%
+    mutate(direction = ifelse(segVal >= 1,"gain",ifelse(segVal <= -1,"loss","neutral"))) %>%
+    mutate(direction = ifelse(segVal >= 1,"gain",ifelse(segVal <= -1,"loss","neutral"))) %>%
+    # mutate(direction = ifelse(segVal >= 0,"gain","loss")) %>%
+    dplyr::select(sample,segVal,direction,seg_bin) %>%
+    count(sample,direction,seg_bin) %>%
+    filter(direction != "neutral") %>%
+    mutate(PATIENT_ID = sig_bar$PATIENT_ID[match(sample,sig_bar$SAMPLE_ID)]) %>%
+    mutate(group = sig_bar$group[match(sample,sig_bar$SAMPLE_ID)]) %>%
+    mutate(BRCA_carrier = sig_bar$BRCA_carrier[match(sample,sig_bar$SAMPLE_ID)])
+
+head(cn_seg_weighted)
+```
+
+```{r seg_weighted_plot}
+ggplot(cn_seg_weighted) +
+  #geom_line(aes(seg_bin,n),alpha = 0.15) +
+  geom_point(aes(seg_bin,n,color=group),alpha = 0.3,
+              position = position_dodge2(width = 0.6)) +
+  geom_violin(aes(seg_bin,n,fill=group),alpha=0.5) +
+  # geom_signif(aes(x = seg_bin,y = n),
+  #               test = "wilcox.test",comparisons = list(c("diagnosis","relapse")),
+  #               vjust = 1.3) +
+  xlab("events") +
+  facet_wrap(direction ~ BRCA_carrier) +
+  scale_x_discrete(labels = seg_bin_names) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_colour_manual(values = colour_palettes$diagnosis_relapse) +
+  theme_bw() +
+  theme(legend.position = "none",axis.text.x = element_text(size = 6))
+```
+
+```{r paired_seg_events_weighted}
+paired_cn_segs_weighted <- cn_seg_weighted %>%
+  filter(sample %in% meta.data$SAMPLE_ID[meta.data$paired == TRUE]) %>%
+  group_by(group,PATIENT_ID,direction,BRCA_carrier,seg_bin) %>%
+  dplyr::select(-sample) %>%
+  summarise(across(n,median)) %>%
+  pivot_wider(id_cols = c("PATIENT_ID","direction","BRCA_carrier","seg_bin"),names_from = group,values_from = n) %>%
+  mutate(change = relapse - diagnosis) %>%
+  dplyr::select(PATIENT_ID,BRCA_carrier,direction,seg_bin,change)
+
+head(paired_cn_segs_weighted)
+```
+
+```{r paired_seg_events_weighted_plot}
+ggplot(paired_cn_segs_weighted) +
+  geom_point(aes(BRCA_carrier,change,color=BRCA_carrier),alpha = 0.3,
+              position = position_dodge2(width = 0.6)) +
+  geom_violin(aes(BRCA_carrier,change,fill=BRCA_carrier),alpha=0.5) +
+  geom_signif(aes(x = BRCA_carrier,y = change),
+                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                vjust = 1.3) +
+  xlab("events") +
+  facet_wrap(direction ~ seg_bin,ncol = 5) +
+  scale_fill_manual(values = colour_palettes$brca_carriers) +
+  scale_colour_manual(values = colour_palettes$brca_carriers) +
+  theme_bw() +
+  theme(legend.position = "none")
+    
+```
+
+```{r segs_sigs_weighted}
+cn_segs_sigs_weighted <- cn_seg_weighted %>%
+                    left_join(.,sig_bar,c("sample"="SAMPLE_ID","group","BRCA_carrier")) %>%
+                    dplyr::select(-PATIENT_ID.y)
+
+head(cn_segs_sigs_weighted)
+```
+
+```{r segs_sigs_weighted_plot}
+ggplot(cn_segs_sigs_weighted) +
+    geom_point(aes(n,value,colour=group),alpha=0.3) +
+    geom_smooth(aes(n,value,colour=group),method = "lm") +
+    facet_wrap(seg_bin ~ signature,ncol = 7,scales = "free_x") +
+    scale_y_continuous(limits = c(0,1)) +
+    scale_colour_manual(values = colour_palettes$diagnosis_relapse) +
+    theme_bw() +
+    theme(legend.position = "bottom")
 ```
 
 ```{r sessioninfo}
