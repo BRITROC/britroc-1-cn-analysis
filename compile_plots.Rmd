@@ -491,19 +491,29 @@ sig_box_paired_wilcox
 ## List plots
 pdf.list <- list.files(path = "copy_number_signatures/plots/ternary_all_combinations/",pattern = "ternary_all",full.names = TRUE)
 
+highlight_list <- c("1+3+7","2+3+7","3+4+7","3+5+7","3+6+7")
 ## Load plots
 plot.list <- lapply(pdf.list,FUN = function(x){
-  name <- gsub(gsub(x = x,pattern = "copy_number_signatures/plots/ternary_all_combinations/ternary_all_",replacement = ""),pattern = ".pdf",replacement = "")
+  name <- gsub(gsub(x = x,pattern = "copy_number_signatures/plots/ternary_all_combinations/ternary_all_",replacement = ""),
+               pattern = ".pdf",replacement = "")
+  #print(name)
   plot <- ggdraw() +
           draw_image(magick::image_read_pdf(x,density = 600))
-  plot <- plot +
-            theme(plot.margin = unit(c(0,0,0,0), "cm"))
+  
+  if(name %in% highlight_list){
+        plot <- plot +
+            theme(plot.margin = unit(c(0.1,0.1,0.1,0.1), "cm"),
+                  plot.background = element_rect(color = "firebrick3",size = 3))
+  } else {
+        plot <- plot +
+            theme(plot.margin = unit(c(0.1,0.1,0.1,0.1), "cm"))
+  }
   return(plot)
 })
 
 ## Plot compile
 ternary_all <- plot_grid(plot_grid(plotlist = plot.list,nrow = 7,ncol = 5),
-                sig_legend_b,nrow = 2,rel_heights = c(0.9,0.1))
+                sig_legend_b,nrow = 2,rel_heights = c(0.95,0.05))
 
 ## Plot render
 ggsave2(filename = "plots/supplemental_figure_ternary_sig_plots_all.png",plot = ternary_all,width = 8,height = 12,units = "in",dpi = 300)

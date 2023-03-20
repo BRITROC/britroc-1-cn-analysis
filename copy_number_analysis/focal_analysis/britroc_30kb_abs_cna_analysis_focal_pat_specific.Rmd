@@ -444,7 +444,7 @@ u3 <- ggplot(as.data.frame(umap.data$layout)) +
   geom_point(aes(umap.data$layout[,1],umap.data$layout[,2],color = as.factor(kmean.clust$cluster))) +
   xlab("dim 1") +
   ylab("dim 2") +
-  labs(title = "clusterd UMAP") +
+  labs(title = "clustered UMAP") +
   scale_color_discrete(name = "cluster") +
   theme_bw() +
   theme(legend.position = "none")
