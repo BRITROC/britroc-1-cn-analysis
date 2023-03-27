@@ -523,10 +523,28 @@ ternary_all
 
 ```{r fig9}
 ## BRCA figure
-brca_rate_plot <- readRDS("copy_number_analysis/focal_analysis/plots/brca_cna_rates_plot.rds")
-brca_sig_bar <- readRDS("copy_number_analysis/focal_analysis/plots/brca_sig_bar_plot.rds")
-brca_sig_dist <- readRDS("copy_number_analysis/focal_analysis/plots/brca_sig_dist_grouped_plot.rds")
+diag_rlps_brca_rate_plot <- readRDS("copy_number_analysis/focal_analysis/plots/brca_diag_rlps_cna_rates_paired_plot.rds")
+diag_rlps_brca_rate_plot <- diag_rlps_brca_rate_plot +
+                            theme(axis.title.x = element_blank(),
+                                  axis.text.x = element_blank(),
+                                  axis.ticks.x = element_blank(),
+                                  legend.position = "none")
+
+brca_rate_plot <- readRDS("copy_number_analysis/focal_analysis/plots/brca_cna_rates_paired_plot.rds")
+brca_rate_plot <- brca_rate_plot +
+                    theme(legend.position = "none")
+
+#brca_sig_bar <- readRDS("copy_number_analysis/focal_analysis/plots/brca_sig_bar_plot.rds")
+brca_sig_copies <- readRDS("copy_number_analysis/focal_analysis/plots/paired_amp_changes_plot.rds")
+brca_sig_copies <- brca_sig_copies +
+                            theme(axis.title.x = element_blank(),
+                                  axis.text.x = element_blank(),
+                                  axis.ticks.x = element_blank(),
+                                  legend.position = "none")
+
 brca_sig_radar <- readRDS("plots/brca_status_radar_partialILR_beta.RDS")
+brca_sig_radar <- brca_sig_radar +
+                    theme(legend.position = "none")
 
 brca_sig_radar <- brca_sig_radar +
     labs(tag = "p=0.25, Wald test") +
@@ -534,19 +552,27 @@ brca_sig_radar <- brca_sig_radar +
           plot.tag = element_text(size=8),
           legend.position = "none")
 
+diag_legend <- get_legend(
+  diag_rlps_brca_rate_plot + 
+    guides(fill = guide_legend(title = "group",nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+
 brca_legend <- get_legend(
   brca_rate_plot + 
     guides(fill = guide_legend(title = "BRCA status",nrow = 1)) +
     theme(legend.position = "bottom")
 )
 
-fig9 <- plot_grid(brca_rate_plot,
-          brca_sig_dist,
-          plot_grid(brca_sig_bar,brca_sig_radar,ncol = 2,labels=c("C","D")),
-          brca_legend,
+fig9 <- plot_grid(diag_rlps_brca_rate_plot,
+          brca_rate_plot,
+          plot_grid(brca_sig_copies,brca_sig_radar,
+                    ncol = 2,labels=c("C","D")),
+          plot_grid(empty,diag_legend,brca_legend,empty,
+                    rel_widths = c(0.1,0.25,0.25,0.1),ncol = 4),
           labels=c("A","B","",""),
           nrow = 4,
-          rel_heights = c(0.33,0.33,0.33,0.05))
+          rel_heights = c(0.20,0.20,0.40,0.04))
 
 ggsave2(filename = "plots/figure_9_render.png",plot = fig9,width = 8,height = 12,units = "in",dpi = 300)
 ggsave2(filename = "plots/figure_9_render.pdf",plot = fig9,width = 8,height = 12,units = "in",dpi = 300)
