@@ -1,26 +1,5 @@
 !.gitignore
 
-# exclusions
-absolute_*/
-*.tsv
-*.csv
-*.txt
-*.png
-*.rds
-*.html
-*.pdf
-*.pptx
-config.yml
-copy_number_analysis/focal_analysis/gistic/
-copy_number_analysis/medicc2/data/input_files/*
-copy_number_analysis/medicc2/data/input_files/*
-copy_number_analysis/medicc2/data/medicc2_output/*
-copy_number_analysis/old/
-workflow_scripts/
-pre_TP53_fix_data_archive/
-fixation_comparison/
-jobsubmit*
-
 # Session Data files
 .RData
 .RDataTmp
@@ -59,6 +38,9 @@ vignettes/*.pdf
 # R Environment Variables
 .Renviron
 
+# Systems files
+.nfs*
+
 # pkgdown site
 docs/
 
@@ -67,10 +49,54 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# exclusions
+*.tsv
+*.csv
+*.txt
+*.png
+*.rds
+*.RDS
+*.Rdata
+*.html
+*.pdf
+*.pptx
+config.yml
+copy_number_analysis/focal_analysis/gistic/
+copy_number_analysis/medicc2/results/input_files/*
+copy_number_analysis/medicc2/results/medicc2_output/*
+copy_number_analysis/old/
+copy_number_signatures/OLD/
+workflow_scripts/
+pre_TP53_fix_data_archive/
+fixation_comparison/
+jobsubmit*
+slurm*
+sbatch*
+plots/
 discussion_temp.docx
 copy_number_analysis/sites_of_relapse/data/20220606_britroc_tissue_groups_MR_IM.xlsx
 EGA/Authorised_submitters_list.docx
 EGA/Authorised_submitters_list_IM.docx
 EGA/Authorised_submitters_list_signed.docx
+
+sample_subsetting.Rmd
+sample_subsetting.Rmd
+absolute_POST_down_sampling/downsampled_bams/archived_or_stored_see_workflow
+
+# Inclusion exceptions
+!metadata_formatting/*
+!britroc_neoadjuvant_chemotherapy_patients.txt
+!britroc_primary_platinum_resistant_patient_list.tsv
+!absolute_PRE_down_sampling/fit_QC_predownsample_withsmooth.tsv
+!absolute_POST_down_sampling/britroc_30kb_ds_abs_fits.tsv
+!copy_number_analysis/focal_analysis/data/focal_CNA_pseudo_bed.txt
+!copy_number_analysis/focal_analysis/data/hg19_cytobands.tsv
+!copy_number_analysis/focal_analysis/data/TCGA_gene_CNA_rates.txt
+!copy_number_analysis/broad_analysis/data/hg19_cytobands.tsv
+!copy_number_analysis/broad_analysis/data/NCG_cancerdrivers_annotation_supporting_evidence.tsv
+!copy_number_analysis/sites_of_relapse/data/tissue_mapping_V2.txt
+
+# Additional temp exclusions
 EGA/britroc_ega_sample_metadata.Rmd
 britroc_1_additional_data.zip

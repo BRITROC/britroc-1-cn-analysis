@@ -36,6 +36,19 @@ suppressPackageStartupMessages(suppressWarnings(library(kableExtra)))
 
 ## Load data and funcs
 
+### Set up directory
+
+```{r setup_dir}
+if(!dir.exists("data/")){
+  dir.create("data/")
+}
+
+if(!dir.exists("plots/")){
+  dir.create("plots/")
+}
+
+```
+
 Define functions specifically utilised in this document
 
 ### Functions

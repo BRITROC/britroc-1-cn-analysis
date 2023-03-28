@@ -80,14 +80,19 @@ meta.data <- read.table("../../copy_number_signatures/britroc_30kb_signature_dat
 Load list of protein coding genes used for bin extraction and annotation in focal copy number analysis
 
 ```{r biomart}
-ensembl <- useEnsembl(biomart = "ENSEMBL_MART_ENSEMBL", dataset = "hsapiens_gene_ensembl",GRCh = 37)
-protein_coding_genes <- getBM(attributes = c("chromosome_name","start_position","end_position","hgnc_symbol"),
+if(file.exists("../focal_analysis/data/protein_coding_genes.tsv")){
+	protein_coding_genes <- read.table("../focal_analysis/data/protein_coding_genes.tsv",header=T,sep="\t")
+} else {
+	ensembl <- useEnsembl(biomart = "ENSEMBL_MART_ENSEMBL", dataset = "hsapiens_gene_ensembl",GRCh = 37)
+	protein_coding_genes <- getBM(attributes = c("chromosome_name","start_position","end_position","hgnc_symbol"),
                                              filters = "biotype",
                                              values = "protein_coding",
                                              mart = ensembl,
                                              useCache = FALSE)
-protein_coding_genes <- protein_coding_genes[protein_coding_genes$chromosome_name %in% seq.int(1,22,1),]
-protein_coding_genes <- protein_coding_genes[protein_coding_genes$hgnc_symbol != "",]
+	protein_coding_genes <- protein_coding_genes[protein_coding_genes$chromosome_name %in% seq.int(1,22,1),]
+	protein_coding_genes <- protein_coding_genes[protein_coding_genes$hgnc_symbol != "",]
+	write.table(protein_coding_genes,"../focal_analysis/data/protein_coding_genes.tsv",col.names=T,row.names=F,sep="\t")
+}
 ```
 
 Load absolute copy number data related to BriTROC paper 2
