@@ -111,20 +111,22 @@ diag_tissue_blocks <- RPostgres::dbReadTable(britroc_con,name = "tissue_blocks")
 diag_pre_op <- RPostgres::dbReadTable(britroc_con,name = "pre_relapse_operations")
 
 diag_tissue_table <- left_join(diag_tissue_blocks,diag_pre_op,"histological_id") %>%
-                      dplyr::select(histological_id,tissue_site) %>%
-                      rename("fk_histological_id"="histological_id")
+                      dplyr::select(histological_id,tissue_site,block_id) %>%
+                      rename("fk_histological_id"="histological_id",
+                             "fk_block_id"="block_id")
 
 relapse_tissue_blocks <- RPostgres::dbReadTable(britroc_con,name = "relapse_tissue_samples")
 relapse_post_op <- RPostgres::dbReadTable(britroc_con,name = "post_relapse_biopsies")
 
 relapse_tissue_table <- left_join(relapse_tissue_blocks,relapse_post_op,by = c("fk_histological_id"="histological_id")) %>%
-                          select("fk_histological_id","anatomical_site") %>%
-                          rename("tissue_site"="anatomical_site")
+                          select("fk_histological_id","anatomical_site","block_id") %>%
+                          rename("tissue_site"="anatomical_site",
+                             "fk_block_id"="block_id")
 
-site_table <- left_join(sample_table,diag_tissue_table,"fk_histological_id") %>%
-                left_join(.,relapse_tissue_table,"fk_histological_id") %>%
+site_table <- left_join(sample_table,diag_tissue_table,c("fk_histological_id","fk_block_id")) %>%
+                left_join(.,relapse_tissue_table,c("fk_histological_id","fk_block_id")) %>%
                 distinct() %>%
-                select("fk_britroc_number","type","name","tissue_site.x","tissue_site.y") %>%
+                select("fk_britroc_number","fk_histological_id","fk_block_id","type","name","tissue_site.x","tissue_site.y") %>%
                 unite("tissue_site",c("tissue_site.x","tissue_site.y"),sep = ",",remove = TRUE,na.rm = TRUE) %>%
                 rename("PATIENT_ID"="fk_britroc_number","SAMPLE_ID"="name") %>%
                 filter(type %in% c("archival","relapse")) %>%
@@ -143,6 +145,7 @@ dup_samples <- site_table$SAMPLE_ID[which(duplicated(site_table$SAMPLE_ID))]
 length(dup_samples)
 site_table <- site_table[which(!site_table$SAMPLE_ID %in% dup_samples),] %>%
                 select(SAMPLE_ID,tissue_site,location_curated,tissue_grouped)
+
 table(site_table$location_curated)
 table(site_table$tissue_grouped)
 tissue_data <- site_table
@@ -171,7 +174,7 @@ annotation_summary_plot <- ggplot(annotation_summary) +
   scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
   xlab("") +
   theme_bw() +
-  theme(axis.text.x = element_text(angle = 90,vjust = 0.5))
+  theme(axis.text.x = element_text(angle = 90,vjust = 0.5,hjust = 1))
 
 annotation_summary_group_plot <- ggplot(annotation_summary_group) + 
   geom_col(aes(group,count,fill=tissue)) +
@@ -201,9 +204,10 @@ cna_calls <- get_cna_calls(data = cna_data)
 ```
 
 ```{r group_samples}
-tissue_samples <- split(meta.data$SAMPLE_ID,f = list(meta.data$tissue_grouped),drop = T)
+tissue_samples <- split(meta.data$SAMPLE_ID[meta.data$tissue_grouped != "uncertain"],f = factor(meta.data$tissue_grouped[meta.data$tissue_grouped != "uncertain"]),drop = T)
 tissue_samples
 ```
+
 ```{r drop_low_counts}
 tissue_samples <- tissue_samples[unlist(lapply(tissue_samples,FUN = function(x){length(x) > 2}))]
 ```
@@ -218,25 +222,6 @@ cna_rates_tissue <- do.call(rbind,lapply(X = names(tissue_samples),FUN = functio
   rates$tissue <- rep(x,times=nrow(rates))
   return(rates)
 }))
-
-focal_rate_plot <- ggplot(cna_rates_tissue) +
-  geom_col(aes(x = tissue,y = rate,fill = group),
-           position="dodge",color="grey20") +
-  #scale_fill_manual(values = colour_palettes$amplification_deletion) +
-  labs(title = "") +
-  xlab("") +
-  ylab("rate (%)") +
-  theme_bw() +
-  theme(axis.title.x = element_blank(),
-          axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90),
-        legend.position = "bottom") +
-  scale_fill_manual(values = colour_palettes$amplification_deletion) +
-  facet_wrap(. ~ gene,ncol = 3)
-
-saveRDS(focal_rate_plot,file = "plots/cna_rates_tissue.RDS")
-ggsave(plot = focal_rate_plot,filename = "plots/cna_rates_tissue.png",width = 8,height = 8,units = "in",dpi = 300)
-ggsave(plot = focal_rate_plot,filename = "plots/cna_rates_tissue.pdf",width = 8,height = 8)
-focal_rate_plot
 ```
 
 
@@ -286,6 +271,32 @@ names(pairwise.fishers.results) <- sig_tissue_genes
 pairwise.fishers.results
 ```
 
+```{r cna_rates_plot}
+focal_rate_plot <- ggplot(cna_rates_tissue) +
+  geom_col(aes(x = tissue,y = rate,fill = group),
+           position="dodge",color="grey20") +
+  #scale_fill_manual(values = colour_palettes$amplification_deletion) +
+  # geom_signif(data = data.frame(gene = c("PIK3CA")),
+  #             aes(y_position=c(26), xmin=c(1.8), xmax=c(4.8),
+  #             annotations=c("*")),
+  #             tip_length=0.05,textsize = 4,
+  #             manual = T,vjust = 1.2) +
+  labs(title = "") +
+  xlab("") +
+  ylab("rate (%)") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+          axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90),
+        legend.position = "bottom") +
+  scale_fill_manual(values = colour_palettes$amplification_deletion[c(2,4)]) +
+  facet_wrap(. ~ gene,ncol = 3)
+
+saveRDS(focal_rate_plot,file = "plots/cna_rates_tissue.RDS")
+ggsave(plot = focal_rate_plot,filename = "plots/cna_rates_tissue.png",width = 8,height = 8,units = "in",dpi = 300)
+ggsave(plot = focal_rate_plot,filename = "plots/cna_rates_tissue.pdf",width = 8,height = 8)
+focal_rate_plot
+```
+
 ### CNA counts
 
 ```{r cna_count}
@@ -295,24 +306,6 @@ cna_copies <- get_cna_changes(data = cna_data,genes = focal_genes_table$Gene.nam
                 filter(!is.na(tissue)) %>%
                 filter(tissue != "uncertain")
                 # mutate(tissue = ifelse(is.na(tissue),"diagnosis",as.character(tissue)))
-```
-
-```{r plot_cna_count}
-cna_count_plot <- ggplot(cna_copies) +
-  geom_point(aes(x = tissue,y=value,color=tissue),
-             position=position_jitterdodge(jitter.width = 0.3),
-             alpha=0.2) +
-  geom_violin(aes(x = tissue,y=value,color=tissue),fill=NA) +
-  ylab("copy number") +
-  xlab("") +
-  facet_wrap(. ~ gene,scales = "free_y",ncol = 2) +
-  theme_bw() +
-  theme(legend.position = "bottom")
-
-saveRDS(cna_count_plot,file = "plots/cna_count_tissue.RDS")
-ggsave(plot = cna_count_plot,filename = "plots/cna_count_tissue.png",width = 12,height = 8,units = "in",dpi = 300)
-ggsave(plot = cna_count_plot,filename = "plots/cna_count_tissue.pdf",width = 12,height = 8)
-cna_count_plot
 ```
 
 ```{r cna_count_test}
@@ -345,6 +338,30 @@ cna_count_anova$q.val <- p.adjust(cna_count_anova$posthoc_pval,method = "bonferr
 cna_count_anova[order(cna_count_anova$anova_pval),]
 ```
 
+```{r plot_cna_count}
+cna_count_plot <- ggplot(cna_copies) +
+  geom_point(aes(tissue,value,fill=tissue),position="jitter",color="grey50") +
+  # geom_point(aes(x = tissue,y=value,color=tissue),
+  #            position=position_jitterdodge(jitter.width = 0.3),
+  #            alpha=0.2) +
+  geom_violin(aes(x = tissue,y=value,fill=tissue),alpha=0.5) +
+  geom_signif(data = data.frame(gene = c("AKT1","MECOM")),
+              aes(y_position=c(15,18), xmin=c(3,2), xmax=c(4,4),
+              annotations=c("*"," * ")),
+              tip_length=0.1,textsize = 4,
+              manual = T,vjust = 1.2) +
+  ylab("copy number") +
+  xlab("") +
+  facet_wrap(. ~ gene,scales = "free_y",ncol = 2) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+saveRDS(cna_count_plot,file = "plots/cna_count_tissue.RDS")
+ggsave(plot = cna_count_plot,filename = "plots/cna_count_tissue.png",width = 12,height = 8,units = "in",dpi = 300)
+ggsave(plot = cna_count_plot,filename = "plots/cna_count_tissue.pdf",width = 12,height = 8)
+cna_count_plot
+```
+
 ### ITH 
 
 ```{r ith_data}
@@ -352,6 +369,12 @@ ith_table_tissue <- ith_table %>%
                       mutate(tissue = meta.data$tissue_grouped[match(sample,meta.data$SAMPLE_ID)]) %>%
                       filter(!is.na(tissue)) %>%
                       filter(tissue != "uncertain")
+```
+
+```{r test_ith}
+res.aov.ith <- aov(ith ~ tissue,data = ith_table_tissue)
+summary(res.aov.ith)
+TukeyHSD(res.aov.ith)
 ```
 
 ```{r ith_plot}
@@ -368,11 +391,7 @@ ggsave(plot = ith_plot,filename = "plots/ith_tissue.pdf",width = 10,height = 8)
 ith_plot
 ```
 
-```{r test_ith}
-res.aov.ith <- aov(ith ~ tissue,data = ith_table_tissue)
-summary(res.aov.ith)
-TukeyHSD(res.aov.ith)
-```
+### CN Signatures
 
 ```{r test_signatures}
 signatures_table <- signatures %>%
@@ -382,22 +401,6 @@ signatures_table <- signatures %>%
                      filter(!is.na(tissue)) %>%
                      filter(tissue != "uncertain")
 head(signatures_table)
-```
-
-```{r sig_plot}
-signature_plot <- ggplot(signatures_table) +
-  geom_point(aes(tissue,exposure,fill=tissue),position="jitter",color="grey50") +
-  geom_violin(aes(tissue,exposure,fill=tissue),alpha=0.5) +
-  #geom_signif(aes(tissue,ith),comparisons = list(c("diagnosis","relapse")),test = "wilcox.test") +
-  scale_y_continuous(limits = c(0,1)) +
-  facet_wrap(. ~ signature,nrow = 1) +
-  theme_bw() +
-  theme(legend.position = "bottom",axis.text.x = element_text(angle = 90))
-
-saveRDS(signature_plot,file = "plots/signature_tissue.RDS")
-ggsave(plot = signature_plot,filename = "plots/signatures_tissue.png",width = 10,height = 8,units = "in",dpi = 300)
-ggsave(plot = signature_plot,filename = "plots/signatures_tissue.pdf",width = 10,height = 8)
-signature_plot
 ```
 
 ```{r signature_aov}
@@ -428,9 +431,31 @@ signature_tissue_anova <- do.call(rbind,lapply(unique(signatures_table$signature
 }))
 signature_tissue_anova$q.val <- p.adjust(signature_tissue_anova$posthoc_pval,method = "bonferroni")
 signature_tissue_anova_tab <- signature_tissue_anova[order(signature_tissue_anova$anova_pval),]
-write.table(signature_tissue_anova_tab,file = "data/signature_tissue_anova_results_table.tsv",quote = F,row.names = F,col.names = T,sep = "\t")
+write.table(signature_tissue_anova_tab,file = "data/signature_tissue_anova_results_table.tsv",
+            quote = F,row.names = F,col.names = T,sep = "\t")
 signature_tissue_anova_tab
 ```
+
+```{r sig_plot}
+signature_plot <- ggplot(signatures_table) +
+  geom_point(aes(tissue,exposure,fill=tissue),position="jitter",color="grey50") +
+  geom_violin(aes(tissue,exposure,fill=tissue),alpha=0.5) +
+  geom_signif(data = data.frame(signature = c("s1")),
+              aes(y_position=c(1), xmin=c(2), xmax=c(4),
+              annotations=c("*")),
+              tip_length=0.1,textsize = 4,
+              manual = T,vjust = 0.5) +
+  scale_y_continuous(limits = c(0,1)) +
+  facet_wrap(. ~ signature,nrow = 1) +
+  theme_bw() +
+  theme(legend.position = "bottom",axis.text.x = element_text(angle = 90))
+
+saveRDS(signature_plot,file = "plots/signature_tissue.RDS")
+ggsave(plot = signature_plot,filename = "plots/signatures_tissue.png",width = 10,height = 8,units = "in",dpi = 300)
+ggsave(plot = signature_plot,filename = "plots/signatures_tissue.pdf",width = 10,height = 8)
+signature_plot
+```
+
 ### Diag/Relapse stratification
 
 ```{r cn_by_diag_relapse}
@@ -454,7 +479,7 @@ cna_rates_tissue_stratified <- do.call(rbind,lapply(X = names(tissue_samples_str
                             genes = focal_genes_table$Gene.name)
   rates$tissue <- rep(x,times=nrow(rates))
   rates <- rates %>%
-            separate(tissue,c("tissue","type")) %>%
+            separate(tissue,c("tissue","type"),sep = "\\.") %>%
             mutate(type = case_when(type == "arx" ~ "diagnosis",
                                     type == "rlps" ~ "relapse"))
   return(rates)
@@ -496,13 +521,13 @@ focal_rate_plot_strat
 
 ```{r cn_by_diag_relapse_plot}
 cn_count_tissue_plot <- ggplot(cna_copies_stratified) +
-  geom_point(aes(group,value,color=group)) +
-  geom_boxplot(aes(group,value,color=group)) +
+  geom_point(aes(group,value),position="jitter",color="grey50") +
+  geom_violin(aes(group,value,fill=group),alpha=0.5) +
   geom_signif(aes(group,value),
               comparisons = list(c("diagnosis","relapse")),
-              test = "wilcox.test",vjust = 1.5) +
+              test = "wilcox.test",vjust = 1.2) +
   facet_grid(cols = vars(tissue),rows = vars(gene),scales = "free") +
-  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90,vjust = 0.5))
 
@@ -522,26 +547,13 @@ signatures_table_group
 
 ```{r cn_sigs_group_by_tissue_plot}
 cn_sigs_tissueplot1 <- ggplot(signatures_table_group) +
-  geom_point(aes(group,exposure,color=group),
-             position = position_jitterdodge(jitter.width = 0.3),
-             alpha=0.3) +
-  geom_violin(aes(group,exposure,color=group),fill=NA) +
+  geom_point(aes(group,exposure),position="jitter",color="grey50") +
+  geom_violin(aes(group,exposure,fill=group),alpha=0.5) +
   geom_signif(aes(group,exposure),
               comparisons = list(c("diagnosis","relapse")),
               test = "wilcox.test",vjust = 1.5) +
   facet_grid(rows = vars(tissue),cols = vars(signature),scales = "free") +
-  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 90,vjust = 0.5))
-
-cn_sigs_tissueplot2 <- ggplot(signatures_table_group) +
-  geom_point(aes(tissue,exposure,color=tissue),alpha=0.4) +
-  geom_violin(aes(tissue,exposure,color=tissue),fill=NA) +
-  # geom_signif(aes(tissue,exposure),
-  #             comparisons = list(c("diagnosis","relapse")),
-  #             test = "wilcox.test",vjust = 1.5) +
-  facet_grid(rows = vars(group),cols = vars(signature),scales = "free") +
-  #scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90,vjust = 0.5))
 
@@ -559,15 +571,13 @@ ith_table_tissue_group
 
 ```{r cith_group_by_tissue_plot}
 ith_tissueplot1 <- ggplot(ith_table_tissue_group) +
-  geom_point(aes(group,ith,color=group),
-             position = position_jitterdodge(jitter.width = 0.3),
-             alpha=0.3) +
-  geom_violin(aes(group,ith,color=group),fill=NA) +
+  geom_point(aes(group,ith,fill=tissue),position="jitter",color="grey50") +
+  geom_violin(aes(group,ith,fill=group),alpha=0.5) +
   geom_signif(aes(group,ith),
               comparisons = list(c("diagnosis","relapse")),
               test = "wilcox.test",vjust = 1.5) +
   facet_grid(cols = vars(tissue),scales = "free") +
-  scale_color_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90,vjust = 0.5))
 

@@ -31,86 +31,228 @@ britroc_con <- dbConnect(RPostgres::Postgres(),
 )
 ```
 
-```{r sig_data}
-load("copy_number_signatures/britroc_30kb_signature_data.rds")
-```
-
-```{r arx}
-patient.meta$SAMPLE_ID[patient.meta$group == "arx"]
-arx <- as.character(patient.meta$SAMPLE_ID[patient.meta$group == "arx"])
-writeLines(arx,con = "sample_lists/arx.txt")
-```
-
-```{r rlps}
-patient.meta$SAMPLE_ID[patient.meta$group == "rlps"]
-rlps <- as.character(patient.meta$SAMPLE_ID[patient.meta$group == "rlps"])
-writeLines(rlps,con = "sample_lists/rlps.txt")
-```
-
-```{r paired_arx}
-patient.meta$SAMPLE_ID[patient.meta$paired == "TRUE" & patient.meta$group == "arx"]
-paired_arx <- as.character(patient.meta$SAMPLE_ID[patient.meta$paired == "TRUE" & patient.meta$group == "arx"])
-writeLines(paired_arx,con = "sample_lists/paired_arx.txt")
-```
-
-```{r paired_rlps}
-patient.meta$SAMPLE_ID[patient.meta$paired == "TRUE" & patient.meta$group == "rlps"]
-paired_rlps <- as.character(patient.meta$SAMPLE_ID[patient.meta$paired == "TRUE" & patient.meta$group == "rlps"])
-writeLines(paired_rlps,con = "sample_lists/paired_rlps.txt")
-```
-
-```{r db_list_tables}
+```{r db_list_tables_con}
 #RPostgres::dbListObjects(britroc_con)
 # Get table example
 pat.data <- RPostgres::dbReadTable(britroc_con, 'patients')
-pat.data$britroc_number <- paste0("BRITROC-",pat.data$britroc_number)
-pat.data <- pat.data[pat.data$britroc_number %in% patient.meta$PATIENT_ID,]
+pat.data <- pat.data %>%
+                mutate(britroc_number = paste0("BRITROC-",britroc_number)) %>%
+                rename("PATIENT_ID"="britroc_number")
 ```
 
-```{r pat_res_sens_filtering}
-resistant.patients <- pat.data$britroc_number[pat.data$pt_sensitivity_at_reg == "resistant"]
-sensitive.patients <- pat.data$britroc_number[pat.data$pt_sensitivity_at_reg == "sensitive"]
-
-resistant.samples <- as.character(patient.meta$SAMPLE_ID[patient.meta$PATIENT_ID %in% resistant.patients])
-sensitive.samples <- as.character(patient.meta$SAMPLE_ID[patient.meta$PATIENT_ID %in% sensitive.patients])
+```{r ITH_meta_data}
+ITH.meta <- read.table("copy_number_analysis/heterogeneity/data/ith_results_table.tsv",header = T,sep = "\t")
+ITH.meta <- ITH.meta %>%
+                rename("SAMPLE_ID"="sample","PATIENT_ID"="patient")
+head(ITH.meta)
 ```
 
-```{r resistant_patients}
-resistant.patients
-writeLines(resistant.patients,con = "patient_lists/resistant.txt")
+```{r immune_meta_data}
+immune.meta <- read.table("copy_number_signatures/britroc_immune_data.tsv",header = T,sep = "\t")
+immune.meta <- immune.meta %>%
+                filter(signature == "s1") %>%
+                dplyr::select(-c(image_id,tissue,normalised_cells)) %>%
+                distinct() %>%
+                rename("PATIENT_ID"="patient_id","SAMPLE_ID"="ID")
+head(immune.meta)
 ```
 
-```{r sensitive_patients}
-sensitive.patients
-writeLines(resistant.patients,con = "patient_lists/sensitive.txt")
+```{r sig_data}
+load("copy_number_signatures/britroc_30kb_signature_data.Rdata")
+head(patient.meta)
 ```
 
-```{r resistant_samples}
-resistant.samples
-table(gsub(pattern = "-[0-9]*$|_[0-9]*$",replacement = "",x = resistant.samples))
-writeLines(resistant.samples,con = "sample_lists/resistant.txt")
+```{r db_list_tables}
+pat.data2 <- read.table("britroc_cohort_patient_data.tsv",header = T,sep = "\t")
+
+pat.data2 <- pat.data2 %>%
+                mutate(britroc_number = paste0("BRITROC-",britroc_number)) %>%
+                rename("PATIENT_ID"="britroc_number")
+
+pat.data$pre_reg_chemo <- pat.data2$pre_reg_chemo[match(pat.data$PATIENT_ID,pat.data2$PATIENT_ID)]
+head(pat.data)
 ```
 
-```{r sensitive_samples}
-sensitive.samples
-table(gsub(pattern = "-[0-9]*$|_[0-9]*$",replacement = "",x = sensitive.samples))
-writeLines(resistant.samples,con = "sample_lists/sensitive.txt")
+```{r primary_pt_group}
+ppr.meta <- read.table("britroc_primary_platinum_resistant_patient_list.tsv",header = T,sep = "\t")
+head(ppr.meta)
 ```
 
-```{r paired_resist}
-paired.resistant.samples <- as.character(patient.meta$SAMPLE_ID[patient.meta$SAMPLE_ID %in% resistant.samples & patient.meta$paired == TRUE])
+```{r combined_table_samples}
+combined_table_samples <- patient.meta %>%
+    left_join(.,pat.data,"PATIENT_ID") %>%
+    mutate(group = case_when(group == "rlps" ~ "relapse",
+                             group == "arx" ~ "diagnosis")) %>%
+    dplyr::select(c(PATIENT_ID,SAMPLE_ID,group,paired,
+                    tumour_stage_at_diagnosis,pt_sensitivity_at_reg,pre_reg_chemo)) %>%
+    mutate(isStage1 = ifelse(tumour_stage_at_diagnosis==1,1,0),) %>%
+    mutate(isStage2 = ifelse(tumour_stage_at_diagnosis==2,1,0)) %>%
+    mutate(isStage3 = ifelse(tumour_stage_at_diagnosis==3,1,0)) %>%
+    mutate(isStage4 = ifelse(tumour_stage_at_diagnosis==4,1,0)) %>%
+    mutate(isStageNA = ifelse(is.na(tumour_stage_at_diagnosis),1,0)) %>%
+    mutate(across(matches("isStage"),~ replace_na(.x,0))) %>%
+    mutate(isPriorlines1 = ifelse(pre_reg_chemo==1,1,0)) %>%
+    mutate(isPriorlines2 = ifelse(pre_reg_chemo==2,1,0)) %>%
+    mutate(isPriorlines3 = ifelse(pre_reg_chemo==3,1,0)) %>%
+    mutate(isPriorlinesge4 = ifelse(pre_reg_chemo >= 4,1,0)) %>%
+    mutate(isPriorlinesNA = ifelse(is.na(pre_reg_chemo),1,0)) %>%
+    mutate(across(matches("isPriorlines"),~ replace_na(.x,0))) %>%
+    mutate(isPaired = ifelse(paired==TRUE,1,0)) %>%
+    mutate(hasITH = ifelse(SAMPLE_ID %in% ITH.meta$SAMPLE_ID,1,0)) %>%
+    mutate(hasImmune = ifelse(SAMPLE_ID %in% immune.meta$SAMPLE_ID,1,0)) %>%
+    mutate(pt_sensitivity_at_reg = ifelse(pt_sensitivity_at_reg == "resistant",1,0)) %>%
+    mutate(isPrimaryPtResisant = ifelse(PATIENT_ID %in% ppr.meta$PATIENT_ID,1,0)) %>%
+    rename("isPtResistant"="pt_sensitivity_at_reg","stage"="tumour_stage_at_diagnosis") %>%
+    mutate(isRelapse = ifelse(group == "relapse",1,0)) %>%
+    mutate(isDiagnosis = ifelse(group == "diagnosis",1,0)) %>%
+    mutate(samples = rep(1,nrow(.))) %>%
+    dplyr::select(-c(group,paired,stage,pre_reg_chemo))
+
+head(combined_table_samples)
 ```
 
-```{r paired_sensitive}
-paired.sensitive.samples <- as.character(patient.meta$SAMPLE_ID[patient.meta$SAMPLE_ID %in% sensitive.samples & patient.meta$paired == TRUE])
+```{r combined_table_patients}
+combined_table_patients <- combined_table_samples %>%
+                    dplyr::select(-c(SAMPLE_ID,isRelapse,isDiagnosis,hasImmune,hasITH,samples)) %>%
+                    distinct() %>%
+                    mutate(patients = rep(1,nrow(.)))
+
+head(combined_table_patients)
 ```
 
-```{r UpsetR}
-SampleLists <- list(Res=resistant.samples,
-                    Sens=sensitive.samples,
-                    Paired_rlps=paired_rlps,
-                    Paired_arx=paired_arx,
-                    Paired_res=paired.resistant.samples,
-                    Paired_sens=paired.sensitive.samples)
-upset(fromList(SampleLists), order.by = "freq")
+```{r column_vects}
+stages <- c("isStage1","isStage2","isStage3","isStage4","isStageNA")
+group <- c("isDiagnosis","isRelapse")
+prior_lines <- c("isPriorlines1","isPriorlines2","isPriorlines3","isPriorlinesge4","isPriorlinesNA")
 ```
+
+### sample dists
+
+```{r UpsetR_paired_samples}
+sampleLists <- combined_table_samples[,c("samples","isPaired")]
+upset(sampleLists, order.by = "freq")
+```
+
+```{r UpsetR_group_samples}
+sampleLists <- combined_table_samples[,c("samples",group)]
+upset(sampleLists, order.by = "freq")
+```
+
+```{r UpsetR_stage_samples}
+sampleLists <- combined_table_samples[,c("samples",stages)]
+upset(sampleLists, order.by = "freq")
+```
+
+```{r UpsetR_prior_samples}
+sampleLists <- combined_table_samples[,c("samples",prior_lines)]
+upset(sampleLists, order.by = "freq")
+```
+
+```{r UpsetR_ptresist_samples}
+sampleLists <- combined_table_samples[,c("samples","isPtResistant","isPrimaryPtResisant")]
+upset(sampleLists, order.by = "freq")
+```
+
+```{r UpsetR_ith_samples}
+sampleLists <- combined_table_samples[,c("samples","hasITH")]
+upset(sampleLists, order.by = "freq")
+```
+
+```{r UpsetR_immune_samples}
+sampleLists <- combined_table_samples[,c("samples","hasImmune")]
+upset(sampleLists, order.by = "freq")
+```
+
+```{r UpsetR_group_paired_samples}
+sampleLists <- combined_table_samples[,c("samples","isPaired",group)]
+upset(sampleLists,order.by = c("freq", "degree"))
+```
+
+```{r UpsetR_stage_paired_samples}
+sampleLists <- combined_table_samples[,c("samples","isPaired",stages)]
+upset(sampleLists, order.by = c("freq", "degree"))
+```
+
+```{r UpsetR_prior_paired_samples}
+sampleLists <- combined_table_samples[,c("samples","isPaired",prior_lines)]
+upset(sampleLists, order.by = c("freq", "degree"))
+```
+
+```{r UpsetR_ptresist_paired_samples}
+sampleLists <- combined_table_samples[,c("samples","isPaired","isPtResistant","isPrimaryPtResisant")]
+upset(sampleLists,order.by = c("freq", "degree"))
+```
+
+```{r UpsetR_ith_paired_samples}
+sampleLists <- combined_table_samples[,c("samples","isPaired","hasITH")]
+upset(sampleLists, order.by = c("freq", "degree"))
+```
+
+```{r UpsetR_immune_paired_samples}
+sampleLists <- combined_table_samples[,c("samples","isPaired","hasImmune")]
+upset(sampleLists, order.by = c("freq", "degree"))
+```
+
+### patient dists
+
+```{r UpsetR_paired_patients}
+patientLists <- combined_table_patients[,c("patients","isPaired")]
+upset(patientLists, order.by = "freq")
+```
+
+```{r UpsetR_stage_patient}
+sampleLists <- combined_table_patients[,c("patients",stages)]
+upset(sampleLists, order.by = "freq")
+```
+
+```{r UpsetR_prior_patient}
+sampleLists <- combined_table_patients[,c("patients",prior_lines)]
+upset(sampleLists, order.by = "freq")
+```
+
+```{r UpsetR_ptresist_patient}
+sampleLists <- combined_table_patients[,c("patients","isPtResistant")]
+upset(sampleLists, order.by = "freq")
+```
+
+```{r UpsetR_primaryptresist_patient}
+sampleLists <- combined_table_patients[,c("patients","isPrimaryPtResisant")]
+upset(sampleLists, order.by = "freq")
+```
+
+```{r UpsetR_stage_paired_patient}
+sampleLists <- combined_table_patients[,c("patients","isPaired",stages)]
+upset(sampleLists, order.by = c("freq","degree"))
+```
+
+```{r UpsetR_prior_paired_patient}
+sampleLists <- combined_table_patients[,c("patients","isPaired",prior_lines)]
+upset(sampleLists, order.by = c("freq","degree"))
+```
+
+```{r UpsetR_ptresist_paired_patient}
+sampleLists <- combined_table_patients[,c("patients","isPaired","isPtResistant")]
+upset(sampleLists, order.by = c("freq","degree"))
+```
+
+```{r UpsetR_primaryptresist_paired_patient}
+sampleLists <- combined_table_patients[,c("patients","isPaired","isPrimaryPtResisant")]
+upset(sampleLists, order.by = c("freq","degree"))
+```
+### tables
+
+```{r writetables}
+write.table(x = combined_table_samples,
+            file = "sample_lists/sample_stratification_numbers.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+
+write.table(x = combined_table_patients,
+            file = "sample_lists/patient_stratification_numbers.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
+```{r sessioninfo}
+sessionInfo()
+```
+
+#### END

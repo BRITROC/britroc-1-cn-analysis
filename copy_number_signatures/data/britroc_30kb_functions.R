@@ -635,11 +635,11 @@ sig_box_plot <- function(sig_quants = NULL,test="t.test",plot_title = NULL,paire
         geom_jitter(aes(x = Signature,y = value,color=group),
                     alpha=0.3,position = position_jitterdodge(jitter.width = 0.2)) +
         geom_boxplot(aes(x = Signature,y = value,fill=group),outlier.colour = NA) +
-        # geom_signif(aes(x = Signature,y = value),
-        #             annotations = ifelse(test.p < 0.01,formatC(test.p,format = "e",digits = 2),signif(test.p,digits = 2)),
-        #                                  xmin = seq.int(0.5,6.5,1)+0.2,
-        #                                  xmax = seq.int(1.5,7.5,1)-0.2,
-        #                                  y_position = 0.9) +
+        geom_signif(aes(x = Signature,y = value),
+                    annotations = ifelse(test.p < 0.01,formatC(test.p,format = "e",digits = 2),signif(test.p,digits = 2)),
+                                         xmin = seq.int(0.5,6.5,1)+0.2,
+                                         xmax = seq.int(1.5,7.5,1)-0.2,
+                                         y_position = 0.9,vjust = 1.4) +
         labs(title = plot_title) +
         scale_y_continuous(name = "Exposure",limits = c(0,1)) +
         scale_fill_manual(values = colour_palettes$diagnosis_relapse) +

@@ -1,0 +1,1391 @@
+---
+title: "Analysis of absolute CNAs - BriTROC 30kb - HRD & BRCA anaylsis"
+author: "Philip Smith"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Load libraries
+
+```{r load_libraries}
+# Load libraries
+suppressPackageStartupMessages(suppressWarnings(library(tidyverse)))
+suppressPackageStartupMessages(suppressWarnings(library(kableExtra)))
+suppressPackageStartupMessages(suppressWarnings(library(biomaRt)))
+suppressPackageStartupMessages(suppressWarnings(library(Biobase)))
+suppressPackageStartupMessages(suppressWarnings(library(QDNAseqmod)))
+suppressPackageStartupMessages(suppressWarnings(library(cowplot)))
+suppressPackageStartupMessages(suppressWarnings(library(ggsignif)))
+#suppressPackageStartupMessages(suppressWarnings(library(topGO)))
+#suppressPackageStartupMessages(suppressWarnings(library(org.Hs.eg.db)))
+```
+
+### source funcs
+
+```{r functions}
+source("data/focal_cna_analysis_funcs.R")
+source("../../copy_number_signatures/data/britroc_30kb_functions.R")
+source("../../colour_palettes.R")
+```
+
+### Load data
+#### Load metadata
+
+```{r meta.data}
+# Load abs cn meta data and add arx/rlps annotation based on sample name prefix
+load("../../copy_number_signatures/britroc_30kb_signature_data.Rdata")
+# Factor of samples in patient order for exposure plots etc
+patient_sorted_samples <- factor(patient.meta$SAMPLE_ID[order(patient.meta$PATIENT_ID)],
+                                 levels = unique(patient.meta$SAMPLE_ID[order(patient.meta$PATIENT_ID)]))
+patient.data <- read.table("../../britroc_cohort_patient_data.tsv",header = TRUE,sep = "\t")
+
+focal_genes_table <- read.table("data/focal_CNA_pseudo_bed.txt",header = T,sep = "\t")
+
+patient.meta <- patient.meta %>%
+                  mutate(group = case_when(group == "arx" ~ "diagnosis",
+                                           group == "rlps" ~ "relapse"))
+meta.data <- patient.meta
+```
+
+#### Assign BRCA status
+
+```{r brca_status}
+## load variant data
+germlineBRCA <- read.table("data/BriTROC-1_germline_variants.tsv",header = T,sep = "\t")
+
+germlineBRCA <- germlineBRCA %>%
+                    filter(variant_type != "missense",
+                           final_call_set == TRUE,
+                           gene_symbol %in% c("BRCA1","BRCA2")) %>%
+                    dplyr::select(fk_britroc_number,gene_symbol) %>%
+                    mutate(fk_britroc_number = paste0("BRITROC-",fk_britroc_number)) %>%
+                    mutate(origin = rep("germline",times=nrow(.))) %>%
+                    rename("PATIENT_ID"="fk_britroc_number")
+                    
+somaticBRCA <- read.table("data/BriTROC-1_matched_and_unpaired_somatic_variants.tsv",header = T,sep = "\t")
+
+somaticBRCA <- somaticBRCA %>%
+                    filter(Consequence != "missense",
+                           SYMBOL %in% c("BRCA1","BRCA2")) %>%
+                    dplyr::select(patient_id,SYMBOL) %>%
+                    mutate(patient_id = paste0("BRITROC-",patient_id)) %>%
+                    mutate(origin = rep("somatic",times=nrow(.))) %>%
+                    rename("PATIENT_ID"="patient_id",
+                           "gene_symbol"="SYMBOL")
+
+combinedBRCA <- rbind(germlineBRCA,somaticBRCA) %>%
+                    group_by(PATIENT_ID) %>%
+                    mutate(BRCA1 = ifelse(gene_symbol == "BRCA1",TRUE,NA)) %>%
+                    mutate(BRCA2 = ifelse(gene_symbol == "BRCA2",TRUE,NA)) %>%
+                    mutate(germline = ifelse(origin == "germline",TRUE,NA)) %>%
+                    mutate(somatic = ifelse(origin == "somatic",TRUE,NA))  %>%
+                    dplyr::select(-gene_symbol,-origin) %>%
+                    summarise_all(~paste0(unique(na.omit(.)),collapse = "")) %>%
+                    mutate(across(everything(), ~ifelse(.=="", FALSE, as.character(.)))) %>%
+                    mutate(BRCA_carrier = rep(TRUE,times=nrow(.)))
+    
+write.table(combinedBRCA[c(1,ncol(combinedBRCA))],"../../britroc_brca_patients_list.tsv",
+            quote = F,sep = "\t",row.names = FALSE,col.names = TRUE)
+head(combinedBRCA)
+```
+#### Get biomart data
+
+```{r biomart}
+if(file.exists("data/protein_coding_genes.tsv")){
+	protein_coding_genes <- read.table("data/protein_coding_genes.tsv",header=T,sep="\t")
+} else {
+	ensembl <- useEnsembl(biomart = "ENSEMBL_MART_ENSEMBL", dataset = "hsapiens_gene_ensembl",GRCh = 37)
+	protein_coding_genes <- getBM(attributes = c("chromosome_name","start_position","end_position","hgnc_symbol"),
+                                             filters = "biotype",
+                                             values = "protein_coding",
+                                             mart = ensembl,
+                                             useCache = FALSE)
+	protein_coding_genes <- protein_coding_genes[protein_coding_genes$chromosome_name %in% seq.int(1,22,1),]
+	protein_coding_genes <- protein_coding_genes[protein_coding_genes$hgnc_symbol != "",]
+	write.table(protein_coding_genes,"data/protein_coding_genes.tsv",col.names=T,row.names=F,sep="\t")
+}
+protein_coding_genes$chromosome_name <- as.numeric(protein_coding_genes$chromosome_name)
+protein_coding_genes <- protein_coding_genes[order(protein_coding_genes$chromosome_name,protein_coding_genes$start_position),]
+```
+
+#### Load cn data
+
+```{r cn_data}
+abs_data <- readRDS("../../absolute_POST_down_sampling/britroc_30kb_ds_absCopyNumber.rds")
+extracted <- readRDS("data/extracted_output.RDS")
+cna_calls <- readRDS("data/cna_calls_output.RDS")
+```
+
+#### Load signature data
+
+```{r signatures}
+t.sig_quants <- t(sig_quants)
+sample_order <- rownames(t.sig_quants[order(t.sig_quants[,1],t.sig_quants[,2],t.sig_quants[,3],
+                                            t.sig_quants[,4],t.sig_quants[,5],t.sig_quants[,6],decreasing = T),])
+```
+
+```{r signature_long}
+sig_bar <- as.data.frame(sig_quants) %>%
+  rownames_to_column(var = "signature") %>%
+  tidyr::pivot_longer(cols = -1, names_to = "SAMPLE_ID") %>%
+  left_join(y = patient.meta,by = "SAMPLE_ID") %>%
+  #filter(paired == TRUE) %>%
+  dplyr::select(-c(ploidy,purity,TP53cn,expected_TP53_AF,TP53freq,use,notes,paired))
+
+sig_bar$SAMPLE_ID <- factor(sig_bar$SAMPLE_ID,levels = sample_order)
+
+sig_bar$BRCA_carrier <- ifelse(sig_bar$PATIENT_ID %in% combinedBRCA$PATIENT_ID,"BRCA","non-BRCA")
+
+head(sig_bar)
+```
+
+#### CNA rate
+
+```{r cna_rate}
+patient.meta$BRCA_carrier <- factor(ifelse(patient.meta$PATIENT_ID %in% combinedBRCA$PATIENT_ID,
+                                           "BRCA","non-BRCA"),levels = c("BRCA","non-BRCA"))
+brca_samples <- split(patient.meta,f = list(patient.meta$BRCA_carrier,patient.meta$group))
+
+brca_rates <- do.call(rbind,lapply(brca_samples,FUN = function(x){
+  brca <- patient.meta$BRCA_carrier[patient.meta$SAMPLE_ID == x$SAMPLE_ID[1]]
+  group <- patient.meta$group[patient.meta$SAMPLE_ID == x$SAMPLE_ID[1]]
+  #print(pt)
+  samples <- x$SAMPLE_ID
+  if(length(samples)>1){
+    cnas <- get_cna_rates(data = cna_calls[,colnames(cna_calls) %in% samples],
+                        genes = focal_genes_table$Gene.name)
+  } else {
+    next()
+  }
+  cnas$BRCA_carrier <- rep(as.character(brca),times=nrow(cnas))
+  cnas$tumour <- rep(as.character(group),times=nrow(cnas))
+  return(cnas)
+}))
+
+brca_rates$BRCA_carrier <- factor(brca_rates$BRCA_carrier,
+                                  levels = c("BRCA","non-BRCA"))
+```
+
+```{r cna_rate_brca_non_brca_1}
+fishers_gene_CNA(data = cna_calls,
+                     sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA"],
+                     sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA"],
+                     genes = focal_genes_table$Gene.name)
+```
+
+```{r cna_rate_brca_non_brca_2}
+fishers_gene_CNA(data = cna_calls,
+                     sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
+                                                         patient.meta$BRCA_carrier == "BRCA"],
+                     sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
+                                                         patient.meta$BRCA_carrier == "non-BRCA"],
+                     genes = focal_genes_table$Gene.name)
+```
+
+```{r cna_rate_brca_non_brca_3}
+fishers_gene_CNA(data = cna_calls,
+                     sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
+                                                         patient.meta$BRCA_carrier == "BRCA"],
+                     sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
+                                                         patient.meta$BRCA_carrier == "non-BRCA"],
+                     genes = focal_genes_table$Gene.name)
+```
+
+```{r cna_rate_brca_non_brca_4}
+fishers_gene_CNA(data = cna_calls,
+                     sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
+                                                         patient.meta$BRCA_carrier == "BRCA"],
+                     sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
+                                                         patient.meta$BRCA_carrier == "BRCA"],
+                     genes = focal_genes_table$Gene.name)
+```
+
+```{r cna_rate_brca_non_brca_5}
+fishers_gene_CNA(data = cna_calls,
+                     sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
+                                                         patient.meta$BRCA_carrier == "non-BRCA"],
+                     sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
+                                                         patient.meta$BRCA_carrier == "non-BRCA"],
+                     genes = focal_genes_table$Gene.name)
+```
+
+```{r cna_rate_plots}
+brca_cna_rates_plot <- ggplot(brca_rates) +
+  geom_col(aes(x = gene,y = rate,fill=BRCA_carrier),position = "dodge") +
+  scale_fill_manual(values = colour_palettes$brca_carriers) +
+  ylab(label = "rate (%)") +
+  facet_wrap(. ~ group,nrow=2,scales = "free_x") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90),
+        legend.position = "none")
+
+brca_cna_rates_diag_plot <- ggplot(brca_rates[brca_rates$tumour == "diagnosis",]) +
+  geom_col(aes(x = gene,y = rate,fill=BRCA_carrier),position = "dodge") +
+  scale_fill_manual(values = colour_palettes$brca_carriers) +
+  ylab(label = "rate (%)") +
+  facet_wrap(. ~ group,nrow=1,scales = "free_x") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90),
+        legend.position = "none")
+
+brca_cna_rates_relapse_plot <- ggplot(brca_rates[brca_rates$tumour == "relapse",]) +
+  geom_col(aes(x = gene,y = rate,fill=BRCA_carrier),position = "dodge") +
+  scale_fill_manual(values = colour_palettes$brca_carriers) +
+  ylab(label = "rate (%)") +
+  facet_wrap(. ~ group,nrow=1,scales = "free_x") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90),
+        legend.position = "none")
+
+brca_cna_rates_legend <- get_legend(
+    brca_cna_rates_plot + 
+        guides(fill = guide_legend(nrow = 1,title = "BRCA status")) +
+        theme(legend.position = "bottom")
+)
+
+# ggplot(brca_rates[brca_rates$group == "amplification",]) +
+#   geom_col(aes(x = BRCA_carrier,y = rate,fill=BRCA_carrier),position = "dodge") +
+#   scale_fill_manual(values = colour_palettes$brca_carriers) +
+#   ylab(label = "rate (%)") +
+#   facet_wrap(tumour ~ gene) +
+#   theme_bw() +
+#   theme(axis.title.x = element_blank(),
+#         axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90))
+# 
+# ggplot(brca_rates[brca_rates$group == "deletion",]) +
+#   geom_col(aes(x = BRCA_carrier,y = rate,fill=BRCA_carrier),position = "dodge") +
+#   scale_fill_manual(values = colour_palettes$brca_carriers) +
+#   ylab(label = "rate (%)") +
+#   facet_wrap(tumour ~ gene) +
+#   theme_bw() +
+#   theme(axis.title.x = element_blank(),
+#         axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90))
+
+
+brca_cna_rates_plot_comb <- plot_grid(brca_cna_rates_plot,
+          plot_grid(brca_cna_rates_diag_plot,
+                    brca_cna_rates_relapse_plot,ncol = 2,labels = c("B","C")),
+          brca_cna_rates_legend,labels = c("A","",""),
+          nrow = 3,
+          rel_heights = c(0.6,0.3,0.1))
+
+ggsave(plot = brca_cna_rates_plot_comb,filename = "plots/brca_cna_rates_plot_comb.png",width = 6,height = 8,units = "in",dpi = 300)
+ggsave(plot = brca_cna_rates_plot_comb,filename = "plots/brca_cna_rates_plot_comb.pdf",width = 6,height = 8)
+brca_cna_rates_plot_comb
+```
+
+#### CNA copies
+
+```{r copies_brca_non_brca_1}
+cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA"],
+                         p.adj = "fdr")
+```
+
+```{r copies_brca_non_brca_2}
+cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$group == "diagnosis"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$group == "diagnosis"],
+                         p.adj = "fdr")
+```
+
+```{r copies_brca_non_brca_3}
+cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$group == "relapse"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$group == "relapse"],
+                         p.adj = "fdr")
+```
+
+```{r copies_brca_non_brca_4}
+cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$group == "diagnosis"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$group == "relapse"],
+                         p.adj = "fdr")
+```
+
+```{r copies_brca_non_brca_5}
+cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$group == "diagnosis"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$group == "relapse"],
+                         p.adj = "fdr")
+```
+
+```{r cna_copies}
+amp_changes_all <- get_patient_changes(data = extracted,
+                                              genes = protein_coding_genes$hgnc_symbol,
+                                              patients = unique(patient.meta$PATIENT_ID)) %>%
+                                            mutate(BRCA_carrier = ifelse(PATIENT_ID %in% combinedBRCA$PATIENT_ID,
+                                           "BRCA","non-BRCA"))
+
+amp_changes_all$BRCA_carrier <- factor(amp_changes_all$BRCA_carrier,
+                                              levels = c("BRCA","non-BRCA"))
+
+amp_changes <- amp_changes_all %>%
+                        filter(gene %in% focal_genes_table$Gene.name)
+head(amp_changes)
+```
+
+```{r cna_copies_plots}
+ggplot(amp_changes) +
+    geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),position = position_dodge2(width = 0.4)) +
+    geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),alpha=0.3,position = "dodge") +
+    scale_fill_manual(values = colour_palettes$brca_carriers) +
+    scale_colour_manual(values = colour_palettes$brca_carriers) +
+    geom_signif(aes(x = BRCA_carrier,y = value),comparison=list(c("BRCA","non-BRCA")),
+               test = "wilcox.test",vjust = 1.5) +
+    facet_wrap(. ~ gene,scales = "free_y",ncol = 3) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+ggplot(amp_changes) +
+    geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),position = position_dodge2(width = 0.4)) +
+    geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),alpha=0.3,position = "dodge") +
+    scale_fill_manual(values = colour_palettes$brca_carriers) +
+    scale_colour_manual(values = colour_palettes$brca_carriers) +
+    geom_signif(aes(x = BRCA_carrier,y = value),comparison=list(c("BRCA","non-BRCA")),
+               test = "wilcox.test",vjust = 1.5) +
+    facet_wrap(group ~ gene,scales = "free_y",ncol = 3) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+```
+
+#### Signatures
+
+```{r sig_plot}
+brca_sig_bar_plot <- ggplot(sig_bar) +
+  geom_col(aes(SAMPLE_ID,value,fill=signature)) +
+  facet_wrap(. ~ BRCA_carrier,nrow =2,scales = "free_x") +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_fill_manual(values = cbPalette) +
+  ylab("exposure") +
+  xlab("sample") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position = "none") +
+  guides(fill = guide_legend(nrow = 1))
+
+brca_sig_bar_diagnosis_plot <- ggplot(sig_bar[sig_bar$group == "diagnosis",]) +
+  geom_col(aes(SAMPLE_ID,value,fill=signature)) +
+  facet_wrap(. ~ BRCA_carrier,nrow = 1,scales = "free_x") +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_fill_manual(values = cbPalette) +
+  ylab("exposure") +
+  xlab("sample") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position = "none") +
+  guides(fill = guide_legend(nrow = 1))
+
+brca_sig_bar_relapse_plot <- ggplot(sig_bar[sig_bar$group == "relapse",]) +
+  geom_col(aes(SAMPLE_ID,value,fill=signature)) +
+  facet_wrap(. ~ BRCA_carrier,nrow = 1,scales = "free_x") +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_fill_manual(values = cbPalette) +
+  ylab("exposure") +
+  xlab("sample") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position = "none") +
+  guides(fill = guide_legend(nrow = 1))
+
+brca_sig_bar_diagnosis_plot
+brca_sig_bar_relapse_plot
+```
+
+```{r brca_sig_status}
+brca_sig_dist_plot <- ggplot(data = sig_bar) +
+    geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),
+               position = position_dodge2(width = 0.4)) +
+    geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
+                alpha=0.3,position = "dodge") +
+    geom_signif(aes(x = BRCA_carrier,y = value),
+                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                vjust = 1.8) +
+    scale_fill_manual(values = colour_palettes$brca_carriers) +
+    scale_colour_manual(values = colour_palettes$brca_carriers) +
+    ylab("exposure") +
+    facet_wrap(. ~ signature,nrow = 1) +
+    theme_bw() +
+    theme(legend.position = "bottom",
+          axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.title.x = element_blank())
+
+brca_sig_dist_diagnosis_plot <- ggplot(data = sig_bar[sig_bar$group == "diagnosis",]) +
+    geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),
+               position = position_dodge2(width = 0.4)) +
+    geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
+                alpha=0.3,position = "dodge") +
+    geom_signif(aes(x = BRCA_carrier,y = value),
+                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                vjust = 1.8) +
+    scale_fill_manual(values = colour_palettes$brca_carriers) +
+    scale_colour_manual(values = colour_palettes$brca_carriers) +
+    ylab("exposure") +
+    facet_wrap(. ~ signature,nrow = 1) +
+    theme_bw() +
+    theme(legend.position = "none",
+          axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.title.x = element_blank())
+
+brca_sig_dist_relapse_plot <- ggplot(data = sig_bar[sig_bar$group == "relapse",]) +
+    geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),
+               position = position_dodge2(width = 0.4)) +
+    geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
+                alpha=0.3,position = "dodge") +
+    geom_signif(aes(x = BRCA_carrier,y = value),
+                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                vjust = 1.8) +
+    scale_fill_manual(values = colour_palettes$brca_carriers) +
+    scale_colour_manual(values = colour_palettes$brca_carriers) +
+    ylab("exposure") +
+    facet_wrap(. ~ signature,nrow = 1) +
+    theme_bw() +
+    theme(legend.position = "none",
+          axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.title.x = element_blank())
+
+brca_sig_dist_grouped_plot <- ggplot(data = sig_bar) +
+    geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),
+               position = position_dodge2(width = 0.4)) +
+    geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
+                alpha=0.3,position = "dodge") +
+    geom_signif(aes(x = BRCA_carrier,y = value),
+                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                vjust = 1.3) +
+    scale_fill_manual(values = colour_palettes$brca_carriers) +
+    scale_colour_manual(values = colour_palettes$brca_carriers) +
+    ylab("exposure") +
+    facet_wrap(group ~ signature,nrow = 2) +
+    theme_bw() +
+    theme(legend.position = "none",
+          axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.title.x = element_blank())
+
+brca_sig_dist_brca_carrier_plot <- ggplot(data = sig_bar) +
+    geom_point(aes(x = group,y = value,color=group),
+               position = position_dodge2(width = 0.4)) +
+    geom_violin(aes(x = group,y = value,fill=group),
+                alpha=0.3,position = "dodge") +
+    geom_signif(aes(x = group,y = value),
+                test = "wilcox.test",comparisons = list(c("diagnosis","relapse")),
+                vjust = 1.3) +
+    scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+    scale_colour_manual(values = colour_palettes$diagnosis_relapse) +
+    ylab("exposure") +
+    facet_wrap(BRCA_carrier ~ signature,nrow = 2) +
+    theme_bw() +
+    theme(legend.position = "none",
+          axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.title.x = element_blank())
+
+brca_sig_dist_brca_carrier_plot
+brca_sig_dist_grouped_plot
+```
+
+#### sig 1
+
+```{r sig 1}
+brca_sig_1_dist_plot <- ggplot(sig_bar[sig_bar$signature == "s1",]) +
+    geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),
+               position = position_dodge2(width = 0.4)) +
+    geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
+                alpha=0.3,position = "dodge") +
+    geom_signif(aes(x = BRCA_carrier,y = value),
+                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                vjust = 1.5) +
+    scale_fill_manual(values = colour_palettes$brca_carriers) +
+    scale_colour_manual(values = colour_palettes$brca_carriers) +
+    ylab("exposure") +
+    theme_bw() +
+    theme(legend.position = "none",
+          axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.title.x = element_blank())
+brca_sig_1_dist_plot
+```
+
+```{r comb_sigs}
+brca_sig_bar_leg <- get_legend(
+    brca_sig_bar_plot + 
+        guides(fill = guide_legend(nrow = 1,title = "signature")) +
+        theme(legend.position = "bottom")
+)
+
+brca_diag_relapse_leg <- get_legend(
+    brca_sig_dist_brca_carrier_plot + 
+        guides(fill = guide_legend(nrow = 1,title = "group")) +
+        theme(legend.position = "bottom")
+)
+
+brca_sig_comb_plot <- plot_grid(brca_sig_bar_plot,
+          brca_sig_dist_brca_carrier_plot,
+          plot_grid(brca_sig_dist_grouped_plot,
+                    labels = c("C")),
+          plot_grid(brca_sig_bar_leg,plot_grid(brca_diag_relapse_leg,brca_cna_rates_legend),nrow = 2),
+          labels = c("A","B","",""),
+          nrow = 4,
+          rel_heights = c(0.3,0.32,0.3,0.08))
+
+ggsave(plot = brca_sig_comb_plot,filename = "plots/brca_sig_comb_plot.png",width = 6,height = 8,units = "in",dpi = 300)
+ggsave(plot = brca_sig_comb_plot,filename = "plots/brca_sig_comb_plot.pdf",width = 6,height = 8)
+brca_sig_comb_plot
+```
+
+#### event progression
+
+```{r segment_changes}
+ploidy_change_pats <- read.table("../broad_analysis/data/ploidy_change_pats.tsv",header = T,sep = "\t")
+ploidy_change_samples <- meta.data$SAMPLE_ID[meta.data$PATIENT_ID %in% ploidy_change_pats$PATIENT_ID]
+cn_data <- Biobase::assayDataElement(abs_data,elt = "segmented")
+cn_segs <- read.table("../../absolute_POST_down_sampling/britroc_30kb_ds_absCopyNumber_segmentTable.tsv",header = T,sep = "\t")
+ploidys <- get_named_ploidy(abs_data)
+
+cn_seg_sub <- do.call(rbind,lapply(names(ploidys),FUN = function(x){
+  pl <- ploidys[x]
+  cn_seg_sub <- cn_segs[cn_segs$sample == x,]
+  cn_seg_sub$segVal <- cn_seg_sub$segVal - pl
+  return(cn_seg_sub)
+}))
+
+cn_segs_events <- cn_seg_sub %>%
+  filter(!sample %in% ploidy_change_samples) %>%
+  mutate(direction = ifelse(segVal >= 1,"gain",ifelse(segVal <= -1,"loss","neutral"))) %>%
+  dplyr::select(sample,segVal,direction) %>%
+  count(sample,direction) %>%
+  filter(direction != "neutral") %>%
+  mutate(PATIENT_ID = sig_bar$PATIENT_ID[match(sample,sig_bar$SAMPLE_ID)]) %>%
+  mutate(group = sig_bar$group[match(sample,sig_bar$SAMPLE_ID)]) %>%
+  mutate(BRCA_carrier = sig_bar$BRCA_carrier[match(sample,sig_bar$SAMPLE_ID)])
+
+head(cn_segs_events)
+```
+
+```{r event_plots}
+cn_event_plots <- ggplot(cn_segs_events) +
+  geom_line(aes(group,n),alpha = 0.15) +
+  geom_point(aes(group,n,color=group),alpha = 0.3,
+              position = position_dodge2(width = 0.6)) +
+  geom_violin(aes(group,n,fill=group),alpha=0.5) +
+  geom_signif(aes(x = group,y = n),
+                test = "wilcox.test",comparisons = list(c("diagnosis","relapse")),
+                vjust = 1.3) +
+  xlab("events") +
+  facet_wrap(direction ~ BRCA_carrier) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_colour_manual(values = colour_palettes$diagnosis_relapse) +
+  theme_bw() +
+  theme(legend.position = "none")
+
+cn_event_plots
+```
+
+```{r segs_sigs}
+cn_segs_sigs <- cn_segs_events %>%
+                    left_join(.,sig_bar,c("sample"="SAMPLE_ID","group","BRCA_carrier")) %>%
+                    dplyr::select(-PATIENT_ID.y)
+
+head(cn_segs_sigs)
+```
+
+```{r segs_sigs_plot}
+ggplot(cn_segs_sigs) +
+    geom_point(aes(n,value,colour=direction),alpha=0.3) +
+    geom_smooth(aes(n,value,colour=direction),method = "lm") +
+    facet_wrap(group ~ signature,ncol = 7) +
+    scale_y_continuous(limits = c(0,1)) +
+    scale_colour_manual(values = colour_palettes$amp_del[c(1,3)]) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+```
+
+```{r seg_weighted}
+cn_seg_weighted_pre <- cn_seg_sub %>%
+    filter(!sample %in% ploidy_change_samples) %>%
+    group_by(sample,chromosome) %>%
+    mutate(seg_count = n()) %>%
+    filter(seg_count > 1) %>%
+    ungroup() %>%
+    mutate(seg_len = end - start) %>%
+    mutate(seg_bin = as.factor(ntile(seg_len,n = 5)))
+
+seg_bin_names <- cn_seg_weighted_pre %>%
+    group_by(seg_bin) %>%
+    summarise(across(seg_len,c(min=min,max=max))) %>%
+    mutate(across(c("seg_len_min","seg_len_max"),~ round(.x/1000000,digits = 1))) %>%
+    mutate(bin = paste0(seg_len_min," - ",seg_len_max," Mb")) %>%
+    dplyr::select(seg_bin,bin) %>%
+    deframe()
+    
+cn_seg_weighted <- cn_seg_weighted_pre %>%
+    mutate(direction = ifelse(segVal >= 1,"gain",ifelse(segVal <= -1,"loss","neutral"))) %>%
+    mutate(direction = ifelse(segVal >= 1,"gain",ifelse(segVal <= -1,"loss","neutral"))) %>%
+    # mutate(direction = ifelse(segVal >= 0,"gain","loss")) %>%
+    dplyr::select(sample,segVal,direction,seg_bin) %>%
+    count(sample,direction,seg_bin) %>%
+    filter(direction != "neutral") %>%
+    mutate(PATIENT_ID = sig_bar$PATIENT_ID[match(sample,sig_bar$SAMPLE_ID)]) %>%
+    mutate(group = sig_bar$group[match(sample,sig_bar$SAMPLE_ID)]) %>%
+    mutate(BRCA_carrier = sig_bar$BRCA_carrier[match(sample,sig_bar$SAMPLE_ID)])
+
+head(cn_seg_weighted)
+```
+
+```{r seg_weighted_plot}
+ggplot(cn_seg_weighted) +
+  #geom_line(aes(seg_bin,n),alpha = 0.15) +
+  geom_point(aes(seg_bin,n,color=group),alpha = 0.3,
+              position = position_dodge2(width = 0.6)) +
+  geom_violin(aes(seg_bin,n,fill=group),alpha=0.5) +
+  # geom_signif(aes(x = seg_bin,y = n),
+  #               test = "wilcox.test",comparisons = list(c("diagnosis","relapse")),
+  #               vjust = 1.3) +
+  xlab("events") +
+  facet_wrap(direction ~ BRCA_carrier) +
+  scale_x_discrete(labels = seg_bin_names) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_colour_manual(values = colour_palettes$diagnosis_relapse) +
+  theme_bw() +
+  theme(legend.position = "none",axis.text.x = element_text(size = 6))
+```
+
+```{r paired_seg_events_weighted}
+paired_cn_segs_weighted <- cn_seg_weighted %>%
+  filter(sample %in% meta.data$SAMPLE_ID[meta.data$paired == TRUE]) %>%
+  group_by(group,PATIENT_ID,direction,BRCA_carrier,seg_bin) %>%
+  dplyr::select(-sample) %>%
+  summarise(across(n,median)) %>%
+  pivot_wider(id_cols = c("PATIENT_ID","direction","BRCA_carrier","seg_bin"),names_from = group,values_from = n) %>%
+  mutate(change = relapse - diagnosis) %>%
+  dplyr::select(PATIENT_ID,BRCA_carrier,direction,seg_bin,change)
+
+head(paired_cn_segs_weighted)
+```
+
+```{r paired_seg_events_weighted_plot}
+ggplot(paired_cn_segs_weighted) +
+  geom_point(aes(BRCA_carrier,change,color=BRCA_carrier),alpha = 0.3,
+              position = position_dodge2(width = 0.6)) +
+  geom_violin(aes(BRCA_carrier,change,fill=BRCA_carrier),alpha=0.5) +
+  geom_signif(aes(x = BRCA_carrier,y = change),
+                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                vjust = 1.3) +
+  xlab("events") +
+  facet_wrap(direction ~ seg_bin,ncol = 5) +
+  scale_fill_manual(values = colour_palettes$brca_carriers) +
+  scale_colour_manual(values = colour_palettes$brca_carriers) +
+  theme_bw() +
+  theme(legend.position = "none")
+    
+```
+
+```{r segs_sigs_weighted}
+cn_segs_sigs_weighted <- cn_seg_weighted %>%
+                    left_join(.,sig_bar,c("sample"="SAMPLE_ID","group","BRCA_carrier")) %>%
+                    dplyr::select(-PATIENT_ID.y)
+
+head(cn_segs_sigs_weighted)
+```
+
+```{r segs_sigs_weighted_plot}
+ggplot(cn_segs_sigs_weighted) +
+    geom_point(aes(n,value,colour=group),alpha=0.3) +
+    geom_smooth(aes(n,value,colour=group),method = "lm") +
+    facet_wrap(seg_bin ~ signature,ncol = 7,scales = "free_x") +
+    scale_y_continuous(limits = c(0,1)) +
+    scale_colour_manual(values = colour_palettes$diagnosis_relapse) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+```
+
+### paired implementation
+#### CNA rate (paired)
+
+```{r cna_rate_paired}
+patient.meta$BRCA_carrier <- factor(ifelse(patient.meta$PATIENT_ID %in% combinedBRCA$PATIENT_ID,
+                                           "BRCA","non-BRCA"),levels = c("BRCA","non-BRCA"))
+brca_samples_paired <- split(patient.meta[patient.meta$paired == "TRUE",],
+                      f = list(patient.meta$BRCA_carrier[patient.meta$paired == "TRUE"],patient.meta$group[patient.meta$paired == "TRUE"]))
+
+brca_rates_paired <- do.call(rbind,lapply(brca_samples_paired,FUN = function(x){
+  brca <- patient.meta$BRCA_carrier[patient.meta$SAMPLE_ID == x$SAMPLE_ID[1]]
+  group <- patient.meta$group[patient.meta$SAMPLE_ID == x$SAMPLE_ID[1]]
+  #print(pt)
+  samples <- x$SAMPLE_ID
+  if(length(samples)>1){
+    cnas <- get_cna_rates(data = cna_calls[,colnames(cna_calls) %in% samples],
+                        genes = focal_genes_table$Gene.name)
+  } else {
+    next()
+  }
+  cnas$BRCA_carrier <- rep(as.character(brca),times=nrow(cnas))
+  cnas$tumour <- rep(as.character(group),times=nrow(cnas))
+  return(cnas)
+}))
+
+brca_rates_paired$BRCA_carrier <- factor(brca_rates_paired$BRCA_carrier,
+                                  levels = c("BRCA","non-BRCA"))
+head(brca_rates_paired)
+```
+
+```{r cna_rate_brca_non_brca_1_paired}
+fishers_gene_CNA(data = cna_calls,
+                     sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$paired == "TRUE"],
+                     sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$paired == "TRUE"],
+                     genes = focal_genes_table$Gene.name)
+```
+
+```{r cna_rate_brca_non_brca_2_paired}
+fishers_gene_CNA(data = cna_calls,
+                     sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
+                                                         patient.meta$BRCA_carrier == "BRCA" & patient.meta$paired == "TRUE"],
+                     sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
+                                                         patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$paired == "TRUE"],
+                     genes = focal_genes_table$Gene.name)
+```
+
+```{r cna_rate_brca_non_brca_3_paired}
+fishers_gene_CNA(data = cna_calls,
+                     sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
+                                                         patient.meta$BRCA_carrier == "BRCA" & patient.meta$paired == "TRUE"],
+                     sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
+                                                         patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$paired == "TRUE"],
+                     genes = focal_genes_table$Gene.name)
+```
+
+```{r cna_rate_brca_non_brca_4_paired}
+fishers_gene_CNA(data = cna_calls,
+                     sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
+                                                         patient.meta$BRCA_carrier == "BRCA" & patient.meta$paired == "TRUE"],
+                     sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
+                                                         patient.meta$BRCA_carrier == "BRCA" & patient.meta$paired == "TRUE"],
+                     genes = focal_genes_table$Gene.name)
+```
+
+```{r cna_rate_brca_non_brca_paired_5}
+fishers_gene_CNA(data = cna_calls,
+                     sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
+                                                         patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$paired == "TRUE"],
+                     sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
+                                                         patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$paired == "TRUE"],
+                     genes = focal_genes_table$Gene.name)
+```
+
+```{r cna_rate_paired_plots}
+brca_diag_rlps_cna_rates_paired_plot <- ggplot(brca_rates_paired[brca_rates_paired$group == "amplification",]) +
+  geom_col(aes(x = gene,y = rate,fill=tumour),position = "dodge") +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  ylab(label = "rate (%)") +
+  facet_grid(cols = vars(BRCA_carrier),scales = "free_x") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90),
+        legend.position = "none")
+
+brca_cna_rates_paired_plot <- ggplot(brca_rates_paired) +
+  geom_col(aes(x = gene,y = rate,fill=BRCA_carrier),position = "dodge") +
+  scale_fill_manual(values = colour_palettes$brca_carriers) +
+  ylab(label = "rate (%)") +
+  facet_wrap(. ~ group,ncol=2,scales = "free_x") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90),
+        legend.position = "none")
+
+brca_cna_rates_paired_diag_plot <- ggplot(brca_rates_paired[brca_rates_paired$tumour == "diagnosis",]) +
+  geom_col(aes(x = gene,y = rate,fill=BRCA_carrier),position = "dodge") +
+  scale_fill_manual(values = colour_palettes$brca_carriers) +
+  ylab(label = "rate (%)") +
+  facet_wrap(. ~ group,nrow=1,scales = "free_x") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90),
+        legend.position = "none")
+
+brca_cna_rates_paired_relapse_plot <- ggplot(brca_rates_paired[brca_rates_paired$tumour == "relapse",]) +
+  geom_col(aes(x = gene,y = rate,fill=BRCA_carrier),position = "dodge") +
+  scale_fill_manual(values = colour_palettes$brca_carriers) +
+  ylab(label = "rate (%)") +
+  facet_wrap(. ~ group,nrow=1,scales = "free_x") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(vjust = 0.5,hjust = 1,angle = 90),
+        legend.position = "none")
+
+brca_cna_rates_paired_legend <- get_legend(
+    brca_cna_rates_plot + 
+        guides(fill = guide_legend(nrow = 1,title = "BRCA status")) +
+        theme(legend.position = "bottom")
+)
+
+
+brca_cna_rates_paired_plot_comb <- plot_grid(brca_diag_rlps_cna_rates_paired_plot,
+                                             brca_cna_rates_paired_plot,
+          plot_grid(brca_cna_rates_paired_diag_plot,
+                    brca_cna_rates_paired_relapse_plot,ncol = 2,labels = c("B","C")),
+          brca_cna_rates_paired_legend,labels = c("A","B","",""),
+          nrow = 4,
+          rel_heights = c(0.6,0.3,0.1))
+
+ggsave(plot = brca_cna_rates_paired_plot,
+       filename = "plots/brca_cna_rates_paired_plot.png",width = 6,height = 8,units = "in",dpi = 300)
+ggsave(plot = brca_cna_rates_paired_plot_comb,
+       filename = "plots/brca_cna_rates_paired_plot.pdf",width = 6,height = 8)
+saveRDS(object = brca_cna_rates_paired_plot,file = "plots/brca_cna_rates_paired_plot.rds")
+brca_cna_rates_paired_plot
+
+ggsave(plot = brca_cna_rates_paired_plot_comb,
+       filename = "plots/brca_diag_rlps_cna_rates_paired_plot.png",width = 6,height = 8,units = "in",dpi = 300)
+ggsave(plot = brca_cna_rates_paired_plot_comb,
+       filename = "plots/brca_diag_rlps_cna_rates_paired_plot.pdf",width = 6,height = 8)
+saveRDS(object = brca_diag_rlps_cna_rates_paired_plot,file = "plots/brca_diag_rlps_cna_rates_paired_plot.rds")
+brca_diag_rlps_cna_rates_paired_plot
+```
+
+#### CNA copies
+
+```{r copies_brca_non_brca_paired_1}
+cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$paired == "TRUE"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$paired == "TRUE"],
+                         p.adj = "fdr")
+```
+
+```{r copies_brca_non_brca_paired_2}
+cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$group == "diagnosis" & patient.meta$paired == "TRUE"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$group == "diagnosis" & patient.meta$paired == "TRUE"],
+                         p.adj = "fdr")
+```
+
+```{r copies_brca_non_brca_paired_3}
+cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$group == "relapse" & patient.meta$paired == "TRUE"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$group == "relapse" & patient.meta$paired == "TRUE"],
+                         p.adj = "fdr")
+```
+
+```{r copies_brca_non_brca_paired_4}
+cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$group == "diagnosis" & patient.meta$paired == "TRUE"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$group == "relapse" & patient.meta$paired == "TRUE"],
+                         p.adj = "fdr")
+```
+
+```{r copies_brca_non_brca_paired_5}
+cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$group == "diagnosis" & patient.meta$paired == "TRUE"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$group == "relapse" & patient.meta$paired == "TRUE"],
+                         p.adj = "fdr")
+```
+
+#### Paired copies
+
+```{r cna_copies_paired}
+paired_amp_changes_all <- get_patient_changes(data = extracted,
+                                              genes = protein_coding_genes$hgnc_symbol,
+                                              patients = unique(patient.meta$PATIENT_ID[patient.meta$paired == TRUE])) %>%
+                                            mutate(BRCA_carrier = ifelse(PATIENT_ID %in% combinedBRCA$PATIENT_ID,
+                                           "BRCA","non-BRCA"))
+
+paired_amp_changes_all$BRCA_carrier <- factor(paired_amp_changes_all$BRCA_carrier,
+                                              levels = c("BRCA","non-BRCA"))
+
+paired_amp_changes <- paired_amp_changes_all %>%
+                        filter(gene %in% focal_genes_table$Gene.name)
+head(paired_amp_changes)
+```
+
+```{r cna_copies_plots_paired}
+sigAnn <- cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$paired == "TRUE"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$paired == "TRUE"],
+                         p.adj = "fdr") %>%
+    arrange(Gene) %>%
+    mutate(xmin = rep(1,nrow(.))) %>%
+    mutate(xmax = rep(2,nrow(.))) %>%
+    mutate(y_position = rep(1,nrow(.))) %>%
+    rename("gene"="Gene")
+
+
+brca_paired_amp_changes_plot <- ggplot(paired_amp_changes) +
+    geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),position = position_dodge2(width = 0.4)) +
+    geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),alpha=0.3,position = "dodge") +
+    scale_fill_manual(values = colour_palettes$brca_carriers) +
+    scale_colour_manual(values = colour_palettes$brca_carriers) +
+    geom_signif(aes(xmin=xmin,xmax=xmax,y_position=unlist(lapply(split(paired_amp_changes,f = factor(paired_amp_changes$gene)),FUN = function(x) round(max(x$value))+2)),annotations=round(qVal,digits = 3),group=gene),
+                data = sigAnn,manual = TRUE,vjust = 1.5) +
+    facet_wrap(. ~ gene,scales = "free_y",ncol = 3) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+brca_paired_amp_changes_strat_plot <- ggplot(paired_amp_changes) +
+    geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),position = position_dodge2(width = 0.4)) +
+    geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),alpha=0.3,position = "dodge") +
+    scale_fill_manual(values = colour_palettes$brca_carriers) +
+    scale_colour_manual(values = colour_palettes$brca_carriers) +
+    geom_signif(aes(x = BRCA_carrier,y = value),comparison=list(c("BRCA","non-BRCA")),
+               test = "wilcox.test",vjust = 1.5) +
+    facet_wrap(group ~ gene,scales = "free_y",ncol = 3) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+
+ggsave(plot = brca_paired_amp_changes_plot,filename = "plots/brca_paired_amp_changes_plot.png",width = 6,height = 8,units = "in",dpi = 300)
+ggsave(plot = brca_paired_amp_changes_plot,filename = "plots/brca_paired_amp_changes_plot.pdf",width = 6,height = 8)
+saveRDS(object = brca_paired_amp_changes_plot,file = "plots/brca_paired_amp_changes_plot.rds")
+brca_paired_amp_changes_plot
+```
+
+```{r cna_norm_changes}
+norm_amp_changes_all <- paired_amp_changes_all %>%
+  group_by(PATIENT_ID,group,gene) %>%
+  summarise(value=median(value)) %>%
+  pivot_wider(values_from = value, names_from=group) %>%
+  mutate(change=relapse-diagnosis)
+
+norm_amp_changes <- norm_amp_changes_all %>%
+                      filter(gene %in% focal_genes_table$Gene.name)
+
+norm_amp_changes$BRCA_carrier <- factor(ifelse(norm_amp_changes$PATIENT_ID %in% combinedBRCA$PATIENT_ID,
+                                           "BRCA","non-BRCA"),levels = c("BRCA","non-BRCA"))
+
+ggplot(norm_amp_changes) +
+    geom_point(aes(x = BRCA_carrier,y = change,color=BRCA_carrier),position = position_dodge2(width = 0.4)) +
+    geom_violin(aes(x = BRCA_carrier,y = change,fill=BRCA_carrier),alpha=0.3,position = "dodge") +
+    scale_fill_manual(values = colour_palettes$brca_carriers) +
+    scale_colour_manual(values = colour_palettes$brca_carriers) +
+    geom_signif(aes(x = BRCA_carrier,y = change),
+        comparison=list(c("BRCA","non-BRCA")),
+        test = "wilcox.test",vjust = 1.5) +
+    facet_wrap(. ~ gene,scales = "free_y",ncol = 3) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+```
+
+#### Signatures (paired)
+
+```{r subset_sig_bar_paired}
+sig_bar_paired <- sig_bar[sig_bar$SAMPLE_ID %in% patient.meta$SAMPLE_ID[patient.meta$paired == "TRUE"],]
+```
+
+```{r sig_plot_paired}
+brca_sig_bar_paired_plot <- ggplot(sig_bar_paired) +
+  geom_col(aes(SAMPLE_ID,value,fill=signature)) +
+  facet_wrap(. ~ BRCA_carrier,nrow =2,scales = "free_x") +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_fill_manual(values = cbPalette) +
+  ylab("exposure") +
+  xlab("sample") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position = "none") +
+  guides(fill = guide_legend(nrow = 1))
+
+brca_sig_bar_paired_diagnosis_plot <- ggplot(sig_bar_paired[sig_bar_paired$group == "diagnosis",]) +
+  geom_col(aes(SAMPLE_ID,value,fill=signature)) +
+  facet_wrap(. ~ BRCA_carrier,nrow = 1,scales = "free_x") +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_fill_manual(values = cbPalette) +
+  ylab("exposure") +
+  xlab("sample") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position = "none") +
+  guides(fill = guide_legend(nrow = 1))
+
+brca_sig_bar_paired_relapse_plot <- ggplot(sig_bar_paired[sig_bar_paired$group == "relapse",]) +
+  geom_col(aes(SAMPLE_ID,value,fill=signature)) +
+  facet_wrap(. ~ BRCA_carrier,nrow = 1,scales = "free_x") +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_fill_manual(values = cbPalette) +
+  ylab("exposure") +
+  xlab("sample") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position = "none") +
+  guides(fill = guide_legend(nrow = 1))
+
+brca_sig_bar_paired_diagnosis_plot
+brca_sig_bar_paired_relapse_plot
+```
+
+```{r brca_sig_status_paired}
+brca_sig_dist_paired_plot <- ggplot(data = sig_bar_paired) +
+    geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),
+               position = position_dodge2(width = 0.4)) +
+    geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
+                alpha=0.3,position = "dodge") +
+    geom_signif(aes(x = BRCA_carrier,y = value),
+                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                vjust = 1.8) +
+    scale_fill_manual(values = colour_palettes$brca_carriers) +
+    scale_colour_manual(values = colour_palettes$brca_carriers) +
+    ylab("exposure") +
+    facet_wrap(. ~ signature,nrow = 1) +
+    theme_bw() +
+    theme(legend.position = "bottom",
+          axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.title.x = element_blank())
+
+brca_sig_dist_diagnosis_paired_plot <- ggplot(data = sig_bar_paired[sig_bar_paired$group == "diagnosis",]) +
+    geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),
+               position = position_dodge2(width = 0.4)) +
+    geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
+                alpha=0.3,position = "dodge") +
+    geom_signif(aes(x = BRCA_carrier,y = value),
+                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                vjust = 1.8) +
+    scale_fill_manual(values = colour_palettes$brca_carriers) +
+    scale_colour_manual(values = colour_palettes$brca_carriers) +
+    ylab("exposure") +
+    facet_wrap(. ~ signature,nrow = 1) +
+    theme_bw() +
+    theme(legend.position = "none",
+          axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.title.x = element_blank())
+
+brca_sig_dist_relapse_paired_plot <- ggplot(data = sig_bar_paired[sig_bar_paired$group == "relapse",]) +
+    geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),
+               position = position_dodge2(width = 0.4)) +
+    geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
+                alpha=0.3,position = "dodge") +
+    geom_signif(aes(x = BRCA_carrier,y = value),
+                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                vjust = 1.8) +
+    scale_fill_manual(values = colour_palettes$brca_carriers) +
+    scale_colour_manual(values = colour_palettes$brca_carriers) +
+    ylab("exposure") +
+    facet_wrap(. ~ signature,nrow = 1) +
+    theme_bw() +
+    theme(legend.position = "none",
+          axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.title.x = element_blank())
+
+brca_sig_dist_grouped_paired_plot <- ggplot(data = sig_bar_paired) +
+    geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),
+               position = position_dodge2(width = 0.4)) +
+    geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
+                alpha=0.3,position = "dodge") +
+    geom_signif(aes(x = BRCA_carrier,y = value),
+                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                vjust = 1.3) +
+    scale_fill_manual(values = colour_palettes$brca_carriers) +
+    scale_colour_manual(values = colour_palettes$brca_carriers) +
+    ylab("exposure") +
+    facet_wrap(group ~ signature,nrow = 2) +
+    theme_bw() +
+    theme(legend.position = "none",
+          axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.title.x = element_blank())
+
+brca_sig_dist_brca_carrier_paired_plot <- ggplot(data = sig_bar_paired) +
+    geom_point(aes(x = group,y = value,color=group),
+               position = position_dodge2(width = 0.4)) +
+    geom_violin(aes(x = group,y = value,fill=group),
+                alpha=0.3,position = "dodge") +
+    geom_signif(aes(x = group,y = value),
+                test = "wilcox.test",comparisons = list(c("diagnosis","relapse")),
+                vjust = 1.3) +
+    scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+    scale_colour_manual(values = colour_palettes$diagnosis_relapse) +
+    ylab("exposure") +
+    facet_wrap(BRCA_carrier ~ signature,nrow = 2) +
+    theme_bw() +
+    theme(legend.position = "none",
+          axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.title.x = element_blank())
+
+brca_sig_dist_paired_plot
+brca_sig_dist_brca_carrier_paired_plot
+brca_sig_dist_grouped_paired_plot
+```
+
+##### sig 1
+
+```{r sig 1_paired}
+brca_sig_1_dist_paired_plot <- ggplot(sig_bar_paired[sig_bar_paired$signature == "s1",]) +
+    geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),
+               position = position_dodge2(width = 0.4)) +
+    geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
+                alpha=0.3,position = "dodge") +
+    geom_signif(aes(x = BRCA_carrier,y = value),
+                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                vjust = 1.5) +
+    scale_fill_manual(values = colour_palettes$brca_carriers) +
+    scale_colour_manual(values = colour_palettes$brca_carriers) +
+    ylab("exposure") +
+    theme_bw() +
+    theme(legend.position = "none",
+          axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.title.x = element_blank())
+brca_sig_1_dist_paired_plot
+```
+
+```{r comb_sigs_paired}
+brca_sig_bar_paired_leg <- get_legend(
+    brca_sig_bar_paired_plot + 
+        guides(fill = guide_legend(nrow = 1,title = "signature")) +
+        theme(legend.position = "bottom")
+)
+
+brca_diag_relapse_paired_leg <- get_legend(
+    brca_sig_dist_brca_carrier_plot + 
+        guides(fill = guide_legend(nrow = 1,title = "group")) +
+        theme(legend.position = "bottom")
+)
+
+brca_sig_comb_paired_plot <- plot_grid(brca_sig_bar_paired_plot,
+          brca_sig_dist_brca_carrier_paired_plot,
+          plot_grid(brca_sig_dist_grouped_paired_plot,
+                    labels = c("C")),
+          plot_grid(brca_sig_bar_leg,plot_grid(brca_diag_relapse_leg,brca_cna_rates_legend),nrow = 2),
+          labels = c("A","B","",""),
+          nrow = 4,
+          rel_heights = c(0.3,0.32,0.3,0.08))
+
+ggsave(plot = brca_sig_comb_paired_plot,filename = "plots/brca_sig_comb_paired_plot.png",width = 6,height = 8,units = "in",dpi = 300)
+ggsave(plot = brca_sig_comb_paired_plot,filename = "plots/brca_sig_comb_paired_plot.pdf",width = 6,height = 8)
+brca_sig_comb_paired_plot
+```
+
+#### event progression (paired)
+
+```{r segment_changes_paired}
+cn_segs_events_paired <- cn_segs_events %>%
+                            filter(sample %in% meta.data$SAMPLE_ID[meta.data$paired == "TRUE"])
+
+head(cn_segs_events_paired)
+```
+
+```{r event_plots_paired}
+cn_event_paired_plots <- ggplot(cn_segs_events_paired) +
+  geom_line(aes(group,n),alpha = 0.15) +
+  geom_point(aes(group,n,color=group),alpha = 0.3,
+              position = position_dodge2(width = 0.6)) +
+  geom_violin(aes(group,n,fill=group),alpha=0.5) +
+  geom_signif(aes(x = group,y = n),
+                test = "wilcox.test",comparisons = list(c("diagnosis","relapse")),
+                vjust = 1.3) +
+  xlab("events") +
+  facet_wrap(direction ~ BRCA_carrier) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_colour_manual(values = colour_palettes$diagnosis_relapse) +
+  theme_bw() +
+  theme(legend.position = "none")
+
+cn_event_paired_plots
+```
+
+```{r paired_events}
+paired_cn_segs_events <- cn_segs_events %>%
+  filter(sample %in% meta.data$SAMPLE_ID[meta.data$paired == TRUE]) %>%
+  group_by(group,PATIENT_ID,direction,BRCA_carrier) %>%
+  dplyr::select(-sample) %>%
+  summarise(across(n,median)) %>%
+  pivot_wider(id_cols = c("PATIENT_ID","direction","BRCA_carrier"),names_from = group,values_from = n) %>%
+  mutate(change = relapse - diagnosis) %>%
+  dplyr::select(PATIENT_ID,BRCA_carrier,change)
+
+head(paired_cn_segs_events)
+```
+
+```{r paired_event_plots}
+paired_cn_event_plots <- ggplot(paired_cn_segs_events) +
+  geom_point(aes(BRCA_carrier,change,colour=BRCA_carrier),
+             alpha=0.3,position = position_dodge2(width = 0.6)) +
+  geom_violin(aes(BRCA_carrier,change,fill=BRCA_carrier),alpha=0.5) +
+  geom_signif(aes(x = BRCA_carrier,y = change),
+                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                vjust = 1.5) +
+  scale_colour_manual(values = colour_palettes$brca_carriers) +
+  scale_fill_manual(values = colour_palettes$brca_carriers) +
+  facet_wrap(. ~ direction) +
+  theme_bw() +
+  theme(legend.position = "none")
+
+paired_cn_event_plots
+```
+
+```{r events_plot_paired}
+brca_cn_event_comb_plot <- plot_grid(cn_event_paired_plots,paired_cn_event_plots,
+          plot_grid(brca_diag_relapse_leg,brca_cna_rates_legend),
+          rel_heights = c(0.45,0.45,0.1),
+          nrow = 3,
+          labels = c("A","B",""))
+
+ggsave(plot = brca_cn_event_comb_plot,filename = "plots/brca_cn_event_paired_comb_plot.png",width = 6,height = 6,units = "in",dpi = 300)
+ggsave(plot = brca_cn_event_comb_plot,filename = "plots/brca_cn_event_paired_comb_plot.pdf",width = 6,height = 6)
+brca_cn_event_comb_plot
+```
+
+```{r segs_sigs_paired}
+cn_segs_sigs_paired <- cn_segs_events %>%
+                    left_join(.,sig_bar,c("sample"="SAMPLE_ID","group","BRCA_carrier")) %>%
+                    dplyr::select(-PATIENT_ID.y) %>%
+                    filter(sample %in% meta.data$SAMPLE_ID[meta.data$paired == "TRUE"])
+
+head(cn_segs_sigs_paired)
+```
+
+```{r segs_sigs_paired_plot}
+ggplot(cn_segs_sigs_paired) +
+    geom_point(aes(n,value,colour=direction),alpha=0.3) +
+    geom_smooth(aes(n,value,colour=direction),method = "lm") +
+    facet_wrap(group ~ signature,ncol = 7) +
+    scale_y_continuous(limits = c(0,1)) +
+    scale_colour_manual(values = colour_palettes$amp_del[c(1,3)]) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+```
+
+```{r seg_weighted_paired}
+ cn_seg_sub_paired <- cn_seg_sub %>%
+                            filter(sample %in% meta.data$SAMPLE_ID[meta.data$paired == "TRUE"])
+
+cn_seg_weighted_pre_paired <- cn_seg_sub_paired %>%
+    filter(!sample %in% ploidy_change_samples) %>%
+    group_by(sample,chromosome) %>%
+    mutate(seg_count = n()) %>%
+    filter(seg_count > 1) %>%
+    ungroup() %>%
+    mutate(seg_len = end - start) %>%
+    mutate(seg_bin = as.factor(ntile(seg_len,n = 5)))
+
+seg_bin_names_paired <- cn_seg_weighted_pre_paired %>%
+    group_by(seg_bin) %>%
+    summarise(across(seg_len,c(min=min,max=max))) %>%
+    mutate(across(c("seg_len_min","seg_len_max"),~ round(.x/1000000,digits = 1))) %>%
+    mutate(bin = paste0(seg_len_min," - ",seg_len_max," Mb")) %>%
+    dplyr::select(seg_bin,bin) %>%
+    deframe()
+    
+cn_seg_weighted_paired <- cn_seg_weighted_pre_paired %>%
+    mutate(direction = ifelse(segVal >= 1,"gain",ifelse(segVal <= -1,"loss","neutral"))) %>%
+    mutate(direction = ifelse(segVal >= 1,"gain",ifelse(segVal <= -1,"loss","neutral"))) %>%
+    # mutate(direction = ifelse(segVal >= 0,"gain","loss")) %>%
+    dplyr::select(sample,segVal,direction,seg_bin) %>%
+    count(sample,direction,seg_bin) %>%
+    filter(direction != "neutral") %>%
+    mutate(PATIENT_ID = sig_bar$PATIENT_ID[match(sample,sig_bar$SAMPLE_ID)]) %>%
+    mutate(group = sig_bar$group[match(sample,sig_bar$SAMPLE_ID)]) %>%
+    mutate(BRCA_carrier = sig_bar$BRCA_carrier[match(sample,sig_bar$SAMPLE_ID)])
+
+head(cn_seg_weighted_paired)
+```
+
+```{r seg_weighted_plot_paired}
+ggplot(cn_seg_weighted_paired) +
+  #geom_line(aes(seg_bin,n),alpha = 0.15) +
+  geom_point(aes(seg_bin,n,color=group),alpha = 0.3,
+              position = position_dodge2(width = 0.6)) +
+  geom_violin(aes(seg_bin,n,fill=group),alpha=0.5) +
+  # geom_signif(aes(x = seg_bin,y = n),
+  #               test = "wilcox.test",comparisons = list(c("diagnosis","relapse")),
+  #               vjust = 1.3) +
+  xlab("events") +
+  facet_wrap(direction ~ BRCA_carrier) +
+  scale_x_discrete(labels = seg_bin_names) +
+  scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
+  scale_colour_manual(values = colour_palettes$diagnosis_relapse) +
+  theme_bw() +
+  theme(legend.position = "none",axis.text.x = element_text(size = 6))
+```
+
+```{r paired_seg_events_weighted_paired}
+paired_cn_segs_weighted_paired <- cn_seg_weighted_paired %>%
+  filter(sample %in% meta.data$SAMPLE_ID[meta.data$paired == TRUE]) %>%
+  group_by(group,PATIENT_ID,direction,BRCA_carrier,seg_bin) %>%
+  dplyr::select(-sample) %>%
+  summarise(across(n,median)) %>%
+  pivot_wider(id_cols = c("PATIENT_ID","direction","BRCA_carrier","seg_bin"),names_from = group,values_from = n) %>%
+  mutate(change = relapse - diagnosis) %>%
+  dplyr::select(PATIENT_ID,BRCA_carrier,direction,seg_bin,change)
+
+head(paired_cn_segs_weighted)
+```
+
+```{r paired_seg_events_weighted_plot_paired}
+ggplot(paired_cn_segs_weighted_paired) +
+  geom_point(aes(BRCA_carrier,change,color=BRCA_carrier),alpha = 0.3,
+              position = position_dodge2(width = 0.6)) +
+  geom_violin(aes(BRCA_carrier,change,fill=BRCA_carrier),alpha=0.5) +
+  geom_signif(aes(x = BRCA_carrier,y = change),
+                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                vjust = 1.3) +
+  xlab("events") +
+  facet_wrap(direction ~ seg_bin,ncol = 5) +
+  scale_fill_manual(values = colour_palettes$brca_carriers) +
+  scale_colour_manual(values = colour_palettes$brca_carriers) +
+  theme_bw() +
+  theme(legend.position = "none")
+    
+```
+
+```{r segs_sigs_weighted_paired}
+cn_segs_sigs_weighted_paired <- cn_seg_weighted_paired %>%
+                    left_join(.,sig_bar,c("sample"="SAMPLE_ID","group","BRCA_carrier")) %>%
+                    dplyr::select(-PATIENT_ID.y)
+
+head(cn_segs_sigs_weighted_paired)
+```
+
+```{r segs_sigs_weighted_plot_paired}
+ggplot(cn_segs_sigs_weighted_paired) +
+    geom_point(aes(n,value,colour=group),alpha=0.3) +
+    geom_smooth(aes(n,value,colour=group),method = "lm") +
+    facet_wrap(seg_bin ~ signature,ncol = 7,scales = "free_x") +
+    scale_y_continuous(limits = c(0,1)) +
+    scale_colour_manual(values = colour_palettes$diagnosis_relapse) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+```
+```{r seg_paired_corr_plot}
+seg_paired_corr <- cn_seg_weighted_paired %>%
+  filter(sample %in% meta.data$SAMPLE_ID[meta.data$paired == TRUE]) %>%
+  group_by(group,PATIENT_ID,direction,BRCA_carrier,seg_bin) %>%
+  dplyr::select(-sample) %>%
+  summarise(across(n,median)) %>%
+  pivot_wider(id_cols = c("PATIENT_ID","direction","BRCA_carrier","seg_bin"),names_from = group,values_from = n)
+
+seg_paired_corr_plot <- ggplot(seg_paired_corr) +
+                            geom_point(aes(diagnosis,relapse,colour=BRCA_carrier)) +
+                            geom_abline(colour="grey50") +
+                        facet_wrap(direction ~ seg_bin,ncol = 5,
+                                   labeller = labeller(seg_bin = seg_bin_names)) +
+                        scale_colour_manual(values = colour_palettes$brca_carriers) +
+                        coord_equal() +
+                        theme_bw()
+
+seg_paired_corr_plot
+```
+
+```{r sessioninfo}
+sessionInfo()
+```

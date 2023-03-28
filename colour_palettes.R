@@ -17,6 +17,8 @@ stage_1_colour_setting <- "#fef0d9"
 stage_2_colour_setting <- "#fdcc8a"
 stage_3_colour_setting <- "#fc8d59"
 stage_4_colour_setting <- "#d7301f"
+brca_colour_setting <- "#E66100"
+non_brca_colour_setting <- "#5D3A9B"
 
 colour_palettes <- list(arx_rlps=c(arx=primary_colour_setting,
                                    rlps=relapse_colour_setting),
@@ -46,6 +48,8 @@ colour_palettes <- list(arx_rlps=c(arx=primary_colour_setting,
                         stage=c("1"=stage_1_colour_setting,
                                 "2"=stage_2_colour_setting,
                                 "3"=stage_3_colour_setting,
-                                "4"=stage_4_colour_setting))
+                                "4"=stage_4_colour_setting),
+                        brca_carriers=c("BRCA"=brca_colour_setting,
+                                        "non-BRCA"=non_brca_colour_setting))
 
 rm(list = ls()[grep("*_colour_setting",ls())])

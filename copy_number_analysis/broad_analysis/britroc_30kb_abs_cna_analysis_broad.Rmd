@@ -254,7 +254,7 @@ paired_diffs_sigGRange <- GenomicRanges::makeGRangesFromDataFrame(paired_diffs_s
 
 proteinOverlaps <- unique(protein_gRanges$hgnc_symbol[GenomicRanges::findOverlaps(protein_gRanges,paired_diffs_sigGRange)@from])
 cat("Signif bins overlapping protein-coding genes: ",length(proteinOverlaps),"\n")
-cat("Any in significant gene list:",any(focal_genes$gene %in% proteinOverlaps),"\n")
+cat("Any in relevant gene list:",any(focal_genes$gene %in% proteinOverlaps),"\n")
 writeLines(text = proteinOverlaps,con = "data/substraction_protein_overlaps.txt",sep = "\n")
 ncg_results <- ncg[ncg$symbol %in% proteinOverlaps,]
 cat("NCG matching genes: ",length(unique(ncg_results$symbol)),"\n")
@@ -315,14 +315,18 @@ paired_segs <- data.frame(nsegs=nsegs) %>%
   inner_join(.,meta.data,by = c("sample"="SAMPLE_ID")) %>%
   filter(paired == "TRUE") %>%
   group_by(PATIENT_ID,group) %>%
-  summarise(segs=mean(nsegs)) %>%
+  summarise(segs=median(nsegs)) %>%
   pivot_wider(id_cols = "PATIENT_ID",names_from = "group",values_from = "segs") %>%
   dplyr::rename(diagnosis="arx",relapse="rlps")
+
+head(paired_segs)
 ```
 
 ```{r plot_segs_violin}
 # Plot primary/relapse boxplot
-seg_paired_long <- pivot_longer(data = paired_segs,cols = 2:3,names_to = "group",values_to = "segments") %>%
+seg_paired_long <- pivot_longer(data = paired_segs,cols = 2:3,
+                                names_to = "group",
+                                values_to = "segments") %>%
   mutate(platinum_treatment = clinical.data$pt_sensitivity_at_reg[match(PATIENT_ID,paste0("BRITROC-",clinical.data$britroc_number))]) %>%
   filter(!is.na(platinum_treatment))
 
@@ -336,6 +340,7 @@ segs_paired <- ggplot(seg_paired_long) +
               test.args = list(paired = TRUE)) +
   scale_fill_manual(values = colour_palettes$diagnosis_relapse) +
   theme_bw()
+
 segs_paired
 ggsave(plot = segs_paired,filename = "plots/seg_counts_paired.png",width = 5,height = 7,units = "in",dpi = 300)
 ggsave(plot = segs_paired,filename = "plots/seg_counts_paired.pdf",width = 5,height = 7,units = "in",dpi = 300)
@@ -354,6 +359,7 @@ segs_paired_pt <- ggplot(seg_paired_long) +
   facet_grid(cols = vars(platinum_treatment)) +
   theme_bw() +
   theme(legend.position = "bottom")
+
 segs_paired_pt
 ggsave(plot = segs_paired_pt,filename = "plots/seg_counts_pt_paired.png",width = 5,height = 7,units = "in",dpi = 300)
 ggsave(plot = segs_paired_pt,filename = "plots/seg_counts_pt_paired.pdf",width = 5,height = 7,units = "in",dpi = 300)
@@ -369,7 +375,8 @@ seg_Corr <- ggplot(paired_segs) +
         geom_smooth(aes(diagnosis,relapse),method = "lm") +
         xlab("diagnosis tumour") +
         ylab("relapse tumour") +
-        theme_bw() + annotate(geom = "text",x = 375,y=10,label=paste0("kendall tau:",round(seg.kenall$estimate,digits = 3)))
+        theme_bw() + annotate(geom = "text",x = 375,y=10,label=paste0("kendall tau:",
+                                                                      round(seg.kenall$estimate,digits = 3)))
 seg_Corr
 ```
 
@@ -408,7 +415,6 @@ ggplot(all_segs) +
 ```{r get_patient_ploidy}
 ploidy_summary <- meta.data %>%
                     group_by(PATIENT_ID,group) %>%
-                    summarise(across(.cols = c("ploidy","paired"),.fns = median)) %>%
                     mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse")) %>%
                     mutate(paired = ifelse(paired == 1,TRUE,FALSE)) %>%
                     ungroup() %>%
@@ -416,6 +422,8 @@ ploidy_summary <- meta.data %>%
   
 ploidy_summary_paired <- ploidy_summary %>%
                             filter(paired == TRUE) %>%
+                            group_by(PATIENT_ID,group) %>%
+                            summarise(across(.cols = c("ploidy","paired"),.fns = median)) %>%
                             pivot_wider(names_from = group,values_from = c(ploidy)) %>%
                             mutate(ploidy_diff = relapse - diagnosis) %>%
                             mutate(ploidy_change = abs(ploidy_diff) >= 1) %>%
@@ -517,18 +525,21 @@ ploidy_plots
 ```
 
 ```{r ploidy_changes}
+labels <- c("diploid-triploid","diploid-triploid",
+            "diploid-tetraploid","diploid-tetraploid",
+            "diploid-tetraploid","diploid-tetraploid",
+            "diploid-triploid","diploid-triploid",
+            "pentaploid-triploid","pentaploid-triploid",
+            "diploid-tetraploid","diploid-tetraploid",
+            "diploid-triploid","diploid-triploid",
+            "triploid-diploid","triploid-diploid",
+            "diploid-triploid","diploid-triploid")
+
 ploidy_change_table <- ploidy_summary_paired[ploidy_summary_paired$ploidy_change == TRUE,] %>%
+                        ungroup() %>%
                         dplyr::select(-paired,-ploidy_change) %>%
                         mutate(direction = ifelse(ploidy_diff < 0,"decrease","increase")) %>%
-                        mutate(ploidy_change = c("diploid-triploid","diploid-triploid",
-                                                 "diploid-tetraploid","diploid-tetraploid",
-                                                 "diploid-tetraploid","diploid-tetraploid",
-                                                 "diploid-triploid","diploid-triploid",
-                                                 "pentaploid-triploid","pentaploid-triploid",
-                                                 "diploid-tetraploid","diploid-tetraploid",
-                                                 "diploid-triploid","diploid-triploid",
-                                                 "triploid-diploid","triploid-diploid",
-                                                 "diploid-triploid","diploid-triploid"))
+                        mutate(ploidy_change = labels)
 
 ploidy_change_table
 
@@ -559,7 +570,6 @@ cat("prior_chem_ploidy_change ","pval=",wilcox.test(x = clinical.data$pre_reg_ch
 ```{r get_patient_purity}
 purity_summary <- meta.data %>%
                     group_by(PATIENT_ID,group) %>%
-                    summarise(across(.cols = c("purity","paired"),.fns = median)) %>%
                     mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse")) %>%
                     mutate(paired = ifelse(paired == 1,TRUE,FALSE)) %>%
                     ungroup() %>%
@@ -567,10 +577,13 @@ purity_summary <- meta.data %>%
   
 purity_summary_paired <- purity_summary %>%
                             filter(paired == TRUE) %>%
+                            group_by(PATIENT_ID,group) %>%
+                            summarise(across(.cols = c("purity","paired"),.fns = median)) %>%
                             pivot_wider(names_from = group,values_from = c(purity)) %>%
                             mutate(purity_diff = relapse - diagnosis) %>%
                             mutate(purity_change = abs(purity_diff) >= 0.2) %>%
                             pivot_longer(cols = c(diagnosis,relapse),names_to = "group",values_to = "purity") %>%
+                            ungroup() %>%
                             mutate(platinum_status = clinical.data$pt_sensitivity_at_reg[match(PATIENT_ID,paste0("BRITROC-",clinical.data$britroc_number))])
 ```
 
@@ -692,19 +705,20 @@ CNA_events <- count_CNA_events_broad(data = abs_data,
                       mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse")) %>%
                       group_by(group,patient) %>%
                       dplyr::select(-sample) %>%
-                      summarise_all(mean)
+                      summarise_all(median)
 
 
-CNA_events_mean <- CNA_events %>%
+CNA_events_median <- CNA_events %>%
   group_by(group) %>%
   dplyr::select(-patient) %>%
-  summarise_all(mean)
-CNA_events_mean
+  summarise_all(median)
+CNA_events_median
 
 CNA_events <- CNA_events %>%
                 pivot_longer(cols = 3:5)
 
-CNA_events$platinum_treatment <- clinical.data$pt_sensitivity_at_reg[match(CNA_events$patient,paste0("BRITROC-",clinical.data$britroc_number))]
+CNA_events$platinum_treatment <- clinical.data$pt_sensitivity_at_reg[match(CNA_events$patient,
+                                                                           paste0("BRITROC-",clinical.data$britroc_number))]
 
 cnv_event_means_broad(data = CNA_events) +
   ggpubr::stat_compare_means(method = "wilcox.test",label.x = 0.6,label.y = 50)
@@ -717,8 +731,6 @@ cnv_event_means_broad(data = CNA_events[!is.na(CNA_events$platinum_treatment),])
 
 ```
 
-Performing the same analysis when restricted to paired samples revealed the same trend with no statistical difference in copy number events between archival and relapse samples across amplification, deletion or total copy number events. Results from CNA the number of events per sample do not show any differences, contrary to results identified by GISTIC (see GISTIC analysis document).
-
 ```{r CNA_events_paired}
 CNA_events_paired <- count_CNA_events_broad(data = abs_data[,meta.data$SAMPLE_ID[meta.data$paired == TRUE]],
                                       ploidys = get_named_ploidy(data = abs_data[,meta.data$SAMPLE_ID[meta.data$paired == TRUE]])) %>%
@@ -727,16 +739,16 @@ CNA_events_paired <- count_CNA_events_broad(data = abs_data[,meta.data$SAMPLE_ID
                       mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse")) %>%
                       group_by(group,patient) %>%
                       dplyr::select(-sample) %>%
-                      summarise_all(mean)
+                      summarise_all(median)
 
-CNA_events_paired_mean <- CNA_events_paired %>%
+CNA_events_paired_median <- CNA_events_paired %>%
   group_by(group) %>%
   dplyr::select(-patient) %>%
   summarise_all(.funs = list(mean=mean,median=median,iqr=stats::IQR,samples=length))
-CNA_events_paired_mean
+CNA_events_paired_median
 
-CNA_events_paired$platinum_treatment <- clinical.data$pt_sensitivity_at_reg[match(CNA_events_paired$patient,paste0("BRITROC-",
-                                                                                                                   clinical.data$britroc_number))]
+CNA_events_paired$platinum_treatment <- clinical.data$pt_sensitivity_at_reg[match(CNA_events_paired$patient,
+                                                                                  paste0("BRITROC-",clinical.data$britroc_number))]
 ```
 
 ```{r CNA_events_paired_plot}
@@ -808,7 +820,9 @@ broad_counts_rlps <- count_broad(data = broad_CNA_rlps,cohort="rlps")
 
 ```{r cyto_fishers}
 cytoband_fishers_arx_rlps <- calc_broad_freq_fishers(a = broad_counts_arx,b = broad_counts_rlps)
-cytoband_fishers_arx_rlps
+kable(cytoband_fishers_arx_rlps) %>%
+  kable_styling(full_width = T) %>%
+  scroll_box(height = "200px")
 ```
 
 
@@ -833,7 +847,9 @@ broad_counts_rlps_paired <- count_broad(data = broad_CNA_rlps_paired,cohort="rlp
 
 ```{r cyto_fishers_paired}
 cytoband_fishers_arx_rlps_paired <- calc_broad_freq_fishers(a = broad_counts_arx_paired,b = broad_counts_rlps_paired)
-cytoband_fishers_arx_rlps_paired
+kable(cytoband_fishers_arx_rlps_paired) %>%
+  kable_styling(full_width = T) %>%
+  scroll_box(height = "200px")
 ```
 
 ```{r cytoband_plot}
@@ -904,7 +920,9 @@ arm_counts_rlps <- count_broad(data = arm_CNA_rlps,cohort="rlps")
 
 ```{r arm_fishers}
 arm_fishers_arx_rlps <- calc_broad_freq_fishers(a = arm_counts_arx,b = arm_counts_rlps)
-arm_fishers_arx_rlps
+kable(arm_fishers_arx_rlps) %>%
+  kable_styling(full_width = T) %>%
+  scroll_box(height = "200px")
 ```
 
 ```{r extract_arm_cna_paired}
@@ -928,7 +946,9 @@ arm_counts_rlps_paired <- count_broad(data = arm_CNA_rlps_paired,cohort="rlps")
 
 ```{r arm_fishers_paired}
 arm_fishers_arx_rlps_paired <- calc_broad_freq_fishers(a = arm_counts_arx_paired,b = arm_counts_rlps_paired)
-arm_fishers_arx_rlps_paired
+kable(arm_fishers_arx_rlps_paired) %>%
+  kable_styling(full_width = T) %>%
+  scroll_box(height = "200px")
 ```
 
 ```{r arm_rate_plots}

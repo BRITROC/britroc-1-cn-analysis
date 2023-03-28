@@ -151,9 +151,18 @@ signature_stacked_alt <- readRDS("copy_number_signatures/plots/signatures_stacke
 # radar_plot <- ggdraw() + draw_image(magick::image_read_pdf("copy_number_signatures/plots/compile_radar.pdf",
 #                                                       density = 600))
 radar_plot <- readRDS("plots/arx_relapse_radar_partialILR_beta.RDS")
+radar_plot <- radar_plot +
+    labs(tag = "p=0.003, Wald test\np=0.052, Wald test (without s5)") +
+    theme(plot.tag.position = c(0.80, 0.05),
+          plot.tag = element_text(size=8),
+          legend.position = "none")
 
 ## Modify plots
-signature_paired_line <- signature_paired_line + theme(legend.position = "none")
+signature_paired_line <- signature_paired_line +
+    geom_signif(aes(x = group,y = value),
+                test = "wilcox.test",comparisons = list(c("diagnosis","relapse")),vjust = 1.4) +
+    theme(legend.position = "none")
+
 signature_stacked_alt <- signature_stacked_alt + theme(legend.position = "none")
 
 ## Get legends
@@ -203,19 +212,81 @@ fig5
 # fig6
 ```
 
+```{r fig7_old}
+## Load plots
+# sig_bar_plot_primary_pt_diag <- readRDS("copy_number_analysis/focal_analysis/plots/sig_bar_plot_primary_pt_diag.RDS")
+# sig_dist_primary_pt_diag <- readRDS("copy_number_analysis/focal_analysis/plots/sig_dist_primary_pt_diag.RDS")
+# cn_focal_rate_primary_pt_diag <- readRDS("copy_number_analysis/focal_analysis/plots/primary_pt_rate_plot2.RDS")
+# sig_primary_beta_results <- ggdraw() +
+#                               draw_image(magick::image_read_pdf("../BriTROC-1-paired_analysis/results/partialILRmodelling_FE_other_regression/primary_platinum_resistant/betas_primaryplatinumsensitivity_partialILRnocor_partialILRnocor.pdf",density = 300))
+# sig_primary_radar <- readRDS("plots/primary_resist_radar_partialILR_beta.RDS")
+# sig_primary_radar <- sig_primary_radar +
+#     labs(tag = "p=0.003, Wald test") +
+#     theme(plot.tag.position = c(0.9, 0.1),
+#           plot.tag = element_text(size=8),
+#           legend.position = "none")
+# 
+# ## Modify plots
+# sig_bar_plot_primary_pt_diag <- sig_bar_plot_primary_pt_diag +
+#     theme(legend.position = "none")
+# sig_dist_primary_pt_diag <- sig_dist_primary_pt_diag +
+#     theme(legend.position = "none",axis.text.x = element_blank())
+# #sig_dist_primary_pt_group_strat <- sig_dist_primary_pt_group_strat + theme(legend.position = "none",axis.text.x = element_blank())
+# 
+# ## Get legends
+# sig_pt_primary_legend_a <- get_legend(
+#   sig_bar_plot_primary_pt_diag + 
+#     guides(fill = guide_legend(nrow = 1)) +
+#     theme(legend.position = "bottom")
+# )
+# 
+# sig_pt_primary_legend_b <- get_legend(
+#   sig_dist_primary_pt_diag + 
+#     guides(fill = guide_legend(nrow = 1)) +
+#     theme(legend.position = "bottom")
+# )
+# ### Figure 7 compile
+# fig7 <- plot_grid(plot_grid(cn_focal_rate_primary_pt_diag,
+#                             sig_bar_plot_primary_pt_diag,
+#                             sig_dist_primary_pt_diag,
+#                             plot_grid(sig_primary_beta_results,
+#                                       sig_primary_radar,
+#                                       ncol = 2,labels = c("D","E")),
+#                     labels = c("A","B","C",""),
+#                     nrow = 4,
+#                     rel_heights = c(1,1,0.6,1)),
+#           plot_grid(empty,sig_pt_primary_legend_a,empty,sig_pt_primary_legend_b,
+#                     nrow = 2,
+#                     rel_widths = c(0.1,1,1)),
+#           rel_heights = c(1.5,0.1),
+#           nrow = 2)
+# 
+# ## Figure 7 render
+# ggsave2(filename = "plots/figure_7_render.png",plot = fig7,width = 8,height = 12,units = "in",dpi = 300)
+# ggsave2(filename = "plots/figure_7_render.pdf",plot = fig7,width = 8,height = 12,units = "in",dpi = 300)
+# fig7
+```
+
 ```{r fig7}
 ## Load plots
 sig_bar_plot_primary_pt_diag <- readRDS("copy_number_analysis/focal_analysis/plots/sig_bar_plot_primary_pt_diag.RDS")
 sig_dist_primary_pt_diag <- readRDS("copy_number_analysis/focal_analysis/plots/sig_dist_primary_pt_diag.RDS")
 cn_focal_rate_primary_pt_diag <- readRDS("copy_number_analysis/focal_analysis/plots/primary_pt_rate_plot2.RDS")
 sig_primary_beta_results <- ggdraw() +
-                              draw_image(magick::image_read_pdf("../BriTROC-1-paired_analysis/results/partialILRmodelling_FE_other_regression/primary_platinum_resistant/betas_primaryplatinumsensitivity_partialILRnocor_partialILRnocor.pdf",density = 300))
+    draw_image(magick::image_read_pdf("../BriTROC-1-paired_analysis/results/partialILRmodelling_FE_other_regression/primary_platinum_resistant/betas_primaryplatinumsensitivity_partialILRnocor_partialILRnocor.pdf",density = 300))
 sig_primary_radar <- readRDS("plots/primary_resist_radar_partialILR_beta.RDS")
-sig_primary_radar <- sig_primary_radar + theme(legend.position = "none")
+sig_primary_radar <- sig_primary_radar +
+    labs(tag = "p=0.003, Wald test") +
+    theme(plot.tag.position = c(0.85, 0.1),
+          plot.tag = element_text(size=8),
+          legend.position = "none")
 
 ## Modify plots
-sig_bar_plot_primary_pt_diag <- sig_bar_plot_primary_pt_diag + theme(legend.position = "none")
-sig_dist_primary_pt_diag <- sig_dist_primary_pt_diag + theme(legend.position = "none",axis.text.x = element_blank())
+sig_bar_plot_primary_pt_diag <- sig_bar_plot_primary_pt_diag +
+    facet_wrap(. ~ platinum_resistance,ncol = 1,scales = "free_x") +
+    theme(legend.position = "none")
+sig_dist_primary_pt_diag <- sig_dist_primary_pt_diag +
+    theme(legend.position = "none",axis.text.x = element_blank())
 #sig_dist_primary_pt_group_strat <- sig_dist_primary_pt_group_strat + theme(legend.position = "none",axis.text.x = element_blank())
 
 ## Get legends
@@ -227,18 +298,18 @@ sig_pt_primary_legend_a <- get_legend(
 
 sig_pt_primary_legend_b <- get_legend(
   sig_dist_primary_pt_diag + 
-    guides(fill = guide_legend(nrow = 1)) +
+    guides(fill = guide_legend(nrow = 1,
+                               title = NULL)) +
     theme(legend.position = "bottom")
 )
 ### Figure 7 compile
 fig7 <- plot_grid(plot_grid(cn_focal_rate_primary_pt_diag,
-                            sig_bar_plot_primary_pt_diag,
-                            sig_dist_primary_pt_diag,
-                            plot_grid(sig_primary_beta_results,
+                            #sig_dist_primary_pt_diag,
+                            plot_grid(sig_bar_plot_primary_pt_diag,
                                       sig_primary_radar,
-                                      ncol = 2,labels = c("D","E")),
-                    labels = c("A","B","C",""),
-                    nrow = 4,
+                                      ncol = 2,labels = c("B","C")),
+                    labels = c("A"),
+                    nrow = 2,
                     rel_heights = c(1,1,0.6,1)),
           plot_grid(empty,sig_pt_primary_legend_a,empty,sig_pt_primary_legend_b,
                     nrow = 2,
@@ -247,8 +318,8 @@ fig7 <- plot_grid(plot_grid(cn_focal_rate_primary_pt_diag,
           nrow = 2)
 
 ## Figure 7 render
-ggsave2(filename = "plots/figure_7_render.png",plot = fig7,width = 8,height = 12,units = "in",dpi = 300)
-ggsave2(filename = "plots/figure_7_render.pdf",plot = fig7,width = 8,height = 12,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_7_render.png",plot = fig7,width = 8,height = 10,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_7_render.pdf",plot = fig7,width = 8,height = 10,units = "in",dpi = 300)
 fig7
 ```
 
@@ -258,9 +329,6 @@ fig7
 
 ```{r fig_pt_status}
 ## Load plots
-## figure legend Figure XX. Copy number signatures stratified by platinum-based treatment sensitivity 
-# A - Copy number signature spectrum of copy number profiles from diagnosis and relapse HGSC tumours across all samples, stratified by response to platinum-based chemotherapeutics (n = 30, n = 94, n = 36, and n = 101, diagnosis resistant, diagnosis sensitive, relapse resistant, and relapse sensitive, respectively). B - Boxplot demonstrating copy number signature distributions in unpaired copy number between resistant and sensitive response to platinum-based chemotherapeutics. C - Boxplot demonstrating copy number signature distributions in unpaired copy number between resistant and sensitive response to platinum-based chemotherapeutics, stratified by diagnosis and relapse tumours.
-
 sig_pt_bar_plot <- readRDS("copy_number_signatures/plots/sig_pt_bar_plot.RDS")
 sig_pt_bar_plot <- sig_pt_bar_plot + theme(legend.position = "none")
 
@@ -354,11 +422,11 @@ tissue_supplemental1
 
 ```{r fig_tissue_diffs_strat}
 ## Load supplemental tissue plots
-cn_tissue_counts_strat <- readRDS("copy_number_analysis/sites_of_relapse/plots/cna_count_tissue.RDS")
+cn_tissue_counts_strat <- readRDS("copy_number_analysis/sites_of_relapse/plots/cn_count_tissue_stratified.RDS")
 cn_tissue_counts_strat <- cn_tissue_counts_strat + theme(legend.position = "none",axis.title.x = element_blank(),
                                                          axis.ticks.x = element_blank(),
                                                          axis.text.x = element_blank())
-cn_tissue_sigs_strat <- readRDS("copy_number_analysis/sites_of_relapse/plots/signature_tissue.RDS")
+cn_tissue_sigs_strat <- readRDS("copy_number_analysis/sites_of_relapse/plots/cn_sigs_tissue_strat.RDS")
 cn_tissue_sigs_strat <- cn_tissue_sigs_strat + theme(legend.position = "none",
                                                      axis.ticks.x = element_blank(),
                                                      axis.title.x = element_blank(),
@@ -423,24 +491,92 @@ sig_box_paired_wilcox
 ## List plots
 pdf.list <- list.files(path = "copy_number_signatures/plots/ternary_all_combinations/",pattern = "ternary_all",full.names = TRUE)
 
+highlight_list <- c("1+3+7","2+3+7","3+4+7","3+5+7","3+6+7")
 ## Load plots
 plot.list <- lapply(pdf.list,FUN = function(x){
-  name <- gsub(gsub(x = x,pattern = "copy_number_signatures/plots/ternary_all_combinations/ternary_all_",replacement = ""),pattern = ".pdf",replacement = "")
+  name <- gsub(gsub(x = x,pattern = "copy_number_signatures/plots/ternary_all_combinations/ternary_all_",replacement = ""),
+               pattern = ".pdf",replacement = "")
+  #print(name)
   plot <- ggdraw() +
           draw_image(magick::image_read_pdf(x,density = 600))
-  plot <- plot +
-            theme(plot.margin = unit(c(0,0,0,0), "cm"))
+  
+  if(name %in% highlight_list){
+        plot <- plot +
+            theme(plot.margin = unit(c(0.1,0.1,0.1,0.1), "cm"),
+                  plot.background = element_rect(color = "firebrick3",size = 3))
+  } else {
+        plot <- plot +
+            theme(plot.margin = unit(c(0.1,0.1,0.1,0.1), "cm"))
+  }
   return(plot)
 })
 
 ## Plot compile
 ternary_all <- plot_grid(plot_grid(plotlist = plot.list,nrow = 7,ncol = 5),
-                sig_legend_b,nrow = 2,rel_heights = c(0.9,0.1))
+                sig_legend_b,nrow = 2,rel_heights = c(0.95,0.05))
 
 ## Plot render
 ggsave2(filename = "plots/supplemental_figure_ternary_sig_plots_all.png",plot = ternary_all,width = 8,height = 12,units = "in",dpi = 300)
 ggsave2(filename = "plots/supplemental_figure_ternary_sig_plots_all.pdf",plot = ternary_all,width = 8,height = 12,units = "in",dpi = 300)
 ternary_all
+```
+
+```{r fig9}
+## BRCA figure
+diag_rlps_brca_rate_plot <- readRDS("copy_number_analysis/focal_analysis/plots/brca_diag_rlps_cna_rates_paired_plot.rds")
+diag_rlps_brca_rate_plot <- diag_rlps_brca_rate_plot +
+                            theme(axis.title.x = element_blank(),
+                                  axis.text.x = element_blank(),
+                                  axis.ticks.x = element_blank(),
+                                  legend.position = "none")
+
+brca_rate_plot <- readRDS("copy_number_analysis/focal_analysis/plots/brca_cna_rates_paired_plot.rds")
+brca_rate_plot <- brca_rate_plot +
+                    theme(legend.position = "none")
+
+#brca_sig_bar <- readRDS("copy_number_analysis/focal_analysis/plots/brca_sig_bar_plot.rds")
+brca_sig_copies <- readRDS("copy_number_analysis/focal_analysis/plots/brca_paired_amp_changes_plot.rds")
+brca_sig_copies <- brca_sig_copies +
+                            theme(axis.title.x = element_blank(),
+                                  axis.text.x = element_blank(),
+                                  axis.ticks.x = element_blank(),
+                                  legend.position = "none")
+
+brca_sig_radar <- readRDS("plots/brca_status_radar_partialILR_beta.RDS")
+brca_sig_radar <- brca_sig_radar +
+                    theme(legend.position = "none")
+
+brca_sig_radar <- brca_sig_radar +
+    labs(tag = "p=0.25, Wald test") +
+    theme(plot.tag.position = c(0.85, 0.1),
+          plot.tag = element_text(size=8),
+          legend.position = "none")
+
+diag_legend <- get_legend(
+  diag_rlps_brca_rate_plot + 
+    guides(fill = guide_legend(title = "group",nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+
+brca_legend <- get_legend(
+  brca_rate_plot + 
+    guides(fill = guide_legend(title = "BRCA status",nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+
+fig9 <- plot_grid(diag_rlps_brca_rate_plot,
+          brca_rate_plot,
+          plot_grid(brca_sig_copies,brca_sig_radar,
+                    ncol = 2,labels=c("C","D")),
+          plot_grid(empty,diag_legend,brca_legend,empty,
+                    rel_widths = c(0.1,0.25,0.25,0.1),ncol = 4),
+          labels=c("A","B","",""),
+          nrow = 4,
+          rel_heights = c(0.20,0.20,0.40,0.04))
+
+ggsave2(filename = "plots/figure_9_render.png",plot = fig9,width = 8,height = 11,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_9_render.pdf",plot = fig9,width = 8,height = 11,units = "in",dpi = 300)
+fig9
 ```
 
 ```{r session_info}

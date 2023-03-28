@@ -582,7 +582,8 @@ diff_age_plot <- ggplot(patient_clonality_diffs) +
   geom_point(aes(age,ith_change)) +
   geom_smooth(aes(age,ith_change),method = "lm") +
   ylab(label = paste0("\u0394","ITH")) +
-  theme_bw()
+  theme_bw() +
+  annotate(geom = "text",x = 71.5,y = -0.15,label="p-value = 0.21 (kendall)")
 
 diff_age_plot
 cor.test(patient_clonality_diffs$age,patient_clonality_diffs$ith_change,method = "kendal")
@@ -590,10 +591,12 @@ cor.test(patient_clonality_diffs$age,patient_clonality_diffs$ith_change,method =
 
 ```{r clonality_diff_sample_age}
 sample_age_plot <- ggplot(patient_clonality_diffs) +
-  geom_point(aes(diagnosis_distance,ith_change)) +
-  geom_smooth(aes(diagnosis_distance,ith_change),method = "lm") +
+  geom_point(aes(-diagnosis_distance,ith_change)) +
+  geom_smooth(aes(-diagnosis_distance,ith_change),method = "lm") +
   ylab(label = paste0("\u0394","ITH")) +
-  theme_bw()
+  xlab(label = "time between diagnosis and registration (days)") +
+  theme_bw() +
+  annotate(geom = "text",x = 5700,y = -0.15,label="p-value = 0.79 (kendall)")
 
 sample_age_plot
 cor.test(patient_clonality_diffs$diagnosis_distance,patient_clonality_diffs$ith_change,method = "kendal")
@@ -626,7 +629,7 @@ delta_itg_priorlines <- ggplot(patient_clonality_diffs) +
   geom_signif(aes(as.factor(pre_reg_chemo),ith_change),comparisons = list(c("1","2")),test = "wilcox.test") +
   ylab(label = paste0("\u0394","ITH")) +
   xlab("") +
-  scale_fill_manual(values=c("#e5f5f9","#99d8c9"),name = "prior lines") +
+  scale_fill_manual(values=colour_palettes$prior_lines[1:2],name = "prior lines") +
   theme_bw() + theme(legend.position = "none")
 
 ggsave(filename = "plots/delta_itg_priorlines.png",plot = delta_itg_priorlines,width = 8,height = 6,units = "in",dpi = 300)

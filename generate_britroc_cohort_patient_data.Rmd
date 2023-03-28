@@ -161,7 +161,15 @@ paste0("Patients missing any progression date: ",paste0(unique(missing_prog$brit
 
 ```{r exlc_diag}
 missing_diag <- survival_data[is.na(survival_data$diagnosis_date),]
-survival_data <- survival_data[!is.na(survival_data$diagnosis_date),]
+## take date at middle of year
+missingDates <- str_split(pattern = " ",
+                          survival_data$diagnosis_date_misc[is.na(survival_data$diagnosis_date)],
+                          simplify = T,2)[,2]
+
+newDates <- as.Date(paste0(missingDates,"-07-02"))
+
+survival_data$diagnosis_date[is.na(survival_data$diagnosis_date)] <- newDates
+
 paste0("Patients with diagnosis date: ",length(unique(survival_data$britroc_number)))
 paste0("Patients missing any diagnosis date: ",paste0(unique(missing_diag$britroc_number),collapse = ", "))
 ```
