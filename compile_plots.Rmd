@@ -535,7 +535,7 @@ brca_rate_plot <- brca_rate_plot +
                     theme(legend.position = "none")
 
 #brca_sig_bar <- readRDS("copy_number_analysis/focal_analysis/plots/brca_sig_bar_plot.rds")
-brca_sig_copies <- readRDS("copy_number_analysis/focal_analysis/plots/paired_amp_changes_plot.rds")
+brca_sig_copies <- readRDS("copy_number_analysis/focal_analysis/plots/brca_paired_amp_changes_plot.rds")
 brca_sig_copies <- brca_sig_copies +
                             theme(axis.title.x = element_blank(),
                                   axis.text.x = element_blank(),
@@ -574,8 +574,8 @@ fig9 <- plot_grid(diag_rlps_brca_rate_plot,
           nrow = 4,
           rel_heights = c(0.20,0.20,0.40,0.04))
 
-ggsave2(filename = "plots/figure_9_render.png",plot = fig9,width = 8,height = 12,units = "in",dpi = 300)
-ggsave2(filename = "plots/figure_9_render.pdf",plot = fig9,width = 8,height = 12,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_9_render.png",plot = fig9,width = 8,height = 11,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_9_render.pdf",plot = fig9,width = 8,height = 11,units = "in",dpi = 300)
 fig9
 ```
 

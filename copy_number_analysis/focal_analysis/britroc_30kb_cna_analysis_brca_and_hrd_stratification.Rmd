@@ -926,7 +926,7 @@ sigAnn <- cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_tab
     rename("gene"="Gene")
 
 
-paired_amp_changes_plot <- ggplot(paired_amp_changes) +
+brca_paired_amp_changes_plot <- ggplot(paired_amp_changes) +
     geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),position = position_dodge2(width = 0.4)) +
     geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),alpha=0.3,position = "dodge") +
     scale_fill_manual(values = colour_palettes$brca_carriers) +
@@ -937,7 +937,7 @@ paired_amp_changes_plot <- ggplot(paired_amp_changes) +
     theme_bw() +
     theme(legend.position = "bottom")
 
-paired_amp_changes_strat_plot <- ggplot(paired_amp_changes) +
+brca_paired_amp_changes_strat_plot <- ggplot(paired_amp_changes) +
     geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),position = position_dodge2(width = 0.4)) +
     geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),alpha=0.3,position = "dodge") +
     scale_fill_manual(values = colour_palettes$brca_carriers) +
@@ -948,10 +948,10 @@ paired_amp_changes_strat_plot <- ggplot(paired_amp_changes) +
     theme_bw() +
     theme(legend.position = "bottom")
 
-ggsave(plot = paired_amp_changes_plot,filename = "plots/paired_amp_changes_plot.png",width = 6,height = 8,units = "in",dpi = 300)
-ggsave(plot = paired_amp_changes_plot,filename = "plots/paired_amp_changes_plot.pdf",width = 6,height = 8)
-saveRDS(object = paired_amp_changes_plot,file = "plots/paired_amp_changes_plot.rds")
-paired_amp_changes_plot
+ggsave(plot = brca_paired_amp_changes_plot,filename = "plots/brca_paired_amp_changes_plot.png",width = 6,height = 8,units = "in",dpi = 300)
+ggsave(plot = brca_paired_amp_changes_plot,filename = "plots/brca_paired_amp_changes_plot.pdf",width = 6,height = 8)
+saveRDS(object = brca_paired_amp_changes_plot,file = "plots/brca_paired_amp_changes_plot.rds")
+brca_paired_amp_changes_plot
 ```
 
 ```{r cna_norm_changes}
