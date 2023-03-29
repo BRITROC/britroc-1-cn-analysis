@@ -45,8 +45,8 @@ mv zenodo/prenorm_downsampled_fitsbritroc_30kb_ds_absCopyNumber.rds absolute_PRE
 mv zenodo/clonality_results/ absolute_PRE_down_sampling/
 # File clean up
 echo -e "[${script}] Cleaning up additional data"
-#rm -rf zenodo/
-#rm britroc_1_additional_data.zip
+rm -rf zenodo/
+rm britroc_1_additional_data.zip
 
 # Check provided conda directory
 if [ "$#" -lt 1 ]; then
