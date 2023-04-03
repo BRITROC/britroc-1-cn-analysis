@@ -49,7 +49,7 @@ colour_palettes <- list(arx_rlps=c(arx=primary_colour_setting,
                                 "2"=stage_2_colour_setting,
                                 "3"=stage_3_colour_setting,
                                 "4"=stage_4_colour_setting),
-                        brca_carriers=c("BRCA"=brca_colour_setting,
-                                        "non-BRCA"=non_brca_colour_setting))
+                        brca_carriers=c("BRCA-mutant"=brca_colour_setting,
+                                        "wildtype"=non_brca_colour_setting))
 
 rm(list = ls()[grep("*_colour_setting",ls())])

@@ -18,6 +18,10 @@ library(magick)
 library(pdftools)
 ```
 
+```{r source}
+source("colour_palettes.R")
+```
+
 ```{r empty_plot}
 ## Empty place holder
 empty <- ggplot() +
@@ -569,7 +573,7 @@ fig9 <- plot_grid(diag_rlps_brca_rate_plot,
           plot_grid(brca_sig_copies,brca_sig_radar,
                     ncol = 2,labels=c("C","D")),
           plot_grid(empty,diag_legend,brca_legend,empty,
-                    rel_widths = c(0.1,0.25,0.25,0.1),ncol = 4),
+                    rel_widths = c(0.1,0.25,0.30,0.05),ncol = 4),
           labels=c("A","B","",""),
           nrow = 4,
           rel_heights = c(0.20,0.20,0.40,0.04))

@@ -141,7 +141,7 @@ sig_bar <- as.data.frame(sig_quants) %>%
 
 sig_bar$SAMPLE_ID <- factor(sig_bar$SAMPLE_ID,levels = sample_order)
 
-sig_bar$BRCA_carrier <- ifelse(sig_bar$PATIENT_ID %in% combinedBRCA$PATIENT_ID,"BRCA","non-BRCA")
+sig_bar$BRCA_carrier <- ifelse(sig_bar$PATIENT_ID %in% combinedBRCA$PATIENT_ID,"BRCA-mutant","wildtype")
 
 head(sig_bar)
 ```
@@ -150,7 +150,7 @@ head(sig_bar)
 
 ```{r cna_rate}
 patient.meta$BRCA_carrier <- factor(ifelse(patient.meta$PATIENT_ID %in% combinedBRCA$PATIENT_ID,
-                                           "BRCA","non-BRCA"),levels = c("BRCA","non-BRCA"))
+                                           "BRCA-mutant","wildtype"),levels = c("BRCA-mutant","wildtype"))
 brca_samples <- split(patient.meta,f = list(patient.meta$BRCA_carrier,patient.meta$group))
 
 brca_rates <- do.call(rbind,lapply(brca_samples,FUN = function(x){
@@ -170,49 +170,49 @@ brca_rates <- do.call(rbind,lapply(brca_samples,FUN = function(x){
 }))
 
 brca_rates$BRCA_carrier <- factor(brca_rates$BRCA_carrier,
-                                  levels = c("BRCA","non-BRCA"))
+                                  levels = c("BRCA-mutant","wildtype"))
 ```
 
 ```{r cna_rate_brca_non_brca_1}
 fishers_gene_CNA(data = cna_calls,
-                     sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA"],
-                     sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA"],
+                     sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA-mutant"],
+                     sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "wildtype"],
                      genes = focal_genes_table$Gene.name)
 ```
 
 ```{r cna_rate_brca_non_brca_2}
 fishers_gene_CNA(data = cna_calls,
                      sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
-                                                         patient.meta$BRCA_carrier == "BRCA"],
+                                                         patient.meta$BRCA_carrier == "BRCA-mutant"],
                      sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
-                                                         patient.meta$BRCA_carrier == "non-BRCA"],
+                                                         patient.meta$BRCA_carrier == "wildtype"],
                      genes = focal_genes_table$Gene.name)
 ```
 
 ```{r cna_rate_brca_non_brca_3}
 fishers_gene_CNA(data = cna_calls,
                      sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
-                                                         patient.meta$BRCA_carrier == "BRCA"],
+                                                         patient.meta$BRCA_carrier == "BRCA-mutant"],
                      sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
-                                                         patient.meta$BRCA_carrier == "non-BRCA"],
+                                                         patient.meta$BRCA_carrier == "wildtype"],
                      genes = focal_genes_table$Gene.name)
 ```
 
 ```{r cna_rate_brca_non_brca_4}
 fishers_gene_CNA(data = cna_calls,
                      sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
-                                                         patient.meta$BRCA_carrier == "BRCA"],
+                                                         patient.meta$BRCA_carrier == "BRCA-mutant"],
                      sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
-                                                         patient.meta$BRCA_carrier == "BRCA"],
+                                                         patient.meta$BRCA_carrier == "BRCA-mutant"],
                      genes = focal_genes_table$Gene.name)
 ```
 
 ```{r cna_rate_brca_non_brca_5}
 fishers_gene_CNA(data = cna_calls,
                      sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
-                                                         patient.meta$BRCA_carrier == "non-BRCA"],
+                                                         patient.meta$BRCA_carrier == "wildtype"],
                      sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
-                                                         patient.meta$BRCA_carrier == "non-BRCA"],
+                                                         patient.meta$BRCA_carrier == "wildtype"],
                      genes = focal_genes_table$Gene.name)
 ```
 
@@ -288,36 +288,36 @@ brca_cna_rates_plot_comb
 
 ```{r copies_brca_non_brca_1}
 cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
-                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA"],
-                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA"],
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA-mutant"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "wildtype"],
                          p.adj = "fdr")
 ```
 
 ```{r copies_brca_non_brca_2}
 cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
-                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$group == "diagnosis"],
-                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$group == "diagnosis"],
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA-mutant" & patient.meta$group == "diagnosis"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "wildtype" & patient.meta$group == "diagnosis"],
                          p.adj = "fdr")
 ```
 
 ```{r copies_brca_non_brca_3}
 cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
-                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$group == "relapse"],
-                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$group == "relapse"],
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA-mutant" & patient.meta$group == "relapse"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "wildtype" & patient.meta$group == "relapse"],
                          p.adj = "fdr")
 ```
 
 ```{r copies_brca_non_brca_4}
 cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
-                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$group == "diagnosis"],
-                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$group == "relapse"],
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA-mutant" & patient.meta$group == "diagnosis"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA-mutant" & patient.meta$group == "relapse"],
                          p.adj = "fdr")
 ```
 
 ```{r copies_brca_non_brca_5}
 cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
-                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$group == "diagnosis"],
-                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$group == "relapse"],
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "wildtype" & patient.meta$group == "diagnosis"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "wildtype" & patient.meta$group == "relapse"],
                          p.adj = "fdr")
 ```
 
@@ -326,10 +326,10 @@ amp_changes_all <- get_patient_changes(data = extracted,
                                               genes = protein_coding_genes$hgnc_symbol,
                                               patients = unique(patient.meta$PATIENT_ID)) %>%
                                             mutate(BRCA_carrier = ifelse(PATIENT_ID %in% combinedBRCA$PATIENT_ID,
-                                           "BRCA","non-BRCA"))
+                                           "BRCA-mutant","wildtype"))
 
 amp_changes_all$BRCA_carrier <- factor(amp_changes_all$BRCA_carrier,
-                                              levels = c("BRCA","non-BRCA"))
+                                              levels = c("BRCA-mutant","wildtype"))
 
 amp_changes <- amp_changes_all %>%
                         filter(gene %in% focal_genes_table$Gene.name)
@@ -342,7 +342,7 @@ ggplot(amp_changes) +
     geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),alpha=0.3,position = "dodge") +
     scale_fill_manual(values = colour_palettes$brca_carriers) +
     scale_colour_manual(values = colour_palettes$brca_carriers) +
-    geom_signif(aes(x = BRCA_carrier,y = value),comparison=list(c("BRCA","non-BRCA")),
+    geom_signif(aes(x = BRCA_carrier,y = value),comparison=list(c("BRCA-mutant","wildtype")),
                test = "wilcox.test",vjust = 1.5) +
     facet_wrap(. ~ gene,scales = "free_y",ncol = 3) +
     theme_bw() +
@@ -353,7 +353,7 @@ ggplot(amp_changes) +
     geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),alpha=0.3,position = "dodge") +
     scale_fill_manual(values = colour_palettes$brca_carriers) +
     scale_colour_manual(values = colour_palettes$brca_carriers) +
-    geom_signif(aes(x = BRCA_carrier,y = value),comparison=list(c("BRCA","non-BRCA")),
+    geom_signif(aes(x = BRCA_carrier,y = value),comparison=list(c("BRCA-mutant","wildtype")),
                test = "wilcox.test",vjust = 1.5) +
     facet_wrap(group ~ gene,scales = "free_y",ncol = 3) +
     theme_bw() +
@@ -413,7 +413,7 @@ brca_sig_dist_plot <- ggplot(data = sig_bar) +
     geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
                 alpha=0.3,position = "dodge") +
     geom_signif(aes(x = BRCA_carrier,y = value),
-                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                test = "wilcox.test",comparisons = list(c("BRCA-mutant","wildtype")),
                 vjust = 1.8) +
     scale_fill_manual(values = colour_palettes$brca_carriers) +
     scale_colour_manual(values = colour_palettes$brca_carriers) +
@@ -431,7 +431,7 @@ brca_sig_dist_diagnosis_plot <- ggplot(data = sig_bar[sig_bar$group == "diagnosi
     geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
                 alpha=0.3,position = "dodge") +
     geom_signif(aes(x = BRCA_carrier,y = value),
-                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                test = "wilcox.test",comparisons = list(c("BRCA-mutant","wildtype")),
                 vjust = 1.8) +
     scale_fill_manual(values = colour_palettes$brca_carriers) +
     scale_colour_manual(values = colour_palettes$brca_carriers) +
@@ -449,7 +449,7 @@ brca_sig_dist_relapse_plot <- ggplot(data = sig_bar[sig_bar$group == "relapse",]
     geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
                 alpha=0.3,position = "dodge") +
     geom_signif(aes(x = BRCA_carrier,y = value),
-                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                test = "wilcox.test",comparisons = list(c("BRCA-mutant","wildtype")),
                 vjust = 1.8) +
     scale_fill_manual(values = colour_palettes$brca_carriers) +
     scale_colour_manual(values = colour_palettes$brca_carriers) +
@@ -467,7 +467,7 @@ brca_sig_dist_grouped_plot <- ggplot(data = sig_bar) +
     geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
                 alpha=0.3,position = "dodge") +
     geom_signif(aes(x = BRCA_carrier,y = value),
-                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                test = "wilcox.test",comparisons = list(c("BRCA-mutant","wildtype")),
                 vjust = 1.3) +
     scale_fill_manual(values = colour_palettes$brca_carriers) +
     scale_colour_manual(values = colour_palettes$brca_carriers) +
@@ -510,7 +510,7 @@ brca_sig_1_dist_plot <- ggplot(sig_bar[sig_bar$signature == "s1",]) +
     geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
                 alpha=0.3,position = "dodge") +
     geom_signif(aes(x = BRCA_carrier,y = value),
-                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                test = "wilcox.test",comparisons = list(c("BRCA-mutant","wildtype")),
                 vjust = 1.5) +
     scale_fill_manual(values = colour_palettes$brca_carriers) +
     scale_colour_manual(values = colour_palettes$brca_carriers) +
@@ -686,7 +686,7 @@ ggplot(paired_cn_segs_weighted) +
               position = position_dodge2(width = 0.6)) +
   geom_violin(aes(BRCA_carrier,change,fill=BRCA_carrier),alpha=0.5) +
   geom_signif(aes(x = BRCA_carrier,y = change),
-                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                test = "wilcox.test",comparisons = list(c("BRCA-mutant","wildtype")),
                 vjust = 1.3) +
   xlab("events") +
   facet_wrap(direction ~ seg_bin,ncol = 5) +
@@ -721,7 +721,7 @@ ggplot(cn_segs_sigs_weighted) +
 
 ```{r cna_rate_paired}
 patient.meta$BRCA_carrier <- factor(ifelse(patient.meta$PATIENT_ID %in% combinedBRCA$PATIENT_ID,
-                                           "BRCA","non-BRCA"),levels = c("BRCA","non-BRCA"))
+                                           "BRCA-mutant","wildtype"),levels = c("BRCA-mutant","wildtype"))
 brca_samples_paired <- split(patient.meta[patient.meta$paired == "TRUE",],
                       f = list(patient.meta$BRCA_carrier[patient.meta$paired == "TRUE"],patient.meta$group[patient.meta$paired == "TRUE"]))
 
@@ -742,50 +742,50 @@ brca_rates_paired <- do.call(rbind,lapply(brca_samples_paired,FUN = function(x){
 }))
 
 brca_rates_paired$BRCA_carrier <- factor(brca_rates_paired$BRCA_carrier,
-                                  levels = c("BRCA","non-BRCA"))
+                                  levels = c("BRCA-mutant","wildtype"))
 head(brca_rates_paired)
 ```
 
 ```{r cna_rate_brca_non_brca_1_paired}
 fishers_gene_CNA(data = cna_calls,
-                     sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$paired == "TRUE"],
-                     sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$paired == "TRUE"],
+                     sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA-mutant" & patient.meta$paired == "TRUE"],
+                     sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "wildtype" & patient.meta$paired == "TRUE"],
                      genes = focal_genes_table$Gene.name)
 ```
 
 ```{r cna_rate_brca_non_brca_2_paired}
 fishers_gene_CNA(data = cna_calls,
                      sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
-                                                         patient.meta$BRCA_carrier == "BRCA" & patient.meta$paired == "TRUE"],
+                                                         patient.meta$BRCA_carrier == "BRCA-mutant" & patient.meta$paired == "TRUE"],
                      sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
-                                                         patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$paired == "TRUE"],
+                                                         patient.meta$BRCA_carrier == "wildtype" & patient.meta$paired == "TRUE"],
                      genes = focal_genes_table$Gene.name)
 ```
 
 ```{r cna_rate_brca_non_brca_3_paired}
 fishers_gene_CNA(data = cna_calls,
                      sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
-                                                         patient.meta$BRCA_carrier == "BRCA" & patient.meta$paired == "TRUE"],
+                                                         patient.meta$BRCA_carrier == "BRCA-mutant" & patient.meta$paired == "TRUE"],
                      sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
-                                                         patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$paired == "TRUE"],
+                                                         patient.meta$BRCA_carrier == "wildtype" & patient.meta$paired == "TRUE"],
                      genes = focal_genes_table$Gene.name)
 ```
 
 ```{r cna_rate_brca_non_brca_4_paired}
 fishers_gene_CNA(data = cna_calls,
                      sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
-                                                         patient.meta$BRCA_carrier == "BRCA" & patient.meta$paired == "TRUE"],
+                                                         patient.meta$BRCA_carrier == "BRCA-mutant" & patient.meta$paired == "TRUE"],
                      sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
-                                                         patient.meta$BRCA_carrier == "BRCA" & patient.meta$paired == "TRUE"],
+                                                         patient.meta$BRCA_carrier == "BRCA-mutant" & patient.meta$paired == "TRUE"],
                      genes = focal_genes_table$Gene.name)
 ```
 
 ```{r cna_rate_brca_non_brca_paired_5}
 fishers_gene_CNA(data = cna_calls,
                      sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
-                                                         patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$paired == "TRUE"],
+                                                         patient.meta$BRCA_carrier == "wildtype" & patient.meta$paired == "TRUE"],
                      sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "relapse" &
-                                                         patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$paired == "TRUE"],
+                                                         patient.meta$BRCA_carrier == "wildtype" & patient.meta$paired == "TRUE"],
                      genes = focal_genes_table$Gene.name)
 ```
 
@@ -864,36 +864,36 @@ brca_diag_rlps_cna_rates_paired_plot
 
 ```{r copies_brca_non_brca_paired_1}
 cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
-                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$paired == "TRUE"],
-                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$paired == "TRUE"],
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA-mutant" & patient.meta$paired == "TRUE"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "wildtype" & patient.meta$paired == "TRUE"],
                          p.adj = "fdr")
 ```
 
 ```{r copies_brca_non_brca_paired_2}
 cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
-                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$group == "diagnosis" & patient.meta$paired == "TRUE"],
-                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$group == "diagnosis" & patient.meta$paired == "TRUE"],
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA-mutant" & patient.meta$group == "diagnosis" & patient.meta$paired == "TRUE"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "wildtype" & patient.meta$group == "diagnosis" & patient.meta$paired == "TRUE"],
                          p.adj = "fdr")
 ```
 
 ```{r copies_brca_non_brca_paired_3}
 cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
-                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$group == "relapse" & patient.meta$paired == "TRUE"],
-                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$group == "relapse" & patient.meta$paired == "TRUE"],
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA-mutant" & patient.meta$group == "relapse" & patient.meta$paired == "TRUE"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "wildtype" & patient.meta$group == "relapse" & patient.meta$paired == "TRUE"],
                          p.adj = "fdr")
 ```
 
 ```{r copies_brca_non_brca_paired_4}
 cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
-                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$group == "diagnosis" & patient.meta$paired == "TRUE"],
-                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$group == "relapse" & patient.meta$paired == "TRUE"],
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA-mutant" & patient.meta$group == "diagnosis" & patient.meta$paired == "TRUE"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA-mutant" & patient.meta$group == "relapse" & patient.meta$paired == "TRUE"],
                          p.adj = "fdr")
 ```
 
 ```{r copies_brca_non_brca_paired_5}
 cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
-                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$group == "diagnosis" & patient.meta$paired == "TRUE"],
-                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$group == "relapse" & patient.meta$paired == "TRUE"],
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "wildtype" & patient.meta$group == "diagnosis" & patient.meta$paired == "TRUE"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "wildtype" & patient.meta$group == "relapse" & patient.meta$paired == "TRUE"],
                          p.adj = "fdr")
 ```
 
@@ -904,10 +904,10 @@ paired_amp_changes_all <- get_patient_changes(data = extracted,
                                               genes = protein_coding_genes$hgnc_symbol,
                                               patients = unique(patient.meta$PATIENT_ID[patient.meta$paired == TRUE])) %>%
                                             mutate(BRCA_carrier = ifelse(PATIENT_ID %in% combinedBRCA$PATIENT_ID,
-                                           "BRCA","non-BRCA"))
+                                           "BRCA-mutant","wildtype"))
 
 paired_amp_changes_all$BRCA_carrier <- factor(paired_amp_changes_all$BRCA_carrier,
-                                              levels = c("BRCA","non-BRCA"))
+                                              levels = c("BRCA-mutant","wildtype"))
 
 paired_amp_changes <- paired_amp_changes_all %>%
                         filter(gene %in% focal_genes_table$Gene.name)
@@ -916,8 +916,8 @@ head(paired_amp_changes)
 
 ```{r cna_copies_plots_paired}
 sigAnn <- cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_table$Gene.name,
-                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA" & patient.meta$paired == "TRUE"],
-                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "non-BRCA" & patient.meta$paired == "TRUE"],
+                         sub_a = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "BRCA-mutant" & patient.meta$paired == "TRUE"],
+                         sub_b = patient.meta$SAMPLE_ID[patient.meta$BRCA_carrier == "wildtype" & patient.meta$paired == "TRUE"],
                          p.adj = "fdr") %>%
     arrange(Gene) %>%
     mutate(xmin = rep(1,nrow(.))) %>%
@@ -925,13 +925,14 @@ sigAnn <- cna_median_copies(data = extracted,min_obs = 3,genes = focal_genes_tab
     mutate(y_position = rep(1,nrow(.))) %>%
     rename("gene"="Gene")
 
-
 brca_paired_amp_changes_plot <- ggplot(paired_amp_changes) +
     geom_point(aes(x = BRCA_carrier,y = value,color=BRCA_carrier),position = position_dodge2(width = 0.4)) +
     geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),alpha=0.3,position = "dodge") +
     scale_fill_manual(values = colour_palettes$brca_carriers) +
     scale_colour_manual(values = colour_palettes$brca_carriers) +
-    geom_signif(aes(xmin=xmin,xmax=xmax,y_position=unlist(lapply(split(paired_amp_changes,f = factor(paired_amp_changes$gene)),FUN = function(x) round(max(x$value))+2)),annotations=round(qVal,digits = 3),group=gene),
+    geom_signif(aes(xmin=xmin,xmax=xmax,
+                    y_position=c(12,42,10,6,7,10,10,7,41,12,12,29,15,14,10,13,8,6),
+                    annotations=round(qVal,digits = 3),group=gene),
                 data = sigAnn,manual = TRUE,vjust = 1.5) +
     facet_wrap(. ~ gene,scales = "free_y",ncol = 3) +
     theme_bw() +
@@ -942,7 +943,7 @@ brca_paired_amp_changes_strat_plot <- ggplot(paired_amp_changes) +
     geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),alpha=0.3,position = "dodge") +
     scale_fill_manual(values = colour_palettes$brca_carriers) +
     scale_colour_manual(values = colour_palettes$brca_carriers) +
-    geom_signif(aes(x = BRCA_carrier,y = value),comparison=list(c("BRCA","non-BRCA")),
+    geom_signif(aes(x = BRCA_carrier,y = value),comparison=list(c("BRCA-mutant","wildtype")),
                test = "wilcox.test",vjust = 1.5) +
     facet_wrap(group ~ gene,scales = "free_y",ncol = 3) +
     theme_bw() +
@@ -965,7 +966,7 @@ norm_amp_changes <- norm_amp_changes_all %>%
                       filter(gene %in% focal_genes_table$Gene.name)
 
 norm_amp_changes$BRCA_carrier <- factor(ifelse(norm_amp_changes$PATIENT_ID %in% combinedBRCA$PATIENT_ID,
-                                           "BRCA","non-BRCA"),levels = c("BRCA","non-BRCA"))
+                                           "BRCA-mutant","wildtype"),levels = c("BRCA-mutant","wildtype"))
 
 ggplot(norm_amp_changes) +
     geom_point(aes(x = BRCA_carrier,y = change,color=BRCA_carrier),position = position_dodge2(width = 0.4)) +
@@ -973,7 +974,7 @@ ggplot(norm_amp_changes) +
     scale_fill_manual(values = colour_palettes$brca_carriers) +
     scale_colour_manual(values = colour_palettes$brca_carriers) +
     geom_signif(aes(x = BRCA_carrier,y = change),
-        comparison=list(c("BRCA","non-BRCA")),
+        comparison=list(c("BRCA-mutant","wildtype")),
         test = "wilcox.test",vjust = 1.5) +
     facet_wrap(. ~ gene,scales = "free_y",ncol = 3) +
     theme_bw() +
@@ -1037,7 +1038,7 @@ brca_sig_dist_paired_plot <- ggplot(data = sig_bar_paired) +
     geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
                 alpha=0.3,position = "dodge") +
     geom_signif(aes(x = BRCA_carrier,y = value),
-                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                test = "wilcox.test",comparisons = list(c("BRCA-mutant","wildtype")),
                 vjust = 1.8) +
     scale_fill_manual(values = colour_palettes$brca_carriers) +
     scale_colour_manual(values = colour_palettes$brca_carriers) +
@@ -1055,7 +1056,7 @@ brca_sig_dist_diagnosis_paired_plot <- ggplot(data = sig_bar_paired[sig_bar_pair
     geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
                 alpha=0.3,position = "dodge") +
     geom_signif(aes(x = BRCA_carrier,y = value),
-                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                test = "wilcox.test",comparisons = list(c("BRCA-mutant","wildtype")),
                 vjust = 1.8) +
     scale_fill_manual(values = colour_palettes$brca_carriers) +
     scale_colour_manual(values = colour_palettes$brca_carriers) +
@@ -1073,7 +1074,7 @@ brca_sig_dist_relapse_paired_plot <- ggplot(data = sig_bar_paired[sig_bar_paired
     geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
                 alpha=0.3,position = "dodge") +
     geom_signif(aes(x = BRCA_carrier,y = value),
-                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                test = "wilcox.test",comparisons = list(c("BRCA-mutant","wildtype")),
                 vjust = 1.8) +
     scale_fill_manual(values = colour_palettes$brca_carriers) +
     scale_colour_manual(values = colour_palettes$brca_carriers) +
@@ -1091,7 +1092,7 @@ brca_sig_dist_grouped_paired_plot <- ggplot(data = sig_bar_paired) +
     geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
                 alpha=0.3,position = "dodge") +
     geom_signif(aes(x = BRCA_carrier,y = value),
-                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                test = "wilcox.test",comparisons = list(c("BRCA-mutant","wildtype")),
                 vjust = 1.3) +
     scale_fill_manual(values = colour_palettes$brca_carriers) +
     scale_colour_manual(values = colour_palettes$brca_carriers) +
@@ -1135,7 +1136,7 @@ brca_sig_1_dist_paired_plot <- ggplot(sig_bar_paired[sig_bar_paired$signature ==
     geom_violin(aes(x = BRCA_carrier,y = value,fill=BRCA_carrier),
                 alpha=0.3,position = "dodge") +
     geom_signif(aes(x = BRCA_carrier,y = value),
-                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                test = "wilcox.test",comparisons = list(c("BRCA-mutant","wildtype")),
                 vjust = 1.5) +
     scale_fill_manual(values = colour_palettes$brca_carriers) +
     scale_colour_manual(values = colour_palettes$brca_carriers) +
@@ -1222,7 +1223,7 @@ paired_cn_event_plots <- ggplot(paired_cn_segs_events) +
              alpha=0.3,position = position_dodge2(width = 0.6)) +
   geom_violin(aes(BRCA_carrier,change,fill=BRCA_carrier),alpha=0.5) +
   geom_signif(aes(x = BRCA_carrier,y = change),
-                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                test = "wilcox.test",comparisons = list(c("BRCA-mutant","wildtype")),
                 vjust = 1.5) +
   scale_colour_manual(values = colour_palettes$brca_carriers) +
   scale_fill_manual(values = colour_palettes$brca_carriers) +
@@ -1337,7 +1338,7 @@ ggplot(paired_cn_segs_weighted_paired) +
               position = position_dodge2(width = 0.6)) +
   geom_violin(aes(BRCA_carrier,change,fill=BRCA_carrier),alpha=0.5) +
   geom_signif(aes(x = BRCA_carrier,y = change),
-                test = "wilcox.test",comparisons = list(c("BRCA","non-BRCA")),
+                test = "wilcox.test",comparisons = list(c("BRCA-mutant","wildtype")),
                 vjust = 1.3) +
   xlab("events") +
   facet_wrap(direction ~ seg_bin,ncol = 5) +
@@ -1380,6 +1381,8 @@ seg_paired_corr_plot <- ggplot(seg_paired_corr) +
                         facet_wrap(direction ~ seg_bin,ncol = 5,
                                    labeller = labeller(seg_bin = seg_bin_names)) +
                         scale_colour_manual(values = colour_palettes$brca_carriers) +
+                        xlab("diagnosis segments") +
+                        ylab("relapse segments") +
                         coord_equal() +
                         theme_bw()
 
