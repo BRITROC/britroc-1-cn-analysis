@@ -32,7 +32,7 @@ empty <- ggplot() +
 ```{r fig1}
 ## Load plot
 ## Temp flow chart load
-flow_chart <- ggdraw() + draw_image(magick::image_read_pdf("plots/BriTROC-1_manuscript2_figure_1_v2-cropped.pdf",density = 600))
+flow_chart <- ggdraw() + draw_image(magick::image_read_pdf("plots/BriTROC-1_manuscript2_figure_1_v3-cropped.pdf",density = 600))
 cohort_plot <- readRDS("plots/cohort_plot.RDS")
 reg_surv_plot <- readRDS("plots/reg_surv_plot.RDS")
 
