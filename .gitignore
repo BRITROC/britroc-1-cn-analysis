@@ -103,3 +103,6 @@ absolute_POST_down_sampling/downsampled_bams/archived_or_stored_see_workflow
 # Additional temp exclusions
 EGA/britroc_ega_sample_metadata.Rmd
 britroc_1_additional_data.zip
+# Unused analysis
+copy_number_analysis/medicc2/
+copy_number_analysis/zhao_paper/
