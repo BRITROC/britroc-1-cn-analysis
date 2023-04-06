@@ -15,7 +15,7 @@ Provided conda is installed and available on the `$PATH` run the following line.
 ```
 Where `{CONDA_INSTALL}` is the path to your conda directory, such as `/home/username/resources/miniconda/`.
 
-#### Activate the newly installed
+#### Activate the newly installed environment
 ```
 conda activate britroc
 ```
