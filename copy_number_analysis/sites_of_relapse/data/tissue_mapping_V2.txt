@@ -1,0 +1,238 @@
+Location of Tumour biopsied	location_curated	tissue_group_curated
+Abdominal	abdominal	abdominal
+Abdominal mass	abdominal	abdominal
+Abdominal Peritoneum	peritoneum	peritoneum
+Abdominal Peritoneum LUQ-LLQ	peritoneum	peritoneum
+Abdominal peritoneum RLQ	peritoneum	peritoneum
+Abdominal Peritoneum R-LQ	peritoneum	peritoneum
+Abdominal Peritoneum R-Lq	peritoneum	peritoneum
+Abdominal peritoneum RUQ	peritoneum	peritoneum
+Abdominal Peritoneum Ruq	peritoneum	peritoneum
+Abdominal Peritoneum; Liver	abdominal	abdominal
+Abdominal Peritoneum; Omentum	abdominal	abdominal
+Abdominal Peritoneum; Omentum; Pelvic Peritoneum; Rectum; Sigmoid; Bladder; Uterus	uncertain	uncertain
+Abdominal Wall	abdominal	abdominal
+Adnexal Mass	gynae	pelvic
+Anterior abdominal wall	peritoneum	peritoneum
+Axillary Lymph Node	lymph_node	lymph_node
+Bladder	bladder	pelvic
+Bowel	bowel	abdominal
+Bowel and Omentum	abdominal	abdominal
+Bowel; Omentum	abdominal	abdominal
+Brain	brain	other
+Brain Frontotemporal Lobe	brain	other
+Brain Occipital Lobe	brain	other
+Brain Parietal Lobe	brain	other
+Breast core biopsy	breast	other
+Breast Core Biopsy	breast	other
+Bx of umbilicus	abdominal	abdominal
+Central Peritoneum	peritoneum	peritoneum
+Cervical cone Bx	gynae	pelvic
+Cervical node	lymph_node	lymph_node
+Cervix	gynae	pelvic
+Chest Wall	chest	other
+Chest wall	chest	other
+Colic Fixture Bowel	bowel	abdominal
+Colon	colon	abdominal
+Colon Descending	colon	abdominal
+Colon Polyp	colon	abdominal
+Colonic polyp	colon	abdominal
+Cystic part of tumour	uncertain	uncertain
+Descending colon	colon	abdominal
+Diaphragm	diaphragm	abdominal
+Diaphragmatic surface	diaphragm	abdominal
+Diaphragmatic Surface	diaphragm	abdominal
+Diaphragmatic Surface; Liver; Omentum; Pelvic Lymph Node; Pelvic Peritoneum	uncertain	uncertain
+Distal Fallopian Tube	ovary_FT	pelvic
+Duodenum	bowel	abdominal
+ENDOMETRIAL	gynae	pelvic
+Endometrial Bx	gynae	pelvic
+Endometrium	gynae	pelvic
+External Iliac Lymph Node	lymph_node	lymph_node
+Fallopian Tube	ovary_FT	pelvic
+Fallopian Tube; Small Bowel	pelvis	pelvic
+Fallopian Tube; Uterus; Peritoneum; Bladder	pelvis	pelvic
+FT	ovary_FT	pelvic
+FT/OV	ovary_FT	pelvic
+Groin Lymph Node	lymph_node	lymph_node
+Iliac Fossa	abdominal	abdominal
+Iliac lymph Node	lymph_node	lymph_node
+Iliac Lymph Node	lymph_node	lymph_node
+Incisional biopsy abdomen	abdominal	abdominal
+Inguinal Lymph Node	lymph_node	lymph_node
+Left anterior abdominal wall	peritoneum	peritoneum
+Left aortic node	lymph_node	lymph_node
+Left Aortic Node	lymph_node	lymph_node
+Left axillary lymph node	lymph_node	lymph_node
+Left Axillary Lymph Node	lymph_node	lymph_node
+Left breast core	breast	other
+Left flank peritoneal	peritoneum	peritoneum
+Left groin	pelvis	pelvic
+left Groin nodes	lymph_node	lymph_node
+Left inguinal node 	lymph_node	lymph_node
+left obturator lymph node	lymph_node	lymph_node
+Left Obturator Lymph Node	lymph_node	lymph_node
+Left ovarian mass	ovary_FT	pelvic
+Left Ovary	ovary_FT	pelvic
+Left ovary and FT	ovary_FT	pelvic
+Left pelvic mass	pelvis	pelvic
+Left supraclavical node	lymph_node	lymph_node
+Left supra-clavicular node	lymph_node	lymph_node
+Left tube and small bowel	pelvis	pelvic
+Lesion from left round ligament	pelvis	pelvic
+Liver	liver	abdominal
+LN	lymph_node	lymph_node
+Lung	chest	other
+Lymph node	lymph_node	lymph_node
+Lymph Node	lymph_node	lymph_node
+Lymph node from bifurcation of left common iliac	lymph_node	lymph_node
+Lymph Nodule	lymph_node	lymph_node
+Mass in bladder	bladder	pelvic
+Mesenteric deposits	peritoneum	peritoneum
+Mesenteric Lymph Node	lymph_node	lymph_node
+Mesenteric mass	peritoneum	peritoneum
+Mesenteric node	peritoneum	peritoneum
+Mesentery	peritoneum	peritoneum
+midline parcardiac	chest	other
+Muscle	muscle	other
+nodule from left posterior pouch of douglas	lymph_node	lymph_node
+Nodule from transverse colon mesentery	peritoneum	peritoneum
+Omental nodule	lymph_node	lymph_node
+Omentum	omentum	abdominal
+Omentum; Pelvic Peritoneum	pelvis	pelvic
+Ovarian	ovary_FT	pelvic
+Ovarian & uterine tumour	ovary_FT	pelvic
+Ovarian mass	ovary_FT	pelvic
+"Ovaries, omentum and tubes"	uncertain	uncertain
+Ovary	ovary_FT	pelvic
+Ovary; Fallopian Tube	ovary_FT	pelvic
+Ovary; Fallopian Tube; Omentum	uncertain	uncertain
+Ovary; Fallopian Tube; Uterus	gynae	pelvic
+Ovary; Fallopian tube; Uterus	gynae	pelvic
+Ovary; Fallopian Tube; Uterus; Cervix	gynae	pelvic
+Ovary; Fallopian Tube; Uterus; Cervix; Rectum	pelvis	pelvic
+Ovary; Fallopian Tube; Uterus; Peritoneum; Bladder	pelvis	pelvic
+Para Aortic Node	lymph_node	lymph_node
+Para-aortic Lymph Node	lymph_node	lymph_node
+Paracolic Peritoneum	peritoneum	peritoneum
+Para-rectal Lymph Nodule	lymph_node	lymph_node
+Parasternal	chest	other
+Para-sternal Mass	chest	other
+Para-sternum	chest	other
+Pelvic deposit	pelvis	pelvic
+Pelvic exenteration - right adnexal region	pelvis	pelvic
+Pelvic lymph node	lymph_node	lymph_node
+Pelvic Lymph Node	lymph_node	lymph_node
+Pelvic Lymph Nodule	lymph_node	lymph_node
+Pelvic mass	pelvis	pelvic
+Pelvic Mass biopsy	pelvis	pelvic
+pelvic mass core biopsy	pelvis	pelvic
+Pelvic peritoneaum - Right lower quadrant	peritoneum	peritoneum
+Pelvic Peritoneum	peritoneum	peritoneum
+Pelvic Side Wall	pelvis	pelvic
+Pelvic Sidewall	pelvis	pelvic
+Pelvic wall	pelvis	pelvic
+Pelvis	pelvis	pelvic
+Peri colic fat cyst	bowel	abdominal
+Peri-colic Region	bowel	abdominal
+Peri-nephric Region	abdominal	abdominal
+Periotneal biopsy	peritoneum	peritoneum
+perisplenic	perisplenic	abdominal
+Perisplenic	perisplenic	abdominal
+Peri-splenic	perisplenic	abdominal
+Peri-splenic Region	perisplenic	abdominal
+Peritoneal	peritoneum	peritoneum
+Peritoneal 	peritoneum	peritoneum
+Peritoneal at Vaginal Vault	gynae	pelvic
+Peritoneal biopsy	peritoneum	peritoneum
+Peritoneal Lymph Node	lymph_node	lymph_node
+Peritoneal node	lymph_node	lymph_node
+Peritoneal tumour	peritoneum	peritoneum
+Peritoneum	peritoneum	peritoneum
+Pleura	chest	other
+Pleural biopsy	chest	other
+Post Caecal deposit	colon	abdominal
+Pouch Of Douglas	gynae	pelvic
+Pouch of Douglas 	gynae	pelvic
+Pouch of Douglas Bx	gynae	pelvic
+Psoas	abdominal	abdominal
+Rectal biopsy	colon	abdominal
+Rectal Sigmoid	colon	abdominal
+Rectum	colon	abdominal
+Rectum/Sigmoid/Bladder	pelvis	pelvic
+Recurrence from left iliac fossa	abdominal	abdominal
+Recurrence From Left Iliac Fossa	abdominal	abdominal
+Retroperitoneal Lymph Node	lymph_node	lymph_node
+Retroperitoneal Lymph Nodule	lymph_node	lymph_node
+Retroperitoneal nodule pericolic fat (not main cyst)	abdominal	abdominal
+Right anteria abdominal wall	diaphragm	abdominal
+Right Anteria Abdominal Wall	abdominal	abdominal
+Right axillary lymph node	lymph_node	lymph_node
+Right Axillary Lymph Node	lymph_node	lymph_node
+Right axillary node mass	lymph_node	lymph_node
+Right chest wall	chest	other
+Right fallopian tube	ovary_FT	pelvic
+Right FT & Ovary	ovary_FT	pelvic
+Right Groin Lymph Node	lymph_node	lymph_node
+Right groin node	lymph_node	lymph_node
+Right groin node Bx	lymph_node	lymph_node
+Right iliac foss node	lymph_node	lymph_node
+Right Inguinal Lymph Node	lymph_node	lymph_node
+Right inguinal node	lymph_node	lymph_node
+Right obturator fossa	pelvis	pelvic
+Right ovarian mass and FT	ovary_FT	pelvic
+Right ovary	ovary_FT	pelvic
+Right ovary and right FT	ovary_FT	pelvic
+Right paracolic peritoneum	peritoneum	peritoneum
+Right pelvic tumour	pelvis	pelvic
+Right Pelvic Tumour	pelvis	pelvic
+Right pelvic wall tumour	pelvis	pelvic
+Right supraclavicular cervical lymph node	lymph_node	lymph_node
+Right tube and ovary	ovary_FT	pelvic
+Right tumour	uncertain	uncertain
+Round Ligament	pelvis	pelvic
+Secondary debulking- peritoneum	peritoneum	peritoneum
+Serosa of left colon	colon	abdominal
+Sigmoid	colon	abdominal
+Sigmoid colon	colon	abdominal
+Sigmoid Colon	colon	abdominal
+Sigmoid Mesentery	peritoneum	peritoneum
+Sigmoid mesentry nodule	peritoneum	peritoneum
+Small bowel	bowel	abdominal
+Small Bowel	bowel	abdominal
+small bowel mesentery	peritoneum	peritoneum
+Small Bowel Mesentery	peritoneum	peritoneum
+Spleen	spleen	abdominal
+Splenic	spleen	abdominal
+Subclavian Fossa Node	lymph_node	lymph_node
+Subcutaneous nodule	subcutaneous	other
+Subcutaneous Nodule	subcutaneous	other
+Subcutaneous Nodule (Midline)	subcutaneous	other
+Supra mesenteric lymph node	lymph_node	lymph_node
+Supracilic Omentum	omentum	abdominal
+Supraclavicular Lymph Node	lymph_node	lymph_node
+Supra-clavicular Lymph Node	lymph_node	lymph_node
+Supraclic tumour deposit	abdominal	abdominal
+Supracolic Region	abdominal	abdominal
+Suprapubic Region	abdominal	abdominal
+"suprapubic, cutaneous"	abdominal	abdominal
+"Suprapubic, Cutaneous"	subcutaneous	other
+Supra-renal Lymph Node	lymph_node	lymph_node
+Transvaginal Bx	gynae	pelvic
+Transverse Mesentery	peritoneum	peritoneum
+Tumour mass	uncertain	uncertain
+Tumour next to posterior wall of uterus	gynae	pelvic
+Tumour Next To Posterior Wall Of Uterus	gynae	pelvic
+Umbilicus	abdominal	abdominal
+UT/Cervix/Left tube & Ovary	gynae	pelvic
+UT/TB/OV	gynae	pelvic
+UT/TB/OV & bladder peritoneum	pelvis	pelvic
+UT/TB/OV & cervix	gynae	pelvic
+UT/TB/OV rectum & cervix	pelvis	pelvic
+Uterus	gynae	pelvic
+Uterus and Cervix	gynae	pelvic
+"Uterus, tubes & ovaries"	gynae	pelvic
+Vagina	gynae	pelvic
+Vaginal vault	gynae	pelvic
+Vaginal Vault	gynae	pelvic
+Vaginal Wall	gynae	pelvic

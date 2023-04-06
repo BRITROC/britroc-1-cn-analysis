@@ -109,14 +109,19 @@ names(ploidys) <- pData(abs_data)$name
 Using ensembl biomart API, a full list of genes are downloaded and subset to those classified as protein-coding with primary/canonical transcripts, then further limited to autosomes as sex chromosomes are not included in the CNA profile data.
 
 ```{r biomart}
-ensembl <- useEnsembl(biomart = "ENSEMBL_MART_ENSEMBL", dataset = "hsapiens_gene_ensembl",GRCh = 37)
-protein_coding_genes <- getBM(attributes = c("chromosome_name","start_position","end_position","hgnc_symbol"),
+if(file.exists("data/protein_coding_genes.tsv")){
+	protein_coding_genes <- read.table("data/protein_coding_genes.tsv",header=T,sep="\t")
+} else {
+	ensembl <- useEnsembl(biomart = "ENSEMBL_MART_ENSEMBL", dataset = "hsapiens_gene_ensembl",GRCh = 37)
+	protein_coding_genes <- getBM(attributes = c("chromosome_name","start_position","end_position","hgnc_symbol"),
                                              filters = "biotype",
                                              values = "protein_coding",
                                              mart = ensembl,
                                              useCache = FALSE)
-protein_coding_genes <- protein_coding_genes[protein_coding_genes$chromosome_name %in% seq.int(1,22,1),]
-protein_coding_genes <- protein_coding_genes[protein_coding_genes$hgnc_symbol != "",]
+	protein_coding_genes <- protein_coding_genes[protein_coding_genes$chromosome_name %in% seq.int(1,22,1),]
+	protein_coding_genes <- protein_coding_genes[protein_coding_genes$hgnc_symbol != "",]
+	write.table(protein_coding_genes,"data/protein_coding_genes.tsv",col.names=T,row.names=F,sep="\t")
+}
 protein_coding_genes$chromosome_name <- as.numeric(protein_coding_genes$chromosome_name)
 protein_coding_genes <- protein_coding_genes[order(protein_coding_genes$chromosome_name,protein_coding_genes$start_position),]
 ```

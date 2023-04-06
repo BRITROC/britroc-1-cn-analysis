@@ -1,5 +1,7 @@
-refit.params <- read.table("refitting_parameters_updated.csv",header = T,sep = ",")
-meta <- read.table("metadata.csv",header = T,sep = ",")
+library(dplyr)
+
+refit.params <- read.table("metadata_formatting/refitting_parameters_updated.csv",header = T,sep = ",")
+meta <- read.table("metadata_formatting/metadata.csv",header = T,sep = ",")
 
 metadata <- meta %>% select(PATIENT_ID,SAMPLE_ID,ALLELE_FREQ,DEPTH) %>%
   group_by(SAMPLE_ID) %>%

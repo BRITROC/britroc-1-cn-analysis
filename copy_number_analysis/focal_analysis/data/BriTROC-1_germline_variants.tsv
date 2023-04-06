@@ -1,0 +1,65 @@
+fk_britroc_number	gene_symbol	chromosome	position	ref	alt	variant_type	HGVS_united	called_by_HaplotypeCaller	called_by_octopus	germline_sequencing	final_call_set	comment
+5	BRCA1	chr17	41226540	T	C	splice_acceptor	c.4548-2A>G	TRUE	TRUE	TRUE	TRUE	NA
+10	BRCA1	chr17	41245073	TG	T	frameshift	p.D825Efs*21	TRUE	TRUE	TRUE	TRUE	NA
+18	BRCA1	chr17	41256280	CT	C	splice_acceptor	c.302-2del	TRUE	TRUE	TRUE	TRUE	NA
+22	BRCA2	chr13	32914438	GT	G	frameshift	p.S1982Rfs*22	TRUE	TRUE	TRUE	TRUE	NA
+23	BRCA1	chr17	41223056	A	C	stop_gained	p.Y1646*	TRUE	TRUE	TRUE	TRUE	NA
+31	BRCA1	chr17	41243941	G	A	stop_gained	p.R1203*	TRUE	TRUE	TRUE	TRUE	NA
+33	BRCA1	chr17	41245474	TG	T	frameshift	p.H692Mfs*9	TRUE	TRUE	TRUE	TRUE	NA
+43	BRCA1	chr17	41267755	T	C	missense	p.H41R	TRUE	TRUE	TRUE	TRUE	NA
+44	BRCA1	chr17	41244543	GT	G	frameshift	p.N1002Tfs*22	TRUE	TRUE	TRUE	TRUE	NA
+46	BRCA1	chr17	NA	NA	NA	NA	NA	FALSE	FALSE	TRUE	TRUE	No additional variant information provided from clinical records
+49	BRCA2	chr13	32914767	CTT	C	frameshift	p.L2092Pfs*7	TRUE	TRUE	TRUE	TRUE	NA
+52	BRCA2	chr13	32913837	CAA	C	frameshift	p.N1784Hfs*2	TRUE	TRUE	TRUE	TRUE	NA
+55	BRCA2	chr13	32944692	C	T	stop_gained,splice_region	p.Q2829*	TRUE	TRUE	TRUE	TRUE	NA
+56	BRCA2	chr13	32911595	G	T	stop_gained	p.E1035*	TRUE	TRUE	TRUE	TRUE	NA
+68	BRCA1	chr17	41244907	C	A	stop_gained	p.E881*	TRUE	TRUE	TRUE	TRUE	NA
+74	BRCA2	chr13	32912965	TGAAA	T	frameshift	p.E1493Vfs*10	TRUE	TRUE	TRUE	TRUE	NA
+75	BRCA1	chr17	41246652	TAC	T	frameshift	p.V299Rfs*4	TRUE	TRUE	TRUE	TRUE	NA
+81	BRCA2	chr13	32913200	CAG	C	frameshift	p.E1571Gfs*3	TRUE	TRUE	TRUE	TRUE	NA
+86	BRCA2	chr13	32912654	CT	A	frameshift	p.Thr1388Asnfs*22	FALSE	FALSE	TRUE	TRUE	Evidence from clinical records; some inconclusive evidence from IGV inspection
+90	BRCA1	chr17	41226499	C	T	stop_gained	p.W1529*	TRUE	TRUE	TRUE	TRUE	NA
+93	RAD51B	chr14	68292235	C	T	stop_gained	p.R47*	TRUE	TRUE	TRUE	TRUE	NA
+108	BRCA2	chr13	32903605	CTG	C	frameshift	p.V220Ifs*4	TRUE	TRUE	TRUE	TRUE	NA
+113	BRCA2	chr13	32913559	C	CA	frameshift	p.W1692Mfs*3	TRUE	TRUE	TRUE	TRUE	NA
+120	BRCA1	chr17	41276045	ACT	A	frameshift	p.Glu23ValfsTer17	FALSE	TRUE	TRUE	TRUE	NA
+127	BRCA1	chr17	NA	NA	NA	frameshift	p.Ala145_Asp1662fsX14	FALSE	FALSE	TRUE	TRUE	Multi-exon deletion reported in clinical records; impossible for thisto be detected by amplicon sequencing
+129	RAD51D	chr17	33428320	C	T	stop_gained	p.W288*	TRUE	TRUE	TRUE	TRUE	NA
+130	BRCA2	chr13	32912896	CTGACA	C	frameshift	p.D1469Kfs*11	TRUE	TRUE	TRUE	TRUE	NA
+149	BRCA2	chr13	32903605	CTG	C	frameshift	p.V220Ifs*4	TRUE	TRUE	TRUE	TRUE	NA
+167	BRCA1	chr17	41245793	GTTCAGCT	G	frameshift	p.K583Nfs*3	TRUE	TRUE	TRUE	TRUE	NA
+168	BRCA2	chr13	32929350	GA	G	frameshift	p.I2454Ffs*13	TRUE	TRUE	TRUE	TRUE	NA
+169	BRCA1	chr17	41223063	G	C	missense	p.A1644G	TRUE	TRUE	TRUE	TRUE	NA
+172	BRCA1	chr17	41245354	C	A	stop_gained	p.E732*	TRUE	TRUE	TRUE	TRUE	NA
+175	BRCA2	chr13	NA	NA	NA	NA	NA	FALSE	FALSE	TRUE	TRUE	Multi-exon deletion reported in clinical records; impossible for this to be detected by amplicon sequencing
+181	BRCA1	chr17	41244866	GTT	G	frameshift	p.K894Tfs*8	TRUE	TRUE	TRUE	TRUE	NA
+184	BRCA2	chr13	32890622	GC	G	frameshift	p.P9Qfs*16	TRUE	TRUE	TRUE	TRUE	NA
+191	BRCA1	chr17	41243877	G	GGGAA	frameshift	p.C1225Sfs*10	TRUE	FALSE	TRUE	TRUE	NA
+194	BRCA1	chr17	41226515	G	T	stop_gained	p.S1524*	TRUE	TRUE	TRUE	TRUE	NA
+211	BRCA1	chr17	41243789	TAGAC	T	frameshift	p.S1253Rfs*10	TRUE	TRUE	TRUE	TRUE	NA
+215	BRCA1	chr17	41244866	GTT	G	frameshift	p.K894Tfs*8	TRUE	TRUE	TRUE	TRUE	NA
+221	RAD51C	chr17	56772543	C	T	stop_gained	p.Q133*	TRUE	TRUE	TRUE	TRUE	NA
+224	BRCA2	chr13	32906805	C	CTTAG	frameshift	p.Q397Lfs*25	TRUE	TRUE	TRUE	TRUE	NA
+225	BRCA1	chr17	NA	NA	NA	NA	NA	NA	NA	FALSE	TRUE	Evidence from clinical records only
+235	BRCA1	chr17	41276045	ACT	A	frameshift	p.E23Vfs*17	TRUE	TRUE	TRUE	TRUE	NA
+245	BRCA2	chr13	NA	NA	NA	NA	NA	FALSE	FALSE	TRUE	TRUE	No additional variant information provided from clinical records
+247	BRCA1	chr17	NA	NA	NA	NA	NA	NA	NA	FALSE	TRUE	Evidence from clinical records only
+248	BRCA1	chr17	41209139	A	G	missense	p.V1757A	TRUE	TRUE	TRUE	TRUE	NA
+253	PALB2	chr16	23625410	AT	A	frameshift,splice_region	p.N1039Ifs*2	TRUE	TRUE	TRUE	TRUE	NA
+256	BRCA1	chr17	41244319	CCT	C	frameshift	p.G1077Afs*8	TRUE	TRUE	TRUE	TRUE	NA
+257	BRCA2	chr13	NA	NA	NA	NA	NA	NA	NA	FALSE	TRUE	Evidence from clinical records only
+259	BRCA1	chr17	NA	NA	NA	NA	NA	NA	NA	FALSE	TRUE	Evidence from clinical records only
+264	BRCA1	chr17	41215920	G	T	missense	p.A1729E	TRUE	TRUE	TRUE	TRUE	NA
+270	BRCA1	chr17	41228596	AT	A	frameshift	p.I1486*	TRUE	TRUE	TRUE	TRUE	NA
+275	BRCA1	chr17	NA	NA	NA	NA	NA	NA	NA	FALSE	TRUE	Evidence from clinical records only
+276	BRCA2	chr13	NA	NA	NA	NA	NA	NA	NA	FALSE	TRUE	Evidence from clinical records only
+120	BRCA2	chr13	32954023	CA	C	frameshift	p.T3033Lfs*29	TRUE	TRUE	TRUE	FALSE	Low MAF; HGVS for some cases fails QC filter; does not pass QC filter in tumour samples; low plausibility double BRCA1/BRCA2 mutation for case 120
+121	BRCA2	chr13	32954023	CA	C	frameshift	p.T3033Lfs*29	TRUE	FALSE	TRUE	FALSE	Low MAF; HGVS for some cases fails QC filter; does not pass QC filter in tumour samples; low plausibility double BRCA1/BRCA2 mutation for case 120
+124	BRCA2	chr13	32954023	CA	C	frameshift	p.T3033Lfs*29	TRUE	TRUE	TRUE	FALSE	Low MAF; HGVS for some cases fails QC filter; does not pass QC filter in tumour samples; low plausibility double BRCA1/BRCA2 mutation for case 120
+138	BRCA2	chr13	32954023	CA	C	frameshift	p.T3033Lfs*29	TRUE	TRUE	TRUE	FALSE	Low MAF; HGVS for some cases fails QC filter; does not pass QC filter in tumour samples; low plausibility double BRCA1/BRCA2 mutation for case 120
+145	BRCA2	chr13	32954023	CA	C	frameshift	p.T3033Lfs*29	TRUE	TRUE	TRUE	FALSE	Low MAF; HGVS for some cases fails QC filter; does not pass QC filter in tumour samples; low plausibility double BRCA1/BRCA2 mutation for case 120
+145	BRIP1	chr17	59885982	CTGCT	C	frameshift	p.K254Rfs*19	TRUE	FALSE	TRUE	FALSE	NA
+155	BRCA2	chr13	32954023	CA	C	frameshift	p.T3033Lfs*29	TRUE	FALSE	TRUE	FALSE	Low MAF; HGVS for some cases fails QC filter; does not pass QC filter in tumour samples; low plausibility double BRCA1/BRCA2 mutation for case 120
+253	BRCA2	chr13	32913551	ACTTG	A	frameshift	p.L1687Kfs*18	TRUE	FALSE	TRUE	FALSE	NA
+264	BRCA2	chr13	32954023	CA	C	frameshift	p.T3033Lfs*29	TRUE	FALSE	TRUE	FALSE	Low MAF; HGVS for some cases fails QC filter; does not pass QC filter in tumour samples; low plausibility double BRCA1/BRCA2 mutation for case 120
+274	BRCA2	chr13	32913557	AGC	A	frameshift	p.A1689Kfs*5	TRUE	FALSE	TRUE	FALSE	NA

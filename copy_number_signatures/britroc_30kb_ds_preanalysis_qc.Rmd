@@ -21,12 +21,9 @@ knitr::opts_chunk$set(echo = TRUE)
 suppressMessages(library(QDNAseqmod))
 suppressMessages(library(tidyverse))
 suppressMessages(library(kableExtra))
-suppressMessages(library(ggplot2))
 suppressMessages(library(reshape2))
 suppressMessages(library(Biobase))
-suppressMessages(library(cowplot))
-suppressMessages(library(RColorBrewer))
-suppressMessages(library(plotly))
+
 ```
 
 ### Source functions
@@ -404,7 +401,7 @@ pc1_sd2 <- c(mean(pca_all$x[,1]) - sd(pca_all$x[,1])*2,mean(pca_all$x[,1]) + sd(
 pc2_sd2 <- c(mean(pca_all$x[,2]) - sd(pca_all$x[,2])*2,mean(pca_all$x[,2]) + sd(pca_all$x[,2])*2)
 pc3_sd2 <- c(mean(pca_all$x[,3]) - sd(pca_all$x[,3])*2,mean(pca_all$x[,3]) + sd(pca_all$x[,3])*2)
 
-ggplotly(ggplot(as.data.frame(pca_all$x[,c(1,2)])) + 
+ggplot(as.data.frame(pca_all$x[,c(1,2)])) + 
   geom_point(aes(x=PC1,y=PC2,text=sprintf("Sample: %s <br><br>Patient: %s", sample, patients),color=Ploidy)) +
   geom_vline(xintercept = pc1_sd2) +
   geom_hline(yintercept = pc2_sd2) +
@@ -412,9 +409,9 @@ ggplotly(ggplot(as.data.frame(pca_all$x[,c(1,2)])) +
   xlab("PC1") +
   ylab("PC2") +
   theme_bw() +
-  theme(strip.background = element_blank()))
+  theme(strip.background = element_blank())
 
-ggplotly(ggplot(as.data.frame(pca_all$x)) + 
+ggplot(as.data.frame(pca_all$x)) + 
   geom_point(aes(x=PC2,y=PC3,text=sprintf("Sample: %s <br>Patient: %s", sample, patients),color=Ploidy)) +
   geom_vline(xintercept = pc2_sd2) +
   geom_hline(yintercept = pc3_sd2) +
@@ -422,7 +419,7 @@ ggplotly(ggplot(as.data.frame(pca_all$x)) +
   xlab("PC2") +
   ylab("PC3") +
   theme_bw() +
-  theme(strip.background = element_blank()))
+  theme(strip.background = element_blank())
 ```
 
 ```{r cumul_var_all_pca}
@@ -452,7 +449,7 @@ pc1_sd2 <- c(mean(pca_paired$x[,1]) - sd(pca_paired$x[,1])*2,mean(pca_paired$x[,
 pc2_sd2 <- c(mean(pca_paired$x[,2]) - sd(pca_paired$x[,2])*2,mean(pca_paired$x[,2]) + sd(pca_paired$x[,2])*2)
 pc3_sd2 <- c(mean(pca_paired$x[,3]) - sd(pca_paired$x[,3])*2,mean(pca_paired$x[,3]) + sd(pca_paired$x[,3])*2)
 
-ggplotly(ggplot(as.data.frame(pca_paired$x[,c(1,2)])) + 
+ggplot(as.data.frame(pca_paired$x[,c(1,2)])) + 
   geom_point(aes(x=PC1,y=PC2,text=sprintf("Sample: %s <br><br>Patient: %s", sample, patients),color=Ploidy)) +
   geom_vline(xintercept = pc1_sd2) +
   geom_hline(yintercept = pc2_sd2) +
@@ -460,9 +457,9 @@ ggplotly(ggplot(as.data.frame(pca_paired$x[,c(1,2)])) +
   xlab("PC1") +
   ylab("PC2") +
   theme_bw() +
-  theme(strip.background = element_blank()))
+  theme(strip.background = element_blank())
 
-ggplotly(ggplot(as.data.frame(pca_paired$x)) + 
+ggplot(as.data.frame(pca_paired$x)) + 
   geom_point(aes(x=PC2,y=PC3,text=sprintf("Sample: %s <br>Patient: %s", sample, patients),color=Ploidy)) +
   geom_vline(xintercept = pc2_sd2) +
   geom_hline(yintercept = pc3_sd2) +
@@ -470,7 +467,7 @@ ggplotly(ggplot(as.data.frame(pca_paired$x)) +
   xlab("PC2") +
   ylab("PC3") +
   theme_bw() +
-  theme(strip.background = element_blank()))
+  theme(strip.background = element_blank())
 ```
 
 ```{r cumul_var_pca_paired}
