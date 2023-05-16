@@ -6,7 +6,7 @@ This repositiory contains the code required to reproduce the copy number analysi
 Clone this git repository and `cd` into the directory
 ```
 git clone https://github.com/Phil9S/britroc-cn-analysis.git
-cd britroc-cn-analysis
+cd britroc-1-cn-analysis
 ```
 #### Install the conda environment
 Provided conda is installed and available on the `$PATH` run the following line. This will downloaded the pre-processed data from [zenodo](https://zenodo.org/record/7573784#.ZC60rnbMJhE), install the required conda environment, and install packages which are not available via conda channels.
