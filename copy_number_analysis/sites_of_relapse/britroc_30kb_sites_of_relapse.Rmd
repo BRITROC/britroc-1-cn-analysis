@@ -33,10 +33,6 @@ suppressPackageStartupMessages(suppressWarnings(library(fmsb)))
 ### Set up directory
 
 ```{r setup_dir}
-if(!dir.exists("data/")){
-  dir.create("data/")
-}
-
 if(!dir.exists("plots/")){
   dir.create("plots/")
 }
@@ -91,7 +87,18 @@ signatures <- read.table("../../copy_number_signatures/britroc_30kb_signature_da
 colnames(signatures) <- gsub(colnames(signatures),pattern = "\\.",replacement = "-")
 ```
 
-```{r db_open}
+### Check for clinDB
+```{r clinDb_need}
+# Checks if connection to clinicalDB is required
+# If generated files already exist then chunks with clinDB = FALSE are skipped
+if(!file.exists("data/site_table.tsv")){
+    clinDB_need <- TRUE
+} else {
+    clinDB_need <- FALSE
+}
+```
+
+```{r db_open,eval=clinDB_need}
 ## Retrieve clinical database login details
 clin_config <- config::get("clinDB")
 ## Establish connection to Postgres DB
@@ -104,7 +111,7 @@ britroc_con <- dbConnect(RPostgres::Postgres(),
 )
 ```
 
-```{r get_db_tables}
+```{r get_db_tables,eval=clinDB_need}
 sample_table <- RPostgres::dbReadTable(britroc_con,name = "sample")
 
 diag_tissue_blocks <- RPostgres::dbReadTable(britroc_con,name = "tissue_blocks")
@@ -132,6 +139,14 @@ site_table <- left_join(sample_table,diag_tissue_table,c("fk_histological_id","f
                 filter(type %in% c("archival","relapse")) %>%
                 filter(SAMPLE_ID %in% meta.data$SAMPLE_ID) %>%
                 filter(tissue_site != "")
+```
+
+```{r write_site_table,eval=clinDB_need}
+write.table(x = site_table,file = "data/site_table.tsv",quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
+```{r read_site_table}
+site_table <- read.table(file = "data/site_table.tsv",header = T,sep = "\t",stringsAsFactors = F)
 ```
 
 ```{r normalise_tissue}
