@@ -267,7 +267,8 @@ plot_data_full <- plot_data %>%
       dplyr::select(-int_start) %>%
       pivot_longer(values_to= "time",names_to = "event",cols = c(diag,os))
 
-plot_chemo_lines_full <- plot_chemo_lines
+plot_chemo_lines_full <- plot_chemo_lines %>%
+                            dplyr::select(britroc_number,line_start,line_end,chemotherapy_line,pt_sensitivity_at_reg)
 ```
 
 ```{r summary_plot_params}
@@ -304,21 +305,23 @@ sum_plot <- ggplot() +
                     panel.grid = element_blank())
 
 sum_plot
-saveRDS(object = sum_plot,file = "plots/cohort_plot.RDS")
-ggsave(filename = "plots/cohort_summary_plot.png",plot = sum_plot,device = "png",width = 12,height = 9,dpi = 300,units = "in")
-ggsave(filename = "plots/cohort_summary_plot.pdf",plot = sum_plot,device = "pdf",width = 12,height = 9,dpi = 300,units = "in")
+# saveRDS(object = sum_plot,file = "plots/cohort_plot.RDS")
+# ggsave(filename = "plots/cohort_summary_plot.png",plot = sum_plot,device = "png",width = 12,height = 9,dpi = 300,units = "in")
+# ggsave(filename = "plots/cohort_summary_plot.pdf",plot = sum_plot,device = "pdf",width = 12,height = 9,dpi = 300,units = "in")
 ```
 
-```{r source_data_export}
-
+```{r source_data_export_1B}
+write.table(x = plot_data_full,file = "source_data/figure_1B_layer_1.tsv",quote = F,sep = "\t",row.names = F,col.names = T)
+write.table(x = plot_chemo_lines_full,file = "source_data/figure_1B_layer_2.tsv",quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r os_pt_status_surv}
 ## Survival from date of registration stratified by pt_status
-survival_data <- survival_data %>%
-                    rename("platinum_status"="pt_sensitivity_at_reg")
+survival_data_plot <- survival_data %>%
+                    rename("platinum_status"="pt_sensitivity_at_reg") %>%
+                    dplyr::select(britroc_number,int_start,int_end,status,platinum_status)
     
-fit <- survfit(Surv(int_end - int_start, status) ~ platinum_status, data = survival_data)
+fit <- survfit(Surv(int_end - int_start, status) ~ platinum_status, data = survival_data_plot)
 surv_plot <- ggsurvplot(fit,
            conf.int = TRUE,
            legend = "bottom",
@@ -334,6 +337,10 @@ surv_plot
 saveRDS(object = surv_plot$plot,file = "plots/reg_surv_plot.RDS")
 ggsave(filename = "plots/reg_surv_plot.png",plot = surv_plot$plot,device = "png",width = 8,height = 8,dpi = 300,units = "in")
 ggsave(filename = "plots/reg_surv_plot.pdf",plot = surv_plot$plot,device = "pdf",width = 8,height = 8,dpi = 300,units = "in")
+```
+
+```{r source_data_export_1C}
+write.table(x = survival_data_plot,file = "source_data/figure_1C.tsv",quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r sessioninfo}
