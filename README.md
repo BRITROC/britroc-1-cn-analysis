@@ -1,5 +1,5 @@
-# BriTROC
-This repositiory contains the code required to reproduce the copy number analysis presented in the publication [The copy number and mutational landscape of recurrent ovarian high-grade serous carcinoma: the BriTROC-1 study](https://www.medrxiv.org/content/10.1101/2022.10.21.22280992v1) (Smith & Bradley _et al._ 2023 - under review).
+# BriTROC-1 copy number analysis pipeline
+This repositiory contains the code required to reproduce the copy number analysis presented in the publication [The copy number and mutational landscape of recurrent ovarian high-grade serous carcinoma](https://www.medrxiv.org/content/10.1101/2022.10.21.22280992v1) (Smith & Bradley _et al._ 2023 - Accepted _Nature Communications_).
 
 ## Copy number analysis
 ### Setup
