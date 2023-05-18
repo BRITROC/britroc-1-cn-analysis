@@ -312,10 +312,17 @@ ggsave(plot = focal_rate_plot,filename = "plots/cna_rates_tissue.pdf",width = 8,
 focal_rate_plot
 ```
 
+```{r source_data_s18B}
+write.table(x = cna_rates_tissue,
+            file = "../../source_data/figure_S18B.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ### CNA counts
 
 ```{r cna_count}
-cna_copies <- get_cna_changes(data = cna_data,genes = focal_genes_table$Gene.name,patients = meta.data$PATIENT_ID) %>%
+cna_copies <- get_cna_changes(data = cna_data,
+                              genes = focal_genes_table$Gene.name,patients = meta.data$PATIENT_ID) %>%
                 mutate(group = case_when(group == "arx" ~ "diagnosis",group == "rlps" ~ "relapse")) %>%
                 mutate(tissue = meta.data$tissue_grouped[match(SAMPLE_ID,meta.data$SAMPLE_ID)]) %>%
                 filter(!is.na(tissue)) %>%
@@ -377,6 +384,12 @@ ggsave(plot = cna_count_plot,filename = "plots/cna_count_tissue.pdf",width = 12,
 cna_count_plot
 ```
 
+```{r source_data_s18A}
+write.table(x = cna_copies,
+            file = "../../source_data/figure_S18A.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ### ITH 
 
 ```{r ith_data}
@@ -404,6 +417,12 @@ saveRDS(ith_plot,file = "plots/ith_tissue.RDS")
 ggsave(plot = ith_plot,filename = "plots/ith_tissue.png",width = 10,height = 8,units = "in",dpi = 300)
 ggsave(plot = ith_plot,filename = "plots/ith_tissue.pdf",width = 10,height = 8)
 ith_plot
+```
+
+```{r source_data_s18C}
+write.table(x = ith_table_tissue,
+            file = "../../source_data/figure_S18C.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ### CN Signatures
@@ -469,6 +488,12 @@ saveRDS(signature_plot,file = "plots/signature_tissue.RDS")
 ggsave(plot = signature_plot,filename = "plots/signatures_tissue.png",width = 10,height = 8,units = "in",dpi = 300)
 ggsave(plot = signature_plot,filename = "plots/signatures_tissue.pdf",width = 10,height = 8)
 signature_plot
+```
+
+```{r source_data_s18D}
+write.table(x = signatures_table,
+            file = "../../source_data/figure_S18D.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ### Diag/Relapse stratification
@@ -552,6 +577,12 @@ ggsave(plot = cn_count_tissue_plot,filename = "plots/cn_count_tissue_stratified.
 cn_count_tissue_plot
 ```
 
+```{r source_data_s19A}
+write.table(x = cna_copies_stratified,
+            file = "../../source_data/figure_S19A.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ```{r cn_sigs_group_by_tissue}
 signatures_table_group <- signatures_table %>%
                             mutate(group = meta.data$group[match(SAMPLE_ID,meta.data$SAMPLE_ID)]) %>%
@@ -576,6 +607,12 @@ saveRDS(cn_sigs_tissueplot1,file = "plots/cn_sigs_tissue_strat.RDS")
 ggsave(plot = cn_count_tissue_plot,filename = "plots/cn_sigs_tissue_strat.png",width = 10,height = 8,units = "in",dpi = 300)
 ggsave(plot = cn_count_tissue_plot,filename = "plots/cn_sigs_tissue_strat.pdf",width = 10,height = 8)
 cn_sigs_tissueplot1
+```
+
+```{r source_data_s19B}
+write.table(x = signatures_table_group,
+            file = "../../source_data/figure_S19B.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r ith_group_by_tissue}
@@ -611,6 +648,12 @@ saveRDS(ith_tissueplot1,file = "plots/ith_tissue_strat.RDS")
 ggsave(plot = ith_tissueplot1,filename = "plots/ith_tissue_strat.png",width = 10,height = 8,units = "in",dpi = 300)
 ggsave(plot = ith_tissueplot1,filename = "plots/ith_tissue_strat.pdf",width = 10,height = 8)
 ith_tissueplot1
+```
+
+```{r source_data_s19C}
+write.table(x = ith_table_tissue_group,
+            file = "../../source_data/figure_S19C.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r session_info}
