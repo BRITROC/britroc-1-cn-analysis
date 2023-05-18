@@ -212,13 +212,6 @@ britroc_tcga_comp_raw
 
 Alterations in these genes, although called at lower frequencies, are still called at proportional rates to previous reports, where the most common alterations are consistent between the different data sets.
 
-figure legend - TCGA
-
-Figure XX Amplification and deletion rates between cohorts (TCGA) 
-A - Amplification and deletion rates as a percentage of total samples between the BriTROC and the TCGA ovarian serous adenocarcinoma sample set for the sixteen clinically relevant or frequently altered genes listed in supplementary table P6. Rates demonstrate a difference in the total number of focal amplifications and deletions for most genes. 
-B - Amplification and deletion rates as described for panel A with a normalisation applied to normalise each rate the highest alteration rate present. The plot demonstrates that though rates are different, the rate at which focal amplifications and deletions are called in the BriTROC cohort are at the same proportions to those seen in TCGA.
-
-
 ```{r tcga_gene_rates_norm}
 total_amp_rates_norm <- total_amp_rates
 total_amp_rates_norm <- total_amp_rates_norm %>%
@@ -330,6 +323,12 @@ ggsave(plot = amp_del_gene_plot,filename = "plots/amp_del_gene_plot_CNA.pdf",wid
 amp_del_gene_plot
 ```
 
+```{r source_data_fig3B}
+write.table(x = combined_rates,
+            file = "../../source_data/figure_3B.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ### Fishers exact for CNA rates
 ##### unpaired
 
@@ -407,6 +406,12 @@ prior_line_plot1 <- ggplot(prior_rates[prior_rates$prior_lines %in% c("1","2","3
 ggsave2(filename = "plots/prior_lines_cna_focal_plot.png",plot = prior_line_plot1,width = 8,height = 8,units = "in",dpi = 300)
 ggsave2(filename = "plots/prior_lines_cna_focal_plot.pdf",plot = prior_line_plot1,width = 8,height = 8,units = "in",dpi = 300)
 prior_line_plot1
+```
+
+```{r source_data_S12A}
+write.table(x = prior_rates[prior_rates$prior_lines %in% c("1","2","3"),],
+            file = "../../source_data/figure_S12A.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r prior_fishers}
@@ -500,6 +505,12 @@ ggsave2(filename = "plots/prior_paired_lines_cna_focal_paired_plot.png",
 ggsave2(filename = "plots/prior_paired_lines_cna_focal_paired_plot.pdf",
         plot = prior_paired_line_plot1,width = 8,height = 8,units = "in",dpi = 300)
 prior_paired_line_plot1
+```
+
+```{r source_data_S12B}
+write.table(x = prior_paired_rates,
+            file = "../../source_data/figure_S12B.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r prior_fishers_paired}
@@ -780,6 +791,12 @@ ggsave(plot = paired_amp_changes_plot,filename = "plots/paired_amp_changes_plot.
 paired_amp_changes_plot
 ```
 
+```{r source_data_S11}
+write.table(x = paired_amp_changes[paired_amp_changes$PATIENT_ID %in% pats,],
+            file = "../../source_data/figure_S11.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ### Paired prior lines of therapy copies
 
 ```{r paired_prior_lines_copies}
@@ -800,6 +817,12 @@ table(paired_amp_changes$prior_lines[paired_amp_changes$prior_lines %in% c(1,2) 
 ggsave(plot = paired_gene_prior_lines,filename = "plots/paired_gene_prior_lines_plot.png",width = 6,height = 8,units = "in",dpi = 300)
 ggsave(plot = paired_gene_prior_lines,filename = "plots/paired_gene_prior_lines_plot.pdf",width = 6,height = 8)
 paired_gene_prior_lines
+```
+
+```{r source_data_S13}
+write.table(x = paired_amp_changes[paired_amp_changes$prior_lines %in% c(1,2),],
+            file = "../../source_data/figure_S13.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r paired_prior_lines_testing}
@@ -835,6 +858,12 @@ table(paired_amp_changes$pt_status[paired_amp_changes$gene == "AKT1"],
 ggsave(plot = paired_gene_pt_status,filename = "plots/paired_gene_pt_status_plot.png",width = 6,height = 8,units = "in",dpi = 300)
 ggsave(plot = paired_gene_pt_status,filename = "plots/paired_gene_pt_status_plot.pdf",width = 6,height = 8)
 paired_gene_pt_status
+```
+
+```{r source_data_S14}
+write.table(x = paired_amp_changes,
+            file = "../../source_data/figure_S14.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r paired_pt_status_testing}
