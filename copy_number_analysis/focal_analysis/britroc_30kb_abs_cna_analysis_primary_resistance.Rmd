@@ -164,6 +164,18 @@ primary_pt_rate_plot1
 primary_pt_rate_plot2
 ```
 
+```{r source_data_S26A}
+write.table(x = primary_pt_rates,
+            file = "../../source_data/figure_S26A.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
+```{r source_data_6A}
+write.table(x = primary_pt_rates[primary_pt_rates$tumour == "diagnosis",],
+            file = "../../source_data/figure_6A.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ```{r cna_rate_primary_non_primary_1}
 fishers_gene_CNA(data = cna_calls,
                      sub_a = patient.meta$SAMPLE_ID[patient.meta$platinum_resistance == "primary platinum resistant"],
@@ -271,6 +283,12 @@ ggsave(plot = primary_pt_copies_plot1,filename = "plots/primary_pt_copies_plot1.
 primary_pt_copies_plot1
 ```
 
+```{r source_data_S26B}
+write.table(x = paired_amp_changes[paired_amp_changes$group == "diagnosis",],
+            file = "../../source_data/figure_S26B.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ```{r cna_norm_changes}
 norm_amp_changes_all <- paired_amp_changes_all %>%
   group_by(PATIENT_ID,group,gene) %>%
@@ -295,6 +313,12 @@ primary_pt_change_plot1 <- ggplot(norm_amp_changes) +
 ggsave(plot = primary_pt_change_plot1,filename = "plots/primary_pt_copies_plot1.png",width = 6,height = 8,units = "in",dpi = 300)
 ggsave(plot = primary_pt_change_plot1,filename = "plots/primary_pt_copies_plot1.pdf",width = 6,height = 8)
 primary_pt_change_plot1
+```
+
+```{r source_data_S26C}
+write.table(x = norm_amp_changes,
+            file = "../../source_data/figure_S26C.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r comb_plot1}
@@ -357,6 +381,12 @@ saveRDS(object = sig_bar_plot_primary_pt_diag,file = "plots/sig_bar_plot_primary
 ggsave(plot = sig_bar_plot_primary_pt_diag,filename = "plots/sig_bar_plot_primary_pt_diag.png",width = 8,height = 6,units = "in",dpi = 300)
 ggsave(plot = sig_bar_plot_primary_pt_diag,filename = "plots/sig_bar_plot_primary_pt_diag.pdf",width = 8,height = 6)
 sig_bar_plot_primary_pt_diag
+```
+
+```{r source_data_6B}
+write.table(x = sig_bar[sig_bar$group == "diagnosis",],
+            file = "../../source_data/figure_6B.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r pt_status_im_list}
@@ -543,12 +573,12 @@ gene_sig_comb_plot
 ```
 
 ```{r cna_rate_primary_non_primary_2_all}
-fishers_gene_CNA(data = cna_calls,
-                     sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
-                                                         patient.meta$platinum_resistance == "primary platinum resistant"],
-                     sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
-                                                         patient.meta$platinum_resistance == "others"],
-                     genes = protein_coding_genes$hgnc_symbol)
+# fishers_gene_CNA(data = cna_calls,
+#                      sub_a = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
+#                                                          patient.meta$platinum_resistance == "primary platinum resistant"],
+#                      sub_b = patient.meta$SAMPLE_ID[patient.meta$group == "diagnosis" &
+#                                                          patient.meta$platinum_resistance == "others"],
+#                      genes = protein_coding_genes$hgnc_symbol)
 ```
 
 ```{r session_info}
