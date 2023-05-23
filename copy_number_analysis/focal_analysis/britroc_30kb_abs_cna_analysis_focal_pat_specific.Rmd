@@ -181,6 +181,12 @@ ggsave(plot = norm_paired_changes_plot,filename = "plots/norm_paired_changes_plo
 norm_paired_changes_plot
 ```
 
+```{r source_data_SM3}
+write.table(x = norm_paired_changes,
+            file = "../../source_data/figure_SM3.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ```{r normalised_changes_stats_genelist}
 norm_paired_change_summary <- norm_paired_changes %>%
                         mutate(shift = ifelse(change < 0, "loss", "gain")) %>%
@@ -290,6 +296,12 @@ dev.off()
 pairs(cor_data,upper.panel = panel.lm,lower.panel = panel.cor,cex.labels = 0.75)
 ```
 
+```{r source_data_S21}
+write.table(x = cor_data,
+            file = "../../source_data/figure_S21.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ```{r change_cor_mat_all_genes}
 paired_changes_all <- get_patient_changes(data = copies,
                                genes = protein_coding_genes$hgnc_symbol,
@@ -356,6 +368,12 @@ ggsave(plot = ploidy_norm_gene_cn_plot,filename = "plots/ploidy_norm_gene_cn_plo
 ploidy_norm_gene_cn_plot
 ```
 
+```{r source_data_S23}
+write.table(x = norm_paired_changes_ploidy,
+            file = "../../source_data/figure_S23.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ```{r norm_cor_all}
 cor_data_all <- norm_paired_changes_all %>%
   dplyr::select(-c(arx,rlps)) %>%
@@ -418,6 +436,13 @@ saveRDS(heatmapGG,file = "plots/gene_change_heatmap.RDS")
 hmPlot
 ```
 
+```{r source_data_S20}
+write.table(x = cor_data_all_sub,
+            file = "../../source_data/figure_S20.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
+
 ```{r gene_change_umap_and_kclusts}
 umap.data <- umap(cor_data_all_sub)
 
@@ -446,7 +471,8 @@ u2 <- ggplot(kclust.est) +
 kmean.clust <- kmeans(cor_data_all_sub,centers = 6)
 
 u3 <- ggplot(as.data.frame(umap.data$layout)) +
-  geom_point(aes(umap.data$layout[,1],umap.data$layout[,2],color = as.factor(kmean.clust$cluster))) +
+  geom_point(aes(umap.data$layout[,1],umap.data$layout[,2],
+                 color = as.factor(kmean.clust$cluster))) +
   xlab("dim 1") +
   ylab("dim 2") +
   labs(title = "clustered UMAP") +
@@ -465,6 +491,24 @@ saveRDS(umap_plot,file = "plots/umap_plot.RDS")
 ggsave(plot = umap_plot,filename = "plots/umap_plot.png",width = 6,height = 6,units = "in",dpi = 300)
 ggsave(plot = umap_plot,filename = "plots/umap_plot.pdf",width = 6,height = 6,units = "in",dpi = 300)
 umap_plot
+```
+
+```{r source_data_S22A}
+write.table(x = as.data.frame(umap.data$layout),
+            file = "../../source_data/figure_S22A.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
+```{r source_data_S22B}
+write.table(x = kclust.est,
+            file = "../../source_data/figure_S22B.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
+```{r source_data_S22C}
+write.table(x = as.data.frame(umap.data$layout),
+            file = "../../source_data/figure_S22C.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r recalc_paired_diffs}
@@ -521,6 +565,12 @@ pt_spread_plot <- plot_grid(pt_jitter,pt_point,nrow = 2,labels = c("A","B"))
 ggsave2(pt_spread_plot,filename = "plots/pt_spread_plot.pdf",height = 8,width = 7)
 ggsave2(pt_spread_plot,filename = "plots/pt_spread_plot.png",height = 8,width = 7,dpi = 300)
 pt_spread_plot
+```
+
+```{r source_data_S25}
+write.table(x = norm_paired_changes_all,
+            file = "../../source_data/figure_S25.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r gene_change_spread_pat_strat}
