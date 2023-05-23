@@ -860,6 +860,18 @@ saveRDS(object = brca_diag_rlps_cna_rates_paired_plot,file = "plots/brca_diag_rl
 brca_diag_rlps_cna_rates_paired_plot
 ```
 
+```{r source_data_8A}
+write.table(x = brca_rates_paired[brca_rates_paired$group == "amplification",],
+            file = "../../source_data/figure_8A.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
+```{r source_data_8B}
+write.table(x = brca_rates_paired,
+            file = "../../source_data/figure_8B.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 #### CNA copies
 
 ```{r copies_brca_non_brca_paired_1}
@@ -953,6 +965,12 @@ ggsave(plot = brca_paired_amp_changes_plot,filename = "plots/brca_paired_amp_cha
 ggsave(plot = brca_paired_amp_changes_plot,filename = "plots/brca_paired_amp_changes_plot.pdf",width = 6,height = 8)
 saveRDS(object = brca_paired_amp_changes_plot,file = "plots/brca_paired_amp_changes_plot.rds")
 brca_paired_amp_changes_plot
+```
+
+```{r source_data_8C}
+write.table(x = paired_amp_changes,
+            file = "../../source_data/figure_8C.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r cna_norm_changes}
