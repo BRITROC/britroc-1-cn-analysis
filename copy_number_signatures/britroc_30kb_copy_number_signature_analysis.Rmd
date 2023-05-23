@@ -145,6 +145,12 @@ ggsave(feat_plot,filename = "plots/feat_plot.pdf",width = 8,height = 8,units = "
 feat_plot
 ```
 
+```{r source_data_S9}
+write.table(x = samp_comp_long,
+            file = "../source_data/figure_S9.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ## Signature proportions
 
 ```{r patient_ordering}
@@ -191,6 +197,12 @@ saveRDS(object = sig_bar_plot,file = "plots/signatures_allSamples_stacked_bar.RD
 ggsave(sig_bar_plot,filename = "plots/signatures_allSamples_stacked_bar.png",width = 8,height = 6,units = "in",dpi = 300)
 ggsave(sig_bar_plot,filename = "plots/signatures_allSamples_stacked_bar.pdf",width = 8,height = 6,units = "in",dpi = 300)
 sig_bar_plot
+```
+
+```{r source_data_4A}
+write.table(x = sig_bar,
+            file = "../source_data/figure_4A.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r bar_plot_paired_data}
@@ -273,11 +285,19 @@ ggsave(sig_bar_plot_paired_alt,filename = "plots/signatures_stacked_bar_alt.pdf"
 sig_bar_plot_paired_alt
 ```
 
+```{r source_data_5B}
+write.table(x = sig_bar_paired_alt,
+            file = "../source_data/figure_5B.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ### Pt status and prior lines
 
 ```{r pt_status_sig}
-sig_bar$pt_status <- patient.data$pt_sensitivity_at_reg[match(sig_bar$PATIENT_ID,paste0("BRITROC-",patient.data$britroc_number))]
-sig_bar$prior_lines <- patient.data$pre_reg_chemo[match(sig_bar$PATIENT_ID,paste0("BRITROC-",patient.data$britroc_number))]
+sig_bar$pt_status <- patient.data$pt_sensitivity_at_reg[match(sig_bar$PATIENT_ID,
+                                                              paste0("BRITROC-",patient.data$britroc_number))]
+sig_bar$prior_lines <- patient.data$pre_reg_chemo[match(sig_bar$PATIENT_ID,
+                                                        paste0("BRITROC-",patient.data$britroc_number))]
 
 sig_bar_filt <- sig_bar %>%
                   filter(!is.na(pt_status)) %>%
@@ -347,6 +367,13 @@ ggsave(sig_group_strat_pt,filename = "plots/sig_group_strat_pt.png",width = 9,he
 ggsave(sig_group_strat_pt,filename = "plots/sig_group_strat_pt.pdf",width = 9,height = 6,units = "in",dpi = 300)
 sig_group_strat_pt
 ```
+
+```{r source_data_4C}
+write.table(x = sig_bar_filt,
+            file = "../source_data/figure_4C.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 
 ```{r pt_status_im_list}
 sig_bar_filt$pt_status_new <- ifelse(gsub(sig_bar_filt$PATIENT_ID,
@@ -421,6 +448,12 @@ ggsave(sig_bar_plot,filename = "plots/sig_box_wilcox.png",width = 8,height = 6,u
 ggsave(sig_bar_plot,filename = "plots/sig_box_wilcox.pdf",width = 8,height = 6,units = "in",dpi = 300)
 ```
 
+```{r source_data_4B}
+write.table(x = sig_box_wilcox$data,
+            file = "../source_data/figure_4B.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ### Paired samples
 
 ```{r sig_box_plot_pair}
@@ -451,6 +484,12 @@ saveRDS(object = paired_line_plot,file = "plots/paired_line_plot.RDS")
 ggsave(paired_line_plot,filename = "plots/paired_line_plot.png",width = 8,height = 6,units = "in",dpi = 300)
 ggsave(paired_line_plot,filename = "plots/paired_line_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
 paired_line_plot
+```
+
+```{r source_data_5A}
+write.table(x = sig_bar_filt,
+            file = "../source_data/figure_5A.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ### Comparison to TCGA/PCAWG
@@ -529,6 +568,12 @@ external_corr_plot <- ggplot(subset_sig_quants) + geom_point(aes(x = value,y = n
 ggsave(external_corr_plot,filename = "plots/external_corr_plot.png",width = 8,height = 6,units = "in",dpi = 300)
 ggsave(external_corr_plot,filename = "plots/external_corr_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
 external_corr_plot
+```
+
+```{r source_data_S17}
+write.table(x = subset_sig_quants,
+            file = "../source_data/figure_S17.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r seg_counts_sig5}
