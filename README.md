@@ -5,7 +5,7 @@ This repositiory contains the code required to reproduce the copy number analysi
 ### Setup
 Clone this git repository and `cd` into the directory
 ```
-git clone https://github.com/Phil9S/britroc-cn-analysis.git
+git clone https://github.com/BRITROC/britroc-1-cn-analysis.git
 cd britroc-1-cn-analysis
 ```
 #### Install the conda environment
