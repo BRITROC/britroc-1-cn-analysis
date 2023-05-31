@@ -86,7 +86,7 @@ fig1
 
 ```{r fig3}
 ## Load plots
-#substraction_plot <- readRDS("copy_number_analysis/broad_analysis/plots/genome_paired_substractionPlot.RDS") ## issues with PositionNudgeRepel error
+substraction_plot <- readRDS("copy_number_analysis/broad_analysis/plots/genome_paired_substractionPlot.RDS") ## issues with PositionNudgeRepel error
 substraction_plot <- ggdraw() + draw_image(magick::image_read_pdf("copy_number_analysis/broad_analysis/plots/genome_paired_substractionPlot.pdf",density = 300))
 focal_rates_clinic <- readRDS("copy_number_analysis/focal_analysis/plots/amp_del_gene_plot_CNA.RDS")
 
@@ -307,7 +307,7 @@ sig_pt_primary_legend_b <- get_legend(
     theme(legend.position = "bottom")
 )
 ### Figure 7 compile
-fig7 <- plot_grid(plot_grid(cn_focal_rate_primary_pt_diag,
+fig6 <- plot_grid(plot_grid(cn_focal_rate_primary_pt_diag,
                             #sig_dist_primary_pt_diag,
                             plot_grid(sig_bar_plot_primary_pt_diag,
                                       sig_primary_radar,
@@ -322,12 +322,12 @@ fig7 <- plot_grid(plot_grid(cn_focal_rate_primary_pt_diag,
           nrow = 2)
 
 ## Figure 7 render
-ggsave2(filename = "plots/figure_7_render.png",plot = fig7,width = 8,height = 10,units = "in",dpi = 300)
-ggsave2(filename = "plots/figure_7_render.pdf",plot = fig7,width = 8,height = 10,units = "in",dpi = 300)
-fig7
+ggsave2(filename = "plots/figure_6_render.png",plot = fig6,width = 8,height = 10,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_6_render.pdf",plot = fig6,width = 8,height = 10,units = "in",dpi = 300)
+fig6
 ```
 
-```{r fig8}
+```{r fig7}
 ## Rendered in sig_immune_analysis
 ```
 
@@ -355,7 +355,7 @@ sig_pt_legend_b <- get_legend(
 )
 
 ## Figure s## compile
-fig7S <- plot_grid(plot_grid(sig_pt_bar_plot,sig_pt_plot,sig_pt_plot_strat_group,
+fig6S <- plot_grid(plot_grid(sig_pt_bar_plot,sig_pt_plot,sig_pt_plot_strat_group,
                             labels = c("A","B","C"),
                             nrow = 3,
                             rel_heights = c(1,0.5,1)),
@@ -366,9 +366,9 @@ fig7S <- plot_grid(plot_grid(sig_pt_bar_plot,sig_pt_plot,sig_pt_plot_strat_group
                   nrow = 2)
 
 ## Plot render
-ggsave2(filename = "plots/figure_7S_render.png",plot = fig7S,width = 8,height = 12,units = "in",dpi = 300)
-ggsave2(filename = "plots/figure_7S_render.pdf",plot = fig7S,width = 8,height = 12,units = "in",dpi = 300)
-fig7S
+ggsave2(filename = "plots/figure_6S_render.png",plot = fig6S,width = 8,height = 12,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_6S_render.pdf",plot = fig6S,width = 8,height = 12,units = "in",dpi = 300)
+fig6S
 ```
 
 ```{r fig_tissue_diffs}
@@ -525,7 +525,7 @@ ggsave2(filename = "plots/supplemental_figure_ternary_sig_plots_all.pdf",plot = 
 ternary_all
 ```
 
-```{r fig9}
+```{r fig8}
 ## BRCA figure
 diag_rlps_brca_rate_plot <- readRDS("copy_number_analysis/focal_analysis/plots/brca_diag_rlps_cna_rates_paired_plot.rds")
 diag_rlps_brca_rate_plot <- diag_rlps_brca_rate_plot +
@@ -568,7 +568,7 @@ brca_legend <- get_legend(
     theme(legend.position = "bottom")
 )
 
-fig9 <- plot_grid(diag_rlps_brca_rate_plot,
+fig8 <- plot_grid(diag_rlps_brca_rate_plot,
           brca_rate_plot,
           plot_grid(brca_sig_copies,brca_sig_radar,
                     ncol = 2,labels=c("C","D")),
@@ -578,9 +578,9 @@ fig9 <- plot_grid(diag_rlps_brca_rate_plot,
           nrow = 4,
           rel_heights = c(0.20,0.20,0.40,0.04))
 
-ggsave2(filename = "plots/figure_9_render.png",plot = fig9,width = 8,height = 11,units = "in",dpi = 300)
-ggsave2(filename = "plots/figure_9_render.pdf",plot = fig9,width = 8,height = 11,units = "in",dpi = 300)
-fig9
+ggsave2(filename = "plots/figure_8_render.png",plot = fig8,width = 8,height = 11,units = "in",dpi = 300)
+ggsave2(filename = "plots/figure_8_render.pdf",plot = fig8,width = 8,height = 11,units = "in",dpi = 300)
+fig8
 ```
 
 ```{r session_info}
