@@ -592,8 +592,7 @@ patient_ploidy <- meta.data %>%
 
 ```{r clonality_diff_cors}
 patient_clonality_diffs <- patient_clonality_diffs %>%
-  inner_join(.,patient_data,by = c("patient"="PATIENT_ID")) %>%
-  mutate(diagnosis_distance = as.numeric(difftime(diagnosis_date,as.Date(format(Sys.time(), '%Y-%m-%d')))))
+  inner_join(.,patient_data,by = c("patient"="PATIENT_ID")) 
 
 patient_clonality_diffs$ploidy <- patient_ploidy$ploidy[match(patient_clonality_diffs$patient,patient_ploidy$PATIENT_ID)]
 ```

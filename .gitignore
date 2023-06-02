@@ -88,6 +88,8 @@ absolute_POST_down_sampling/downsampled_bams/archived_or_stored_see_workflow
 !metadata_formatting/*
 !britroc_neoadjuvant_chemotherapy_patients.txt
 !britroc_primary_platinum_resistant_patient_list.tsv
+!britroc_cohort_patient_data.tsv
+!britroc_patient_treatment_data.tsv
 !absolute_PRE_down_sampling/fit_QC_predownsample_withsmooth.tsv
 !absolute_POST_down_sampling/britroc_30kb_ds_abs_fits.tsv
 !absolute_POST_down_sampling/britroc_30kb_ds_absCopyNumber_segmentTable.tsv

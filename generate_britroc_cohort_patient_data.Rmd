@@ -212,6 +212,7 @@ survival_data$os <- difftime(survival_data$doc_date,survival_data$diagnosis_date
 survival_data$pfs <- difftime(survival_data$progression_date,survival_data$diagnosis_date)
 survival_data$int_start <- difftime(survival_data$registration_date,survival_data$diagnosis_date)
 survival_data$int_end <- difftime(survival_data$doc_date,survival_data$diagnosis_date)
+survival_data$diagnosis_distance <- as.numeric(difftime(survival_data$diagnosis_date,as.Date(format(Sys.time(), '%Y-%m-%d'))))
 ```
 
 ### Filter surv metrics
@@ -232,7 +233,6 @@ paste0("Duplicated patient rows: ",length(which(any(duplicated(survival_data$bri
 
 ## Final table
 write.table(x = survival_data,file = "britroc_cohort_patient_data.tsv",quote = F,sep = "\t",row.names = F,col.names = T)
-plot_data_db <- plot_data
 ```
 
 ## Summary plot
