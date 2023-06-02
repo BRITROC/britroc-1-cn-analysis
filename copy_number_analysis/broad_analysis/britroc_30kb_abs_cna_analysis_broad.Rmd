@@ -156,6 +156,12 @@ ggsave("plots/cna_freq_plot.pdf",plot = genome_plot,device = "pdf",width = 12,he
 genome_plot
 ```
 
+```{r source_data_s4}
+write.table(x = bin_cna[bin_cna$cna != "neutral",],
+            file = "../../source_data/figure_S4.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ### Genome plot subtraction
 
 ```{r broad_genome_plot_paired}
@@ -238,6 +244,16 @@ ggsave(filename = "plots/genome_paired_substractionPlot.pdf",
        dpi = 300)
 ```
 
+```{r source_data_fig3A}
+write.table(x = paired_diffs_stats,
+            file = "../../source_data/figure_3A_layer1.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+
+write.table(x = chrlabs,
+            file = "../../source_data/figure_3A_layer2.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ```{r substraction_stats}
 paired_diffs_sig <- paired_diffs_stats[paired_diffs_stats$wilcox_sig == "significant",]
 summary(paired_diffs_sig$change)
@@ -303,10 +319,6 @@ write.table(x = reactome_results[reactome_results$pvalue < 0.05,],file = "data/s
 
 ### Segments
 
-The code below extracts segments for each patient in the QDNAseq object and returns a table containing the number of segments for each paired patient at primary and relapse. 
-
-Analysis of the segment numbers within paired samples demonstrates that segments are highly correlated between primary and relapse cases within patients and that there is no coordinated shift in the number of segments from primary to relapse tumours.
-
 ```{r segment_counts}
 nsegs <- apply(assayDataElement(abs_data,elt = "segmented"),MARGIN = 2,FUN = function(x) length(rle(x)$values))
 
@@ -346,6 +358,12 @@ ggsave(plot = segs_paired,filename = "plots/seg_counts_paired.png",width = 5,hei
 ggsave(plot = segs_paired,filename = "plots/seg_counts_paired.pdf",width = 5,height = 7,units = "in",dpi = 300)
 ```
 
+```{r source_data_S7A}
+write.table(x = seg_paired_long,
+            file = "../../source_data/figure_S7A.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ```{r plot_segs_pt}
 segs_paired_pt <- ggplot(seg_paired_long) +
   geom_jitter(aes(group,segments)) +
@@ -365,6 +383,12 @@ ggsave(plot = segs_paired_pt,filename = "plots/seg_counts_pt_paired.png",width =
 ggsave(plot = segs_paired_pt,filename = "plots/seg_counts_pt_paired.pdf",width = 5,height = 7,units = "in",dpi = 300)
 ```
 
+```{r source_data_S7C}
+write.table(x = seg_paired_long,
+            file = "../../source_data/figure_S7C.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ```{r segs_corr}
 # Test segment count correlation
 seg.kenall <- cor.test(paired_segs$diagnosis,paired_segs$relapse,method = "kendal")
@@ -378,6 +402,12 @@ seg_Corr <- ggplot(paired_segs) +
         theme_bw() + annotate(geom = "text",x = 375,y=10,label=paste0("kendall tau:",
                                                                       round(seg.kenall$estimate,digits = 3)))
 seg_Corr
+```
+
+```{r source_data_S7B}
+write.table(x = paired_segs,
+            file = "../../source_data/figure_S7B.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r seg_plot_main}
@@ -463,6 +493,18 @@ ploidy_plot
 ploidy_pt_plot
 ```
 
+```{r source_data_S6A}
+write.table(x = ploidy_summary,
+            file = "../../source_data/figure_S6A.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
+```{r source_data_S6C}
+write.table(x = ploidy_summary[!is.na(ploidy_summary$platinum_status),],
+            file = "../../source_data/figure_S6C.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ```{r plot_paired_ploidy}
 ploidy_paired_plot <- ggplot(ploidy_summary_paired) +
   geom_point(aes(group,ploidy)) +
@@ -502,6 +544,18 @@ ggsave(plot = ploidy_paired_pt_plot,filename = "plots/ploidy_paired_pt_plot.pdf"
 
 ploidy_paired_plot
 ploidy_paired_pt_plot
+```
+
+```{r source_data_S6B}
+write.table(x = ploidy_summary_paired,
+            file = "../../source_data/figure_S6B.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
+```{r source_data_S6D}
+write.table(x = ploidy_summary_paired,
+            file = "../../source_data/figure_S6D.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r plot_ploidy}
@@ -620,6 +674,18 @@ purity_plot
 purity_pt_plot
 ```
 
+```{r source_data_S5A}
+write.table(x = purity_summary,
+            file = "../../source_data/figure_S5A.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
+```{r source_data_S5C}
+write.table(x = purity_summary[!is.na(purity_summary$platinum_status),],
+            file = "../../source_data/figure_S5C.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ```{r plot_paired_purity}
 purity_paired_plot <- ggplot(purity_summary_paired) +
   geom_point(aes(group,purity)) +
@@ -657,6 +723,18 @@ ggsave(plot = purity_paired_pt_plot,filename = "plots/purity_paired_pt_plot.pdf"
 
 purity_paired_plot
 purity_paired_pt_plot
+```
+
+```{r source_data_S5B}
+write.table(x = purity_summary_paired,
+            file = "../../source_data/figure_S5B.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
+```{r source_data_S5D}
+write.table(x = purity_summary_paired,
+            file = "../../source_data/figure_S5D.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r plot_purity}
@@ -795,6 +873,12 @@ ggsave(filename = "plots/cnv_event_means_broad__ptsen_paired.pdf",
        dpi = 300)
 ```
 
+```{r source_data_S8}
+write.table(x = CNA_events_paired_long[!is.na(CNA_events_paired_long$platinum_treatment),],
+            file = "../../source_data/figure_S8.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ### Broad-level alterations - cytoband-level events
 
 Assessment of broad (cytoband-level) alterations, overall amplification involved the assessment of cytoband-resolution alterations. At the cytoband level, at least 80% of bins overlapping with a given cytoband were required to support the CN call. Additionally, where cytoband length to bin ratio exceeded a ratio greater than the 90th percentile  over all cytobands were removed as these cytobands had minimal number of bins supporting a large genomic region, typically in close proximity to centromeric or telomeric regions. 
@@ -884,6 +968,12 @@ cyto_plot_paired <- ggplot(broad_cyto_combined) +
 ggsave(plot = cyto_plot_paired,filename = "plots/cyto_plot_paired_plot.png",width = 8,height = 6,units = "in",dpi = 300)
 ggsave(plot = cyto_plot_paired,filename = "plots/cyto_plot_paired_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
 cyto_plot_paired
+```
+
+```{r source_data_S10A}
+write.table(x = broad_cyto_combined,
+            file = "../../source_data/figure_S10A.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ### Broad-level alterations - Arm-level events
@@ -982,6 +1072,12 @@ arm_plot_paired <- ggplot(broad_arm_combined) +
 ggsave(plot = arm_plot_paired,filename = "plots/arm_plot_paired_plot.png",width = 8,height = 6,units = "in",dpi = 300)
 ggsave(plot = arm_plot_paired,filename = "plots/arm_plot_paired_plot.pdf",width = 8,height = 6,units = "in",dpi = 300)
 arm_plot_paired
+```
+
+```{r source_data_S10B}
+write.table(x = broad_arm_combined,
+            file = "../../source_data/figure_S10B.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r arm_cyto_plotting}

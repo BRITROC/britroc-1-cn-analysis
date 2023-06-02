@@ -14,13 +14,6 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## General method
-
-Modelling tumour immune environments from copy number signature
-To adequately model the interaction between tumour immune environment and chromosomal instability, measured by immunohistochemistry markers and copy number signatures, respectively. Utilising the copy number signatures as a predictor variable, we implemented a [generalised/linear mixed model] which allows for the incorporation of compositional nature of copy number signature exposures and the multiple correlated images generated per sample in the IHC data in order to assess if the tumour immune environment can be predicted from copy number signatures. We also included several clinical covariates such as tissue type, age, stage, and lines of therapy as covariates to estimate the effects of these features on the response variable.
-
-Copy number signatures were transformed from a relative compositional state using a [binarisation/ALR/ILR/binarisation-logisticPCA], similarly to the partial ILR transformation utilised in the signature comparison model described previously, where this chosen transformation results in the best predictive performance. The model was constructed in R using the [lme4/lmerTest] package and model performance was tested between a model with transformed copy number signatures compared to a null model without including the transformed copy number signatures assessed using a [Likelihood-ratio/anova] test.
-
 ## Load libraries
 
 ```{r library_load, warning=FALSE}
@@ -437,6 +430,18 @@ ggsave(sig_immune_cor,filename = "plots/sig_immune_cor.pdf",width = 8,height = 8
 sig_immune_cor
 ```
 
+```{r source_data_7A}
+write.table(x = sig_immune[sig_immune$tissue == "tumour",],
+            file = "../source_data/figure_7A.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
+```{r source_data_7B}
+write.table(x = sig_immune[sig_immune$tissue == "stroma",],
+            file = "../source_data/figure_7B.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ```{r glmm_data_prep}
 sig_immune$status <- patient.data$pt_sensitivity_at_reg[match(gsub(sig_immune$patient_id,
                                                                   pattern = "BRITROC-",replacement = ""),patient.data$britroc_number)]
@@ -471,6 +476,7 @@ sig_immune_cor_s <- ggplot(sig_immune[sig_immune$tissue == "stroma",]) +
           axis.text.x = element_blank(),
           axis.ticks.x = element_blank())
 ```
+
 ## model immune
 
 Model steps

@@ -1,0 +1,253 @@
+PATIENT_ID	fk_histological_id	fk_block_id	type	SAMPLE_ID	tissue_site
+1	R,11.0009873.S	2	archival	IM_3	Omentum
+1	13/3337	2	relapse	JBLAB-4102	Omentum
+1	13/3337	3	relapse	JBLAB-4103	Omentum
+2	120005225	NA	archival	IM_5	Ovary; Fallopian Tube
+2	120005225	A02	archival	IM_6	Ovary; Fallopian Tube
+2	13/4502	1	relapse	JBLAB-4104	Abdominal Peritoneum
+2	13/4502	2	relapse	JBLAB-4105	Abdominal Peritoneum
+3	H1106620	A2	archival	IM_11	Peritoneal Lymph Node
+3	H1106620	A1	archival	IM_7	Peritoneal Lymph Node
+3	H1106620	A1	archival	IM_9	Peritoneal Lymph Node
+4	13/5608	1	relapse	JBLAB-4106	Retroperitoneal Lymph Node
+5	R,09.0015837.S	A3	archival	IM_18	Ovary; Fallopian Tube
+5	13/11047	NA	relapse	JBLAB-4108	Liver
+5	13/11048	NA	relapse	JBLAB-4109	Liver
+7	D,12.0015145.Y	NA	archival	IM_21	Peritoneum
+8	UB028015K/04	1L	archival	IM_22	Ovary; Fallopian tube; Uterus
+8	13/11857	NA	relapse	JBLAB-4112	Para-sternum
+9	UB015027/10	1A	archival	IM_23	Ovary; Fallopian Tube
+9	13/15253	NA	relapse	JBLAB-4113	Axillary Lymph Node
+11	UB007945G/11	3A	archival	IM_25	Omentum
+11	13/17275	NA	relapse	JBLAB-4115	Suprapubic Region
+12	13S20324	NA	relapse	JBLAB-4116	Axillary Lymph Node
+13	R,08.0001542	A6	archival	IM_33	Ovary; Fallopian Tube; Uterus
+14	14/4252	NA	relapse	JBLAB-4289	Inguinal Lymph Node
+16	13/21637	NA	relapse	JBLAB-4120	Retroperitoneal Lymph Node
+17	P.11.06947	A8	archival	IM_190	Ovary; Fallopian Tube; Uterus
+19	13S016286	NA	relapse	JBLAB-4123	Omentum
+22	13/24353	NA	relapse	JBLAB-4127	Diaphragmatic Surface; Liver; Omentum; Pelvic Lymph Node; Pelvic Peritoneum
+23	LH09-7834	A17	archival	IM_56	Ovary
+23	13/25831	NA	relapse	JBLAB-4128	Peri-splenic Region
+29	HS10-2744	A16	archival	IM_66	Ovary
+30	13/27414	NA	relapse	JBLAB-4136	Abdominal Peritoneum
+32	H12.14795	A1	archival	IM_299	Omentum
+32	HS13-8595	B6	relapse	JBLAB-4139	Uterus
+32	HS13-8595	A1	relapse	JBLAB-4236	Lymph Node
+32	HS13-8595	B13	relapse	JBLAB-4238	Abdominal Peritoneum; Omentum; Pelvic Peritoneum; Rectum; Sigmoid; Bladder; Uterus
+34	PS13.6425	1B	archival	IM_323	Omentum
+34	14/0472	NA	relapse	JBLAB-4141	Abdominal Peritoneum
+36	PS07.19019	2B	archival	IM_80	Ovary; Fallopian Tube; Uterus
+36	14/1132	NA	relapse	JBLAB-4143	Abdominal Peritoneum
+37	12S012896	B7	archival	IM_81	Ovary
+37	14/1131	NA	relapse	JBLAB-4144	Omentum
+37	15/22068	NA	relapse	JBLAB-4290	Omentum
+38	11S023679	A6	archival	IM_82	Ovary
+39	H11.3488	C05	archival	IM_84	Ovary
+39	H11.3488	D05	archival	IM_85	Omentum
+39	14/1439	NA	relapse	JBLAB-4147	Abdominal Peritoneum
+40	14/1780	NA	relapse	JBLAB-4148	Liver
+41	14/1537	1	relapse	JBLAB-4149	Pelvic Lymph Node
+41	14/1537	2	relapse	JBLAB-4150	Pelvic Lymph Node
+42	14/3570	NA	relapse	JBLAB-4151	Abdominal Peritoneum
+45	14/2232	1	relapse	JBLAB-4152	Small Bowel Mesentery
+46	HS08-3718	B18	archival	IM_92	Ovary
+47	14/2532	NA	relapse	JBLAB-4157	Peritoneum
+49	14/2852	NA	relapse	JBLAB-4159	Abdominal Peritoneum
+53	14/4253	NA	relapse	JBLAB-4163	Pelvic Lymph Node
+55	09S025368	A1	archival	IM_101	Ovary
+55	14/4876	1	relapse	JBLAB-4165	Iliac Fossa
+55	14/4876	2	relapse	JBLAB-4166	Iliac Fossa
+61	HS09-13362	A14	archival	IM_108	Ovary
+62	14/6984	NA	relapse	JBLAB-4173	Abdominal Peritoneum
+63	14/6985	1	relapse	JBLAB-4174	Peritoneum
+63	14/6985	2	relapse	JBLAB-4175	Peritoneum
+64	11S001666	B21	archival	IM_112	Ovary
+65	HS11-5017	A7	archival	IM_113	Uterus
+65	14/6987	NA	relapse	JBLAB-4177	Para-aortic Lymph Node
+66	14/6988	NA	relapse	JBLAB-4178	Spleen
+67	LH08-25169	B2	archival	IM_115	Ovary; Fallopian Tube
+67	14/9272	NA	relapse	JBLAB-4179	Pelvic Peritoneum
+68	UB015564X/12	4C	archival	IM_116	Ovary; Fallopian Tube
+69	D12.0020437	B2	archival	IM_117	Omentum
+69	D12.0020437	B3	archival	IM_118	Omentum
+69	D12.0020437	B4	archival	IM_119	Omentum
+74	07H14700	D1	archival	IM_124	Sigmoid Mesentery
+74	14/10217	1	relapse	JBLAB-4186	Sigmoid Colon
+74	14/10217	2	relapse	JBLAB-4187	Sigmoid Colon
+74	14/10218	1	relapse	JBLAB-4188	Sigmoid Colon
+74	14/10218	2	relapse	JBLAB-4189	Sigmoid Colon
+76	14/12028	NA	relapse	JBLAB-4191	Axillary Lymph Node
+78	14/12310	NA	relapse	JBLAB-4193	Abdominal Wall
+81	14/14764	1	relapse	JBLAB-4195	Brain
+81	14/14764	2	relapse	JBLAB-4196	Brain
+84	14/14869	NA	relapse	JBLAB-4199	Omentum
+85	14/15463	NA	relapse	JBLAB-4200	Omentum
+91	14/19395	NA	relapse	JBLAB-4208	Pelvis
+91	14S034285	B2	relapse	JBLAB-4295	Pelvis
+92	S8625-13	2A	archival	IM_143	Omentum
+94	672539	1	archival	IM_311	Bladder
+94	672539	7	archival	IM_312	Bladder
+96	HP162522	A16	archival	IM_146	Ovary
+96	14/20270	NA	relapse	JBLAB-4213	Axillary Lymph Node
+99	HS13-385	C16	archival	IM_149	Ovary
+99	14/21540	NA	relapse	JBLAB-4217	Diaphragm
+100	14/21809	NA	relapse	JBLAB-4218	Groin Lymph Node
+101	13S047957	A6	archival	IM_202	Ovary; Fallopian Tube
+103	PS11.16566	1A	archival	IM_282	Omentum
+104	M13314/11	B15	archival	IM_152	Ovary; Fallopian Tube; Uterus; Cervix; Rectum
+105	08S021963	A8	archival	IM_211	Fallopian Tube; Small Bowel
+106	PS11.25115	1K	archival	IM_326	Ovary
+106	14/24236	NA	relapse	JBLAB-4223	Abdominal Peritoneum
+107	S13/02984	NA	archival	IM_153	Omentum
+111	14/01479	B1	archival	IM_154	Sigmoid Mesentery
+112	14S049602	C2	relapse	JBLAB-4299	Muscle
+113	H11.02147	A02	archival	IM_155	Omentum
+114	D,13.0022031.H	A5	archival	IM_186	Ovary; Fallopian Tube; Omentum
+114	D,13.0022031.H	A18	archival	IM_187	Ovary; Fallopian Tube; Omentum
+115	R11.0006357.W	C1	archival	IM_180	Pouch Of Douglas
+115	R11.0006357.W	A14	archival	IM_182	Ovary; Fallopian Tube
+115	R11.0006357.W	A3	archival	IM_229	Ovary; Fallopian Tube
+118	LH12-42145	A10	archival	IM_158	Ovary; Fallopian Tube
+120	unknown_142	NA	relapse	JBLAB-4287	Axillary Lymph Node
+124	HS12-10425	A1	archival	IM_214	Peritoneum
+124	15/1233	NA	relapse	JBLAB-4245	Small Bowel
+128	PS12.32292	2E	archival	IM_205	Ovary; Fallopian Tube
+131	15/4334	NA	relapse	JBLAB-4251	Abdominal Wall
+132	D12.S006614	B7	archival	IM_252	Ovary; Fallopian Tube
+133	15/6072	NA	relapse	JBLAB-4253	Peri-nephric Region
+134	15/6821	NA	relapse	JBLAB-4254	Omentum
+135	UB010065M/14	NA	archival	IM_193	Peritoneum
+136	UB010138P/13	5A	archival	IM_195	Ovary; Fallopian Tube
+138	HS12-4008	A4	archival	IM_207	Ovary
+139	13S006562	A1	archival	IM_196	Omentum
+140	H09-03028	A14	archival	IM_165	Ovary; Fallopian Tube
+141	R.12.0007028	A	archival	IM_169	Peritoneum
+141	R.12.0007028	B2	archival	IM_171	Ovary
+145	HS13-15313	A2	archival	IM_208	Pelvis
+146	D,13.0039158.A	A1	archival	IM_255	Omentum
+146	D,13.0039158.A	B4	archival	IM_256	Colon
+146	D,13.0039158.A	D12	archival	IM_257	Ovary; Fallopian Tube; Uterus; Peritoneum; Bladder
+146	D,13.0039158.A	E1	archival	IM_258	Mesentery
+146	D,13.0039158.A	G1	archival	IM_259	Mesenteric Lymph Node
+147	UB023259M	3C	archival	IM_198	Ovary
+147	15/12202	NA	relapse	JBLAB-4274	Subcutaneous Nodule
+148	15/12203	NA	relapse	JBLAB-4275	Liver
+150	15/16541	NA	relapse	JBLAB-4277	Uterus
+150	15/16542	NA	relapse	JBLAB-4278	Uterus
+153	H12-00237	A2	archival	IM_218	Ovary
+156	PS10.31462	1A	archival	IM_220	Ovary; Fallopian Tube
+157	BH13-18212	NA	archival	IM_260	Omentum
+157	15/17960	NA	relapse	JBLAB-4282	Vagina
+159	15/22065	NA	relapse	JBLAB-4908	Abdominal Peritoneum
+161	H14-31426	A12	archival	IM_352	Ovary; Fallopian Tube; Uterus; Cervix
+161	H14-31426	A19	archival	IM_354	Ovary; Fallopian Tube; Uterus; Cervix
+162	UB06-22980	1C	archival	IM_222	Ovary; Fallopian Tube
+162	UB06-22980	1D	archival	IM_223	Ovary; Fallopian Tube
+165	15/24112	NA	relapse	JBLAB-4913	Subcutaneous Nodule
+165	15/24113	NA	relapse	JBLAB-4914	Subcutaneous Nodule
+166	15/24440	NA	relapse	JBLAB-4915	Omentum
+167	15/25458	NA	relapse	JBLAB-4920	Small Bowel Mesentery
+169	15/25608	NA	relapse	JBLAB-4921	Abdominal Peritoneum; Liver
+170	D,14.0070953.T	B1	archival	IM_243	Ovary
+172	D,13.0049741.X	A5	archival	IM_269	Ovary; Fallopian Tube
+173	E15.0000521	A1	archival	IM_306	Brain
+175	PS14.29183	2E	archival	IM_329	Ovary
+176	15/31498	2	relapse	JBLAB-4927	Lung
+180	16/520	NA	relapse	JBLAB-4932	Small Bowel
+181	16/521	NA	relapse	JBLAB-4933	Abdominal Peritoneum
+184	16/1562	NA	relapse	JBLAB-4936	Pelvic Peritoneum
+185	9169/06	2A	archival	IM_357	Omentum
+185	9169/06	1N	archival	IM_358	Ovary; Fallopian Tube; Uterus
+186	16/2377	NA	relapse	JBLAB-4938	Abdominal Peritoneum
+187	UB013585X/13	2G	archival	IM_277	Ovary
+187	16/2796	NA	relapse	JBLAB-4939	Abdominal Peritoneum
+188	16/2797	1	relapse	JBLAB-4940	Vaginal Vault
+188	16/2797	2	relapse	JBLAB-4941	Vaginal Vault
+192	13S-13203	A1	archival	IM_360	Ovary
+192	16/5417	NA	relapse	JBLAB-4945	Vaginal Vault
+194	HS14-13408	C10	archival	IM_361	Ovary
+199	HS12.7235	A12	archival	IM_319	Ovary
+201	16/11753	NA	relapse	JBLAB-4953	Pelvic Peritoneum
+203	16/12812	NA	relapse	JBLAB-4955	Mesentery
+204	14S040646	A9	archival	IM_435	Ovary
+204	16/13659	NA	relapse	JBLAB-4956	Para-rectal Lymph Nodule
+205	12S.09277	C3	archival	IM_321	Ovary; Fallopian tube; Uterus
+205	16/13116	NA	relapse	JBLAB-4957	Abdominal Peritoneum
+209	HS14.10102	C14	archival	IM_295	Ovary
+209	16/15004	NA	relapse	JBLAB-4960	Supra-renal Lymph Node
+212	16/19408	NA	relapse	JBLAB-4962	Iliac Fossa
+216	D.14.0030332.P	B2	archival	IM_340	Ovary; Fallopian Tube
+216	D.14.0030332.P	B3	archival	IM_341	Ovary; Fallopian Tube
+216	16/22150	NA	relapse	JBLAB-4965	Pelvic Peritoneum
+218	0014S010149	NA	archival	IM_332	Omentum
+219	16/28241	NA	relapse	JBLAB-4969	Para-aortic Lymph Node
+221	16/28856	NA	relapse	JBLAB-4971	Abdominal Peritoneum
+222	16/29429	NA	relapse	JBLAB-4972	Omentum
+223	16/29430	NA	relapse	JBLAB-4973	Omentum
+224	D.16.0002566.B	A1	archival	IM_348	Omentum
+225	16/30145	NA	relapse	JBLAB-4975	Spleen
+226	14H17056	A6	archival	IM_364	Ovary; Fallopian Tube
+228	16/31830	NA	relapse	JBLAB-19311	Supra-clavicular Lymph Node
+229	H16-01529	NA	archival	IM_422	Peritoneum
+229	16/31304	NA	relapse	JBLAB-4981	Omentum; Pelvic Peritoneum
+232	D.14.0092431.S	A4	archival	IM_349	Ovary; Fallopian Tube
+232	D.14.0092431.S	A8	archival	IM_350	Ovary; Fallopian Tube
+232	D.14.0092431.S	A12	archival	IM_351	Ovary; Fallopian Tube
+232	D16.0068972.Z	A6	relapse	JBLAB-4985	Ovary
+232	D16.0068972.Z	F1	relapse	JBLAB-4986	Pelvic Side Wall
+232	D16.0068972.Z	F2	relapse	JBLAB-4987	Pelvic Lymph Node
+234	D.16.0070868.R	A10	archival	IM_399	Ovary; Fallopian Tube
+234	D.16.0070868.R	A13	archival	IM_400	Ovary; Fallopian Tube
+234	D.16.0070868.R	B1	archival	IM_401	Omentum
+234	D.16.0070868.R	B5	archival	IM_402	Omentum
+234	17/5185	NA	relapse	JBLAB-4989	Omentum
+235	17/5841	NA	relapse	JBLAB-4990	Liver
+237	M00555/12	D2	archival	IM_367	Ovary
+238	17/7811	NA	relapse	JBLAB-4993	Subcutaneous Nodule
+240	NA	NA	archival	IM_449	Omentum
+241	HS15-3727	B13	archival	IM_423	Fallopian Tube
+241	17/10138	NA	relapse	JBLAB-4996	Bowel
+242	M12-2459-14	B11	archival	IM_431	Fallopian Tube
+242	17/10137	NA	relapse	JBLAB-4997	Abdominal Peritoneum; Omentum
+243	17/10986	NA	relapse	JBLAB-4998	Rectal Sigmoid
+245	D.17.0016231.A	A8	relapse	JBLAB-19312	Colon
+245	D.17.0016231.A	A10	relapse	JBLAB-19313	Inguinal Lymph Node
+246	M28641/14	A13	archival	IM_430	Ovary; Fallopian Tube
+246	17/12511	NA	relapse	JBLAB-4999	Abdominal Peritoneum
+247	1519103	A3	archival	IM_387	Pelvic Sidewall
+248	D.15.0027726.Z	A1	archival	IM_403	Omentum
+248	17/12568	NA	relapse	JBLAB-19302	Pelvic Lymph Node
+248	17/12569	NA	relapse	JBLAB-19303	Pelvic Lymph Node
+249	17/13067	NA	relapse	JBLAB-19304	Para-aortic Lymph Node
+250	17/13626	NA	relapse	JBLAB-19305	Omentum
+252	UH15-8589	A5	archival	IM_388	Ovary; Fallopian Tube
+255	H15-17653	A1	archival	IM_385	Omentum
+256	D.13.0069807.D	D4	archival	IM_381	Ovary; Fallopian Tube
+256	D.17.0025990.K	A14	relapse	JBLAB-19316	Peri-colic Region
+256	D.17.0025990.K	A15	relapse	JBLAB-19317	Peritoneum
+256	D.17.0025990.K	A16	relapse	JBLAB-19318	Retroperitoneal Lymph Nodule
+259	10H16457	A4	archival	IM_394	Ovary; Fallopian Tube
+259	17/17596	NA	relapse	JBLAB-19321	Bowel; Omentum
+259	17/17597	NA	relapse	JBLAB-19322	Omentum
+260	SP-12-002204	1B	archival	IM_426	Ovary
+260	17/19002	NA	relapse	JBLAB-19323	Omentum
+263	17/5034	NA	relapse	JBLAB-19325	Brain Parietal Lobe
+264	E.17.0000274K	A2	relapse	JBLAB-19326	Brain Frontotemporal Lobe
+266	14S053572	C2	archival	IM_434	Ovary
+267	UB012849P/16	3O	archival	IM_383	Ovary
+267	17/22665	NA	relapse	JBLAB-19330	Retroperitoneal Lymph Nodule
+268	D.15.0085638	A1	archival	IM_411	Omentum
+268	D.15.0085638	A3	archival	IM_412	Omentum
+268	17/22116	NA	relapse	JBLAB-19331	Pelvic Peritoneum
+269	17/23236	NA	relapse	JBLAB-19332	Pelvic Peritoneum
+270	17/24178	NA	relapse	JBLAB-19333	Chest Wall
+271	UB012471X/12	3F	archival	IM_390	Ovary
+271	17/25896	NA	relapse	JBLAB-19334	Peri-colic Region
+272	17/23832	NA	relapse	JBLAB-19335	Brain Occipital Lobe
+273	D.15.0019972	A5	archival	IM_414	Ovary; Fallopian Tube; Uterus
+273	D.15.0019972	A10	archival	IM_415	Ovary; Fallopian Tube; Uterus
+274	D.15.0084386.Q	A4	archival	IM_395	Ovary; Fallopian Tube
+274	D.15.0084386.Q	A8	archival	IM_396	Ovary; Fallopian Tube
+274	17/28142	NA	relapse	JBLAB-19337	Pelvic Peritoneum
+274	17/28143	NA	relapse	JBLAB-19338	Pelvic Peritoneum

@@ -10,9 +10,6 @@ output:
 
 ## Initial steps
 
-- ANALYSIS of intra/inter group clonality (larger differences between spatial samples than temporal samples?)
-- https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-021-23384-6/MediaObjects/41467_2021_23384_MOESM1_ESM.pdf
-
 ### knitr options
 
 ```{r setup, include=FALSE}
@@ -392,6 +389,18 @@ ggsave2(plot = noise_plot,filename = "plots/seg_sample_noise_filt_plot.png",widt
 ggsave2(plot = noise_plot,filename = "plots/seg_sample_noise_filt_plot.pdf",width = 8,height = 9,units = "in",dpi = 300)
 ```
 
+```{r source_data_SM4A}
+write.table(x = segment_noise_sample,
+            file = "../../source_data/figure_SM4A.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
+```{r source_data_SM4B_D}
+write.table(x = segment_noise_segs,
+            file = "../../source_data/figure_SM4B_D.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ```{r noise_stats}
 table(segment_noise_sample$excluded)
 table(segment_noise_sample$excluded)/ nrow(segment_noise_sample) * 100
@@ -532,6 +541,18 @@ ggsave(filename = "plots/paired_clonality_plot.pdf",plot = comp_clonality_plot,w
 comp_clonality_plot
 ```
 
+```{r source_data_S15A}
+write.table(x = clonality_table_paired,
+            file = "../../source_data/figure_S15A.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
+```{r source_data_S15B}
+write.table(x = clonality_table,
+            file = "../../source_data/figure_S15B.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 #### Intra-sampe clonality
 
 Clonality values were not different at a cohort level between primary and relapse tumours but did have variation within the groups.
@@ -571,8 +592,7 @@ patient_ploidy <- meta.data %>%
 
 ```{r clonality_diff_cors}
 patient_clonality_diffs <- patient_clonality_diffs %>%
-  inner_join(.,patient_data,by = c("patient"="PATIENT_ID")) %>%
-  mutate(diagnosis_distance = as.numeric(difftime(diagnosis_date,as.Date(format(Sys.time(), '%Y-%m-%d')))))
+  inner_join(.,patient_data,by = c("patient"="PATIENT_ID")) 
 
 patient_clonality_diffs$ploidy <- patient_ploidy$ploidy[match(patient_clonality_diffs$patient,patient_ploidy$PATIENT_ID)]
 ```
@@ -589,6 +609,12 @@ diff_age_plot
 cor.test(patient_clonality_diffs$age,patient_clonality_diffs$ith_change,method = "kendal")
 ```
 
+```{r source_data_S16C}
+write.table(x = patient_clonality_diffs,
+            file = "../../source_data/figure_S16C.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
+```
+
 ```{r clonality_diff_sample_age}
 sample_age_plot <- ggplot(patient_clonality_diffs) +
   geom_point(aes(-diagnosis_distance,ith_change)) +
@@ -600,6 +626,12 @@ sample_age_plot <- ggplot(patient_clonality_diffs) +
 
 sample_age_plot
 cor.test(patient_clonality_diffs$diagnosis_distance,patient_clonality_diffs$ith_change,method = "kendal")
+```
+
+```{r source_data_S16D}
+write.table(x = patient_clonality_diffs,
+            file = "../../source_data/figure_S16D.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r clonality_diff_sensitivity}
@@ -615,6 +647,12 @@ delta_itg_pt_sens <- ggplot(patient_clonality_diffs) +
 ggsave(filename = "plots/delta_itg_pt_sens.png",plot = delta_itg_pt_sens,width = 8,height = 6,units = "in",dpi = 300)
 ggsave(filename = "plots/delta_itg_pt_sens.pdf",plot = delta_itg_pt_sens,width = 8,height = 6,units = "in",dpi = 300)
 delta_itg_pt_sens
+```
+
+```{r source_data_S16A}
+write.table(x = patient_clonality_diffs,
+            file = "../../source_data/figure_S16A.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r clonality_diff_priorlines}
@@ -635,6 +673,12 @@ delta_itg_priorlines <- ggplot(patient_clonality_diffs) +
 ggsave(filename = "plots/delta_itg_priorlines.png",plot = delta_itg_priorlines,width = 8,height = 6,units = "in",dpi = 300)
 ggsave(filename = "plots/delta_itg_priorlines.pdf",plot = delta_itg_priorlines,width = 8,height = 6,units = "in",dpi = 300)
 delta_itg_priorlines
+```
+
+```{r source_data_S16B}
+write.table(x = patient_clonality_diffs,
+            file = "../../source_data/figure_S16B.tsv",
+            quote = F,sep = "\t",row.names = F,col.names = T)
 ```
 
 ```{r mixed_pat_delta_ith_plot}

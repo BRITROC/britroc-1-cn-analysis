@@ -88,6 +88,8 @@ absolute_POST_down_sampling/downsampled_bams/archived_or_stored_see_workflow
 !metadata_formatting/*
 !britroc_neoadjuvant_chemotherapy_patients.txt
 !britroc_primary_platinum_resistant_patient_list.tsv
+!britroc_cohort_patient_data.tsv
+!britroc_patient_treatment_data.tsv
 !absolute_PRE_down_sampling/fit_QC_predownsample_withsmooth.tsv
 !absolute_POST_down_sampling/britroc_30kb_ds_abs_fits.tsv
 !absolute_POST_down_sampling/britroc_30kb_ds_absCopyNumber_segmentTable.tsv
@@ -99,6 +101,7 @@ absolute_POST_down_sampling/downsampled_bams/archived_or_stored_see_workflow
 !copy_number_analysis/broad_analysis/data/hg19_cytobands.tsv
 !copy_number_analysis/broad_analysis/data/NCG_cancerdrivers_annotation_supporting_evidence.tsv
 !copy_number_analysis/sites_of_relapse/data/tissue_mapping_V2.txt
+!copy_number_analysis/sites_of_relapse/data/site_table.tsv
 
 # Additional temp exclusions
 EGA/britroc_ega_sample_metadata.Rmd
@@ -107,3 +110,4 @@ britroc_1_additional_data.zip
 copy_number_analysis/medicc2/
 copy_number_analysis/zhao_paper/
 absolute_PRE_down_sampling/abcel_vs_gridsearch_fits_correlations.Rmd
+EGA/britroc_DAA_complete.doc
