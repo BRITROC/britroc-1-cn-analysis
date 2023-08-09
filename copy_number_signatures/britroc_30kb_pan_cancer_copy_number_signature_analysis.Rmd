@@ -68,7 +68,7 @@ panCanSigs <- quantifyCNSignatures(object = cn_data,experimentName = "britroc-pa
 panCanSigs
 ```
 ```{r getfeats}
-panCanSigsfeats <- panCanSigs@featData
+panCanSigsfeats <- getFeatures(panCanSigs)
 names(panCanSigsfeats)
 ```
 
@@ -81,7 +81,15 @@ head(panCanSigsSampComp)
 panCanSigsAct <- t(getActivities(panCanSigs))
 head(t(panCanSigsAct))
 ```
-
+```{r save_pan_sig_data}
+save(panCanSigsAct,panCanSigsSampComp,meta.data,file = "britroc_30kb_pan_cancer_signature_data.Rdata")
+write.table(x = panCanSigsAct,file = "britroc_30kb_pan_cancer_signature_data_sig_exposures.tsv",
+            append = F,quote = F,sep = "\t",row.names = T,col.names = T)
+write.table(x = panCanSigsSampComp,file = "britroc_30kb_pan_cancer_signature_data_sample_by_comp.tsv",
+            append = F,quote = F,sep = "\t",row.names = T,col.names = T)
+write.table(x = meta.data,file = "britroc_30kb_pan_cancer_signature_data_meta.tsv",
+            append = F,quote = F,sep = "\t",row.names = F,col.names = T)
+```
 
 ```{r feat_dists}
 samp_comp_long <- as.data.frame(panCanSigsSampComp) %>%
