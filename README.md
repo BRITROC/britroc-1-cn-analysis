@@ -9,7 +9,7 @@ git clone https://github.com/BRITROC/britroc-1-cn-analysis.git
 cd britroc-1-cn-analysis
 ```
 #### Install the conda environment
-Provided conda is installed and available on the `$PATH` run the following line. This will downloaded the pre-processed data from [zenodo](https://zenodo.org/record/7573784#.ZC60rnbMJhE), install the required conda environment, and install packages which are not available via conda channels.
+Provided conda is installed and available on the `$PATH` run the following line. This will downloaded the pre-processed data from [zenodo](https://zenodo.org/record/8304868), install the required conda environment, and install packages which are not available via conda channels.
 ```
 ./install_env.sh {CONDA_INSTALL}
 ```
