@@ -73,6 +73,14 @@ ith <- read.table("../heterogeneity/data/ith_results_table.tsv",header = TRUE,se
 # BRCA
 ```
 
+```{r temp_q_rowan}
+#sigs-ith
+signature.table %>% 
+  left_join(.,ith,by = join_by(SAMPLE_ID == sample)) %>%
+  ggplot(.) + geom_point(aes(ith,exposure)) +
+  geom_smooth(aes(ith,exposure),method = "lm") +
+  facet_wrap(. ~ signature)
+```
 Frequently altered genes are as listed below:
 
 ```{r load_genes}
